@@ -1,0 +1,2204 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Reiseplaner</title>
+
+  <!-- PWA Manifest -->
+  <link rel="manifest" href="manifest.json" />
+
+  <!-- iOS Web App -->
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Reiseplaner" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="theme-color" content="#0A0E14" />
+
+  <!-- iOS Icons (SVG inline als Data-URL) -->
+  <link rel="apple-touch-icon" href="icon-192.png" />
+
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;800&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; overscroll-behavior: none; }
+    body {
+      background: #0A0E14;
+      font-family: 'DM Sans', sans-serif;
+      /* iOS safe areas (Notch / Home Indicator) */
+      padding-top: env(safe-area-inset-top);
+      padding-bottom: env(safe-area-inset-bottom);
+      -webkit-overflow-scrolling: touch;
+    }
+    input[type="date"]::-webkit-calendar-picker-indicator,
+    input[type="time"]::-webkit-calendar-picker-indicator { filter: invert(0.6); }
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 4px; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useRef } = React;
+
+    const STORAGE_KEY    = "reiseplaner_v1";
+    const STORAGE_ROUTES = "reiseplaner_routes_v1";
+
+    const ICONS = {
+      plane: "✈️", hotel: "🏨", car: "🚗", train: "🚆", ferry: "⛴️",
+      restaurant: "🍽️", activity: "🎯", document: "📄", ticket: "🎫",
+      passport: "🛂", visa: "📋", insurance: "🛡️", plus: "+",
+      back: "←", edit: "✏️", trash: "🗑️", close: "✕",
+      map: "🗺️", calendar: "📅", clock: "🕐", note: "📝",
+      photo: "📸", check: "✓", globe: "🌍", sun: "☀️",
+      search: "🔍", sort: "⇅", filter: "⊟",
+    };
+
+    const TRIP_COLORS = [
+      "#E8A87C","#85C1E9","#82E0AA","#F1948A","#BB8FCE",
+      "#F8C471","#76D7C4","#F0B27A","#AED6F1","#A9DFBF"
+    ];
+
+    const EVENT_TYPES = [
+      { key: "flight",     label: "Flug",       icon: "✈️",  color: "#4A90D9" },
+      { key: "hotel",      label: "Hotel",      icon: "🏨",  color: "#E07B5A" },
+      { key: "car",        label: "Mietwagen",  icon: "🚗",  color: "#5BAD72" },
+      { key: "train",      label: "Zug",        icon: "🚆",  color: "#9B59B6" },
+      { key: "ferry",      label: "Fähre",      icon: "⛴️",  color: "#1ABC9C" },
+      { key: "restaurant", label: "Restaurant", icon: "🍽️",  color: "#E67E22" },
+      { key: "activity",   label: "Aktivität",  icon: "🎯",  color: "#E74C3C" },
+      { key: "note",       label: "Notiz",      icon: "📝",  color: "#95A5A6" },
+    ];
+
+    const DOC_TYPES = [
+      { key: "ticket",    label: "Ticket",              icon: "🎫" },
+      { key: "hotel",     label: "Hotelbestätigung",    icon: "🏨" },
+      { key: "email",     label: "E-Mail",              icon: "📧" },
+      { key: "passport",  label: "Reisepass/Ausweis",   icon: "🛂" },
+      { key: "visa",      label: "Visum",               icon: "📋" },
+      { key: "insurance", label: "Versicherung",        icon: "🛡️" },
+      { key: "other",     label: "Sonstiges",           icon: "📄" },
+    ];
+
+    function hexToRgb(hex) {
+      const r = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+      return r ? [parseInt(r[1],16), parseInt(r[2],16), parseInt(r[3],16)] : [100,100,100];
+    }
+
+    function generateTripPDF(trip) {
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF({ unit:"mm", format:"a4" });
+      const W = 210, margin = 16, cW = W - 2*margin;
+      let y = 0;
+
+      // ── Farbbalken oben ───────────────────────────────
+      const [cr,cg,cb] = hexToRgb(trip.color||"#E8A87C");
+      doc.setFillColor(cr,cg,cb);
+      doc.rect(0, 0, W, 6, "F");
+      y = 18;
+
+      // ── Reisetitel ────────────────────────────────────
+      doc.setFont("helvetica","bold");
+      doc.setFontSize(22);
+      doc.setTextColor(30,30,30);
+      doc.text(trip.name, margin, y);
+      y += 8;
+
+      if (trip.destination) {
+        doc.setFont("helvetica","normal");
+        doc.setFontSize(12);
+        doc.setTextColor(90,110,130);
+        doc.text(trip.destination, margin, y);
+        y += 7;
+      }
+
+      doc.setFontSize(11);
+      doc.setTextColor(100,100,100);
+      const totalDays = Math.ceil((new Date(trip.endDate)-new Date(trip.startDate))/86400000)+1;
+      doc.text(`${formatDate(trip.startDate)} – ${formatDate(trip.endDate)}  |  ${totalDays} Tage`, margin, y);
+      y += 5;
+
+      // ── Trennlinie ────────────────────────────────────
+      doc.setDrawColor(220,220,220);
+      doc.setLineWidth(0.4);
+      doc.line(margin, y+3, W-margin, y+3);
+      y += 12;
+
+      // ── Programm ──────────────────────────────────────
+      const events = [...(trip.events||[])].sort((a,b)=>a.startDate.localeCompare(b.startDate));
+      if (events.length > 0) {
+        doc.setFont("helvetica","bold");
+        doc.setFontSize(9);
+        doc.setTextColor(130,140,155);
+        doc.text("PROGRAMM", margin, y);
+        y += 6;
+
+        for (const ev of events) {
+          if (y > 268) { doc.addPage(); y = 18; }
+          const et = EVENT_TYPES.find(e=>e.key===ev.type)||EVENT_TYPES[0];
+          const [er,eg,eb] = hexToRgb(et.color);
+
+          // Farbiger Seitenbalken
+          doc.setFillColor(er,eg,eb);
+          doc.rect(margin, y-3.5, 2.5, 5.5, "F");
+
+          // Titel
+          doc.setFont("helvetica","bold");
+          doc.setFontSize(12);
+          doc.setTextColor(30,30,30);
+          doc.text(ev.title, margin+6, y);
+
+          // Typ + Datum
+          doc.setFont("helvetica","normal");
+          doc.setFontSize(9);
+          doc.setTextColor(100,100,100);
+          let meta = `${et.label}  ·  ${formatDate(ev.startDate)}`;
+          if (ev.startTime) meta += `  ${ev.startTime}`;
+          if (ev.endDate && ev.endDate!==ev.startDate) meta += ` – ${formatDate(ev.endDate)}`;
+          if (ev.endTime) meta += ` ${ev.endTime}`;
+          doc.text(meta, margin+6, y+5);
+          y += 5;
+
+          if (ev.location) {
+            doc.setFontSize(9);
+            doc.setTextColor(90,110,130);
+            doc.text(ev.location, margin+6, y+5);
+            y += 5;
+          }
+          if (ev.confirmation) {
+            doc.setTextColor(130,130,130);
+            doc.text("Buchungsnr.: "+ev.confirmation, margin+6, y+5);
+            y += 5;
+          }
+          if (ev.kosten && parseFloat(ev.kosten)>0) {
+            doc.setTextColor(130,130,130);
+            doc.text("Kosten: "+parseFloat(ev.kosten).toFixed(2)+" €", margin+6, y+5);
+            y += 5;
+          }
+          if (ev.note) {
+            doc.setTextColor(110,110,110);
+            doc.setFontSize(9);
+            const nl = doc.splitTextToSize(ev.note, cW-6);
+            doc.text(nl, margin+6, y+5);
+            y += nl.length*4.5;
+          }
+          y += 10;
+        }
+      }
+
+      // ── Notizen ───────────────────────────────────────
+      if (trip.note) {
+        if (y > 260) { doc.addPage(); y = 18; }
+        doc.setDrawColor(220,220,220);
+        doc.line(margin, y, W-margin, y);
+        y += 8;
+        doc.setFont("helvetica","bold");
+        doc.setFontSize(9);
+        doc.setTextColor(130,140,155);
+        doc.text("NOTIZEN", margin, y);
+        y += 6;
+        doc.setFont("helvetica","normal");
+        doc.setFontSize(10);
+        doc.setTextColor(60,60,60);
+        const nl = doc.splitTextToSize(trip.note, cW);
+        doc.text(nl, margin, y);
+        y += nl.length*5+8;
+      }
+
+      // ── Kosten gesamt ─────────────────────────────────
+      const gesamtEvents = (trip.events||[]).reduce((s,e)=>s+parseFloat(e.kosten||0),0);
+      const reiseKosten = parseFloat(trip.kosten||0);
+      const gesamt = gesamtEvents + reiseKosten;
+      if (gesamt > 0) {
+        if (y > 260) { doc.addPage(); y = 18; }
+        doc.setDrawColor(220,220,220);
+        doc.line(margin, y, W-margin, y);
+        y += 8;
+        doc.setFont("helvetica","bold");
+        doc.setFontSize(11);
+        doc.setTextColor(30,30,30);
+        doc.text(`Gesamtkosten: ${gesamt.toFixed(2)} €`, margin, y);
+      }
+
+      // ── Footer ────────────────────────────────────────
+      doc.setFillColor(cr,cg,cb);
+      doc.rect(0, 291, W, 6, "F");
+
+      doc.save((trip.name.replace(/[^a-zA-Z0-9äöüÄÖÜß\s]/g,"_"))+".pdf");
+    }
+
+    function useLocalStorage(key, initialValue) {
+      const [state, setState] = useState(() => {
+        try {
+          const stored = localStorage.getItem(key);
+          return stored ? JSON.parse(stored) : initialValue;
+        } catch { return initialValue; }
+      });
+      const set = (val) => {
+        setState(prev => {
+          const next = typeof val === "function" ? val(prev) : val;
+          try { localStorage.setItem(key, JSON.stringify(next)); } catch {}
+          return next;
+        });
+      };
+      return [state, set];
+    }
+
+    function uid() { return Math.random().toString(36).slice(2) + Date.now().toString(36); }
+
+    function formatDate(d) {
+      if (!d) return "–";
+      const date = new Date(d);
+      return date.toLocaleDateString("de-DE", { day: "2-digit", month: "short", year: "numeric" });
+    }
+
+    function daysUntil(start) {
+      const today = new Date(); today.setHours(0,0,0,0);
+      const s = new Date(start); s.setHours(0,0,0,0);
+      return Math.ceil((s - today) / 86400000);
+    }
+
+    function tripProgress(start, end) {
+      const now = new Date();
+      const s = new Date(start), e = new Date(end);
+      if (now < s) return 0;
+      if (now > e) return 100;
+      return Math.round(((now - s) / (e - s)) * 100);
+    }
+
+    // ──────────────────────────────────────────────────
+    //  MODAL WRAPPER
+    // ──────────────────────────────────────────────────
+    function Modal({ title, onClose, children }) {
+      return (
+        <div style={{
+          position:"fixed",inset:0,background:"rgba(10,14,20,0.75)",
+          display:"flex",alignItems:"flex-end",justifyContent:"center",
+          zIndex:1000,backdropFilter:"blur(4px)",overflow:"hidden"
+        }} onClick={e => e.target === e.currentTarget && onClose()}>
+          <div style={{
+            background:"#141921",borderRadius:"24px 24px 0 0",
+            width:"100%",maxWidth:480,maxHeight:"92dvh",overflow:"auto",
+            overscrollBehavior:"contain",WebkitOverflowScrolling:"touch",
+            padding:"0 0 32px",boxShadow:"0 -8px 40px rgba(0,0,0,0.5)"
+          }}>
+            <div style={{
+              display:"flex",alignItems:"center",justifyContent:"space-between",
+              padding:"20px 20px 16px",borderBottom:"1px solid rgba(255,255,255,0.07)",
+              position:"sticky",top:0,background:"#141921",zIndex:1
+            }}>
+              <span style={{fontFamily:"'Playfair Display',serif",fontSize:18,fontWeight:700,color:"#F0EDE6"}}>
+                {title}
+              </span>
+              <button onClick={onClose} style={{
+                background:"rgba(255,255,255,0.08)",border:"none",color:"#aaa",
+                width:32,height:32,borderRadius:"50%",cursor:"pointer",fontSize:14,
+                display:"flex",alignItems:"center",justifyContent:"center"
+              }}>{ICONS.close}</button>
+            </div>
+            <div style={{padding:"20px 20px 0"}}>{children}</div>
+          </div>
+        </div>
+      );
+    }
+
+    // ──────────────────────────────────────────────────
+    //  INPUT FIELD
+    // ──────────────────────────────────────────────────
+    function Field({ label, children }) {
+      return (
+        <div style={{marginBottom:16}}>
+          <label style={{display:"block",fontSize:11,fontWeight:600,letterSpacing:1,
+            color:"#7A8899",textTransform:"uppercase",marginBottom:6}}>{label}</label>
+          {children}
+        </div>
+      );
+    }
+
+    function Input({ value, onChange, placeholder, type="text", ...p }) {
+      return (
+        <input type={type} value={value} onChange={e=>onChange(e.target.value)}
+          placeholder={placeholder} {...p}
+          style={{width:"100%",background:"rgba(255,255,255,0.05)",
+            border:"1px solid rgba(255,255,255,0.1)",borderRadius:10,
+            padding:"11px 14px",color:"#F0EDE6",fontSize:15,outline:"none",
+            fontFamily:"inherit",boxSizing:"border-box",...p.style}} />
+      );
+    }
+
+    function Select({ value, onChange, children }) {
+      return (
+        <select value={value} onChange={e=>onChange(e.target.value)}
+          style={{width:"100%",background:"#1E2530",border:"1px solid rgba(255,255,255,0.1)",
+            borderRadius:10,padding:"11px 14px",color:"#F0EDE6",fontSize:15,outline:"none",
+            fontFamily:"inherit",appearance:"none",boxSizing:"border-box"}}>
+          {children}
+        </select>
+      );
+    }
+
+    function Textarea({ value, onChange, placeholder, rows=3 }) {
+      return (
+        <textarea value={value} onChange={e=>onChange(e.target.value)}
+          placeholder={placeholder} rows={rows}
+          style={{width:"100%",background:"rgba(255,255,255,0.05)",
+            border:"1px solid rgba(255,255,255,0.1)",borderRadius:10,
+            padding:"11px 14px",color:"#F0EDE6",fontSize:15,outline:"none",
+            fontFamily:"inherit",resize:"vertical",boxSizing:"border-box"}} />
+      );
+    }
+
+    function Btn({ onClick, children, variant="primary", full=false, small=false, danger=false }) {
+      const bg = danger ? "#C0392B" : variant==="primary" ? "#D4A44C" : "rgba(255,255,255,0.07)";
+      const col = danger||variant==="primary" ? "#0A0E14" : "#F0EDE6";
+      return (
+        <button onClick={onClick} style={{
+          background:bg,color:col,border:"none",borderRadius:10,
+          padding:small?"8px 16px":"12px 20px",fontSize:small?13:15,
+          fontWeight:700,cursor:"pointer",width:full?"100%":"auto",
+          fontFamily:"inherit",letterSpacing:0.3,transition:"opacity .15s"
+        }}
+        onMouseEnter={e=>e.currentTarget.style.opacity=".85"}
+        onMouseLeave={e=>e.currentTarget.style.opacity="1"}>
+          {children}
+        </button>
+      );
+    }
+
+    // ──────────────────────────────────────────────────
+    //  TRIP FORM
+    // ──────────────────────────────────────────────────
+    function TripForm({ trip, onSave, onClose }) {
+      const [name, setName] = useState(trip?.name||"");
+      const [destination, setDestination] = useState(trip?.destination||"");
+      const [startDate, setStartDate] = useState(trip?.startDate||"");
+      const [endDate, setEndDate] = useState(trip?.endDate||"");
+      const [color, setColor] = useState(trip?.color||TRIP_COLORS[0]);
+      const [note, setNote] = useState(trip?.note||"");
+      const [kosten, setKosten] = useState(trip?.kosten||"");
+      const [error, setError] = useState("");
+
+      const save = () => {
+        if (!name) { setError("Bitte einen Reisenamen eingeben."); return; }
+        onSave({ id:trip?.id||uid(), name, destination, startDate, endDate, color, note, kosten,
+          events:trip?.events||[], documents:trip?.documents||[], createdAt:trip?.createdAt||Date.now() });
+        onClose();
+      };
+
+      return (
+        <Modal title={trip ? "Reise bearbeiten" : "Neue Reise"} onClose={onClose}>
+          {error && <div style={{background:"rgba(192,57,43,0.15)",border:"1px solid rgba(192,57,43,0.4)",
+            borderRadius:10,padding:"10px 14px",marginBottom:16,color:"#E74C3C",fontSize:13}}>{error}</div>}
+          <Field label="Reisename"><Input value={name} onChange={v=>{setName(v);setError("");}} placeholder="z.B. Sommerurlaub Toskana" /></Field>
+          <Field label="Zielort"><Input value={destination} onChange={setDestination} placeholder="z.B. Florenz, Italien" /></Field>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:16}}>
+            <Field label="Abreise"><Input type="date" value={startDate} onChange={setStartDate} /></Field>
+            <Field label="Rückkehr"><Input type="date" value={endDate} onChange={setEndDate} /></Field>
+          </div>
+          <Field label="Farbe">
+            <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+              {TRIP_COLORS.map(c=>(
+                <div key={c} onClick={()=>setColor(c)} style={{
+                  width:28,height:28,borderRadius:"50%",background:c,cursor:"pointer",
+                  boxSizing:"border-box",border:color===c?"3px solid #F0EDE6":"3px solid transparent",
+                  transition:"border .15s"
+                }} />
+              ))}
+            </div>
+          </Field>
+          <Field label="Notizen"><Textarea value={note} onChange={setNote} placeholder="Pläne, Hinweise, Wünsche…" /></Field>
+          <Field label="Ausgaben & Kosten (€)"><Input type="number" min="0" step="0.01" value={kosten} onChange={setKosten} placeholder="0,00" /></Field>
+          <Btn onClick={save} full>Speichern</Btn>
+        </Modal>
+      );
+    }
+
+    // ──────────────────────────────────────────────────
+    //  EVENT FORM
+    // ──────────────────────────────────────────────────
+    function EventForm({ event, onSave, onClose }) {
+      const [type, setType] = useState(event?.type||"flight");
+      const [title, setTitle] = useState(event?.title||"");
+      const [startDate, setStartDate] = useState(event?.startDate||"");
+      const [startTime, setStartTime] = useState(event?.startTime||"");
+      const [endDate, setEndDate] = useState(event?.endDate||"");
+      const [endTime, setEndTime] = useState(event?.endTime||"");
+      const [location, setLocation] = useState(event?.location||"");
+      const [confirmation, setConfirmation] = useState(event?.confirmation||"");
+      const [note, setNote] = useState(event?.note||"");
+      const [kosten, setKosten] = useState(event?.kosten||"");
+      const [photos, setPhotos] = useState(event?.photos||[]);
+      const [pdfs, setPdfs] = useState(event?.pdfs||[]);
+      const [gpxFiles, setGpxFiles] = useState(event?.gpxFiles||[]);
+      const [error, setError] = useState("");
+
+      const save = () => {
+        if (!title) { setError("Bitte einen Titel eingeben."); return; }
+        onSave({ id:event?.id||uid(), type, title, startDate, startTime,
+          endDate, endTime, location, confirmation, note, kosten, photos, pdfs, gpxFiles });
+        onClose();
+      };
+
+      const addPhotos = (files) => {
+        Array.from(files).forEach(f => {
+          const reader = new FileReader();
+          reader.onload = e => setPhotos(prev => [...prev, e.target.result]);
+          reader.readAsDataURL(f);
+        });
+      };
+
+      const addPdfs = (files) => {
+        Array.from(files).forEach(f => {
+          const reader = new FileReader();
+          reader.onload = e => setPdfs(prev => [...prev, {name:f.name, data:e.target.result}]);
+          reader.readAsDataURL(f);
+        });
+      };
+
+      const addGpxFiles = (files) => {
+        Array.from(files).forEach(f => {
+          const reader = new FileReader();
+          reader.onload = e => setGpxFiles(prev => [...prev, {name:f.name, data:e.target.result}]);
+          reader.readAsDataURL(f);
+        });
+      };
+
+      const et = EVENT_TYPES.find(e=>e.key===type)||EVENT_TYPES[0];
+
+      return (
+        <Modal title={event ? "Eintrag bearbeiten" : "Neuer Eintrag"} onClose={onClose}>
+          {error && <div style={{background:"rgba(192,57,43,0.15)",border:"1px solid rgba(192,57,43,0.4)",
+            borderRadius:10,padding:"10px 14px",marginBottom:16,color:"#E74C3C",fontSize:13}}>{error}</div>}
+          <Field label="Typ">
+            <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:4}}>
+              {EVENT_TYPES.map(e=>(
+                <button key={e.key} onClick={()=>setType(e.key)} style={{
+                  background:type===e.key?e.color:"rgba(255,255,255,0.06)",
+                  border:"none",borderRadius:20,padding:"6px 12px",
+                  color:type===e.key?"#fff":"#aaa",cursor:"pointer",fontSize:13,
+                  fontFamily:"inherit",fontWeight:600,transition:"all .15s"
+                }}>{e.icon} {e.label}</button>
+              ))}
+            </div>
+          </Field>
+          <Field label="Titel / Beschreibung"><Input value={title} onChange={v=>{setTitle(v);setError("");}} placeholder={`z.B. ${et.label} München → Rom`} /></Field>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:16}}>
+            <Field label="Start-Datum"><Input type="date" value={startDate} onChange={setStartDate} /></Field>
+            <Field label="Uhrzeit"><Input type="time" value={startTime} onChange={setStartTime} /></Field>
+          </div>
+          {(type==="hotel"||type==="flight"||type==="car"||type==="train"||type==="ferry") && (
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:16}}>
+              <Field label="End-Datum"><Input type="date" value={endDate} onChange={setEndDate} /></Field>
+              <Field label="Uhrzeit"><Input type="time" value={endTime} onChange={setEndTime} /></Field>
+            </div>
+          )}
+          <Field label="Ort / Adresse"><Input value={location} onChange={setLocation} placeholder="Hotel, Flughafen, Restaurant…" /></Field>
+          <Field label="Bestätigungsnummer"><Input value={confirmation} onChange={setConfirmation} placeholder="Buchungs-/Bestätigungscode" /></Field>
+          <Field label="Fotos">
+            <div>
+              <label style={{display:"inline-flex",alignItems:"center",gap:6,cursor:"pointer",
+                background:"rgba(255,255,255,0.07)",border:"1px dashed rgba(255,255,255,0.2)",
+                borderRadius:10,padding:"8px 14px",fontSize:13,color:"#aaa",userSelect:"none"}}>
+                Foto hinzufügen
+                <input type="file" accept="image/*" multiple style={{display:"none"}}
+                  onChange={e=>{addPhotos(e.target.files);e.target.value="";}} />
+              </label>
+              {photos.length>0 && (
+                <div style={{display:"flex",gap:8,flexWrap:"wrap",marginTop:10}}>
+                  {photos.map((p,i)=>(
+                    <div key={i} style={{position:"relative",display:"inline-block"}}>
+                      <img src={p} style={{width:80,height:80,objectFit:"cover",borderRadius:10,display:"block"}} />
+                      <button onClick={()=>setPhotos(prev=>prev.filter((_,j)=>j!==i))}
+                        style={{position:"absolute",top:-6,right:-6,background:"#C0392B",border:"none",
+                          color:"#fff",borderRadius:"50%",width:20,height:20,cursor:"pointer",
+                          fontSize:12,lineHeight:"20px",textAlign:"center",padding:0}}>×</button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </Field>
+          <Field label="PDFs">
+            <div>
+              <label style={{display:"inline-flex",alignItems:"center",gap:6,cursor:"pointer",
+                background:"rgba(255,255,255,0.07)",border:"1px dashed rgba(255,255,255,0.2)",
+                borderRadius:10,padding:"8px 14px",fontSize:13,color:"#aaa",userSelect:"none"}}>
+                PDF hinzufügen
+                <input type="file" accept=".pdf,application/pdf" multiple style={{display:"none"}}
+                  onChange={e=>{addPdfs(e.target.files);e.target.value="";}} />
+              </label>
+              {pdfs.length>0 && (
+                <div style={{display:"flex",flexDirection:"column",gap:4,marginTop:8}}>
+                  {pdfs.map((f,i)=>(
+                    <div key={i} style={{display:"flex",alignItems:"center",gap:8,
+                      background:"rgba(255,255,255,0.05)",borderRadius:8,padding:"6px 10px"}}>
+                      <span style={{fontSize:13,color:"#ccc",flex:1,overflow:"hidden",
+                        textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{"PDF: "+f.name}</span>
+                      <button onClick={()=>setPdfs(prev=>prev.filter((_,j)=>j!==i))}
+                        style={{background:"#C0392B",border:"none",color:"#fff",borderRadius:"50%",
+                          width:20,height:20,cursor:"pointer",fontSize:12,lineHeight:"20px",
+                          textAlign:"center",padding:0,flexShrink:0}}>×</button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </Field>
+          <Field label="GPX-Routen">
+            <div>
+              <label style={{display:"inline-flex",alignItems:"center",gap:6,cursor:"pointer",
+                background:"rgba(255,255,255,0.07)",border:"1px dashed rgba(255,255,255,0.2)",
+                borderRadius:10,padding:"8px 14px",fontSize:13,color:"#aaa",userSelect:"none"}}>
+                GPX hinzufügen
+                <input type="file" accept=".gpx" multiple style={{display:"none"}}
+                  onChange={e=>{addGpxFiles(e.target.files);e.target.value="";}} />
+              </label>
+              {gpxFiles.length>0 && (
+                <div style={{display:"flex",flexDirection:"column",gap:4,marginTop:8}}>
+                  {gpxFiles.map((f,i)=>(
+                    <div key={i} style={{display:"flex",alignItems:"center",gap:8,
+                      background:"rgba(255,255,255,0.05)",borderRadius:8,padding:"6px 10px"}}>
+                      <span style={{fontSize:13,color:"#ccc",flex:1,overflow:"hidden",
+                        textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{"GPX: "+f.name}</span>
+                      <button onClick={()=>setGpxFiles(prev=>prev.filter((_,j)=>j!==i))}
+                        style={{background:"#C0392B",border:"none",color:"#fff",borderRadius:"50%",
+                          width:20,height:20,cursor:"pointer",fontSize:12,lineHeight:"20px",
+                          textAlign:"center",padding:0,flexShrink:0}}>×</button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </Field>
+          <Field label="Notizen"><Textarea value={note} onChange={setNote} placeholder="Weitere Infos…" /></Field>
+          <Field label="Ausgaben & Kosten (€)"><Input type="number" min="0" step="0.01" value={kosten} onChange={setKosten} placeholder="0,00" /></Field>
+          <Btn onClick={save} full>Speichern</Btn>
+        </Modal>
+      );
+    }
+
+    // ──────────────────────────────────────────────────
+    //  DOCUMENT FORM
+    // ──────────────────────────────────────────────────
+    //  EML PARSER
+    // ──────────────────────────────────────────────────
+    function parseEml(text) {
+
+      // ── Hilfsfunktionen ──────────────────────────────
+      function splitHeaderBody(raw) {
+        const idx = raw.search(/\r?\n\r?\n/);
+        if (idx === -1) return [raw, ""];
+        return [raw.slice(0, idx), raw.slice(idx).replace(/^\r?\n/, "")];
+      }
+
+      function parseHeaders(headerText) {
+        const unfolded = headerText.replace(/\r?\n([ \t]+)/g, " ");
+        const headers = {};
+        for (const line of unfolded.split(/\r?\n/)) {
+          const m = line.match(/^([A-Za-z0-9\-]+)\s*:\s*(.*)$/);
+          if (m) headers[m[1].toLowerCase()] = m[2].trim();
+        }
+        return headers;
+      }
+
+      function decodeQP(str) {
+        return str
+          .replace(/=\r?\n/g, "")
+          .replace(/=([0-9A-Fa-f]{2})/g, (_, h) => String.fromCharCode(parseInt(h, 16)));
+      }
+
+      function decodeBase64Part(b64, charset) {
+        try {
+          const clean = b64.replace(/\r?\n/g, "");
+          const bytes = Uint8Array.from(atob(clean), c => c.charCodeAt(0));
+          return new TextDecoder(charset || "utf-8").decode(bytes);
+        } catch { return ""; }
+      }
+
+      function decodeWord(str) {
+        return str.replace(/=\?([^?]+)\?([BQbq])\?([^?]*)\?=/g, (_, charset, enc, word) => {
+          try {
+            if (enc.toUpperCase() === "B") {
+              const bytes = Uint8Array.from(atob(word), c => c.charCodeAt(0));
+              return new TextDecoder(charset).decode(bytes);
+            } else {
+              return decodeQP(word.replace(/_/g, " "));
+            }
+          } catch { return word; }
+        });
+      }
+
+      function stripHtml(html) {
+        return html
+          .replace(/<style[\s\S]*?<\/style>/gi, "")
+          .replace(/<script[\s\S]*?<\/script>/gi, "")
+          .replace(/<br\s*\/?>/gi, "\n")
+          .replace(/<\/p>/gi, "\n\n")
+          .replace(/<\/div>/gi, "\n")
+          .replace(/<\/tr>/gi, "\n")
+          .replace(/<\/td>/gi, " | ")
+          .replace(/<[^>]+>/g, "")
+          .replace(/&nbsp;/g, " ")
+          .replace(/&amp;/g, "&")
+          .replace(/&lt;/g, "<")
+          .replace(/&gt;/g, ">")
+          .replace(/&quot;/g, '"')
+          .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(n))
+          .replace(/\n{3,}/g, "\n\n")
+          .trim();
+      }
+
+      function decodeBody(raw, encoding, charset) {
+        const enc = (encoding || "").trim().toLowerCase();
+        if (enc === "base64") return decodeBase64Part(raw, charset);
+        if (enc === "quoted-printable") {
+          const decoded = decodeQP(raw);
+          try { return new TextDecoder(charset || "utf-8").decode(
+            Uint8Array.from(decoded, c => c.charCodeAt(0))); }
+          catch { return decoded; }
+        }
+        return raw;
+      }
+
+      // ── MIME-Teile rekursiv durchsuchen ──────────────
+      function extractParts(raw, ct_full) {
+        const ct = (ct_full || "").toLowerCase();
+        const bm = ct_full.match(/boundary=["']?([^"';\r\n]+)["']?/i);
+
+        if (ct.includes("multipart") && bm) {
+          const boundary = "--" + bm[1].trim();
+          const endBoundary = boundary + "--";
+          const lines = raw.split(/\r?\n/);
+          const parts = [];
+          let current = null;
+
+          for (const line of lines) {
+            if (line.startsWith(endBoundary)) { if (current !== null) parts.push(current); break; }
+            if (line.startsWith(boundary))    { if (current !== null) parts.push(current); current = ""; continue; }
+            if (current !== null) current += line + "\n";
+          }
+
+          // Search plain text first, then HTML as fallback
+          let plainBody = "", htmlBody = "";
+          for (const part of parts) {
+            const [ph, pb] = splitHeaderBody(part);
+            const ph_ = parseHeaders(ph);
+            const pct  = ph_["content-type"] || "";
+            const pte  = ph_["content-transfer-encoding"] || "";
+            const pcset = (pct.match(/charset=["']?([^"';\s]+)/i)||[])[1] || "utf-8";
+            const pctBase = pct.split(";")[0].trim().toLowerCase();
+
+            if (pctBase === "text/plain" && !plainBody) {
+              plainBody = decodeBody(pb, pte, pcset);
+            } else if (pctBase === "text/html" && !htmlBody) {
+              htmlBody = stripHtml(decodeBody(pb, pte, pcset));
+            } else if (pctBase.startsWith("multipart")) {
+              const sub = extractParts(pb, pct);
+              if (sub.plain) plainBody = sub.plain;
+              if (sub.html && !htmlBody) htmlBody = sub.html;
+            }
+          }
+          return { plain: plainBody, html: htmlBody };
+        }
+
+        // Single part
+        return { plain: raw, html: "" };
+      }
+
+      // ── Hauptverarbeitung ─────────────────────────────
+      const [headerRaw, bodyRaw] = splitHeaderBody(text);
+      const headers = parseHeaders(headerRaw);
+
+      const subject = decodeWord(headers["subject"] || "");
+      const from    = decodeWord(headers["from"]    || "");
+      const rawDate = headers["date"] || "";
+
+      let dateStr = "";
+      try {
+        const d = new Date(rawDate);
+        if (!isNaN(d)) dateStr = d.toISOString().split("T")[0];
+      } catch {}
+
+      const ct     = headers["content-type"] || "";
+      const te     = headers["content-transfer-encoding"] || "";
+      const charset = (ct.match(/charset=["']?([^"';\s]+)/i)||[])[1] || "utf-8";
+
+      let body = "";
+      if (ct.toLowerCase().includes("multipart")) {
+        const { plain, html } = extractParts(bodyRaw, ct);
+        body = plain || html;
+      } else if (ct.toLowerCase().includes("text/html")) {
+        body = stripHtml(decodeBody(bodyRaw, te, charset));
+      } else {
+        body = decodeBody(bodyRaw, te, charset);
+      }
+
+      body = body.replace(/\r\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+
+      return { subject, from, dateStr, body };
+    }
+
+    // ──────────────────────────────────────────────────
+    //  BOOKING DETECTION FROM EMAIL
+    // ──────────────────────────────────────────────────
+    function detectBookingFromEmail(subject, body) {
+      const full = (subject || "") + "\n" + (body || "");
+
+      let type = null;
+      if (/check[\s-]?in|hotel|unterkunft|accommodation|zimmer|room|übernachtung|property|hotelbestätigung/i.test(full)) {
+        type = "hotel";
+      } else if (/\bflug\b|flight|boarding|gate|\babflug\b|depart|arriv|airline|lufthansa|ryanair|easyjet|turkish|condor|eurowings|wizz|pegasus/i.test(full)) {
+        type = "flight";
+      } else if (/mietwagen|car[\s-]?rental|rental[\s-]?car|hertz|avis|europcar|sixt|budget|enterprise/i.test(full)) {
+        type = "car";
+      } else if (/\bzug\b|\bbahn\b|\brail\b|\btrain\b|\bice\b|deutsche bahn/i.test(full)) {
+        type = "train";
+      } else if (/fähre|ferry|\bschiff\b|kreuzfahrt|cruise/i.test(full)) {
+        type = "ferry";
+      }
+
+      if (!type) return { detected: false };
+
+      const MONTHS = {
+        jan:1,feb:2,mär:3,mar:3,apr:4,mai:5,may:5,
+        jun:6,jul:7,aug:8,sep:9,okt:10,oct:10,nov:11,dez:12,dec:12
+      };
+
+      function toISO(str) {
+        if (!str) return "";
+        if (/^\d{4}-\d{2}-\d{2}$/.test(str.trim())) return str.trim();
+        let m = str.match(/(\d{1,2})[./](\d{1,2})[./](\d{4})/);
+        if (m) return `${m[3]}-${m[2].padStart(2,"0")}-${m[1].padStart(2,"0")}`;
+        m = str.match(/(\d{1,2})\.?\s+([A-Za-zäöü]+)\.?\s+(\d{4})/);
+        if (m) {
+          const mn = MONTHS[m[2].slice(0,3).toLowerCase()];
+          if (mn) return `${m[3]}-${String(mn).padStart(2,"0")}-${m[1].padStart(2,"0")}`;
+        }
+        m = str.match(/([A-Za-z]+)\.?\s+(\d{1,2}),?\s+(\d{4})/);
+        if (m) {
+          const mn = MONTHS[m[1].slice(0,3).toLowerCase()];
+          if (mn) return `${m[3]}-${String(mn).padStart(2,"0")}-${m[2].padStart(2,"0")}`;
+        }
+        return "";
+      }
+
+      function findDate(patterns) {
+        for (const pat of patterns) {
+          const m = full.match(pat);
+          if (m) { const d = toISO(m[1]); if (d) return d; }
+        }
+        return "";
+      }
+
+      function findTime(patterns) {
+        for (const pat of patterns) {
+          const m = full.match(pat);
+          if (m) return m[1];
+        }
+        return "";
+      }
+
+      let startDate = "", endDate = "", startTime = "", endTime = "";
+
+      if (type === "hotel") {
+        startDate = findDate([
+          // mit Doppelpunkt: "Check-in: 20. Mai 2026"
+          /check[\s-]?in[^:\n]{0,10}:[^\n]{0,30}?(\d{1,2}\.?\s+\w+\.?\s+\d{4})/i,
+          /check[\s-]?in[^:\n]{0,10}:[^\n]{0,30}?(\d{1,2}[./]\d{1,2}[./]\d{4})/i,
+          /check[\s-]?in[^:\n]{0,10}:[^\n]{0,30}?(\d{4}-\d{2}-\d{2})/i,
+          // ohne Doppelpunkt: "Anreise Freitag, 1. Mai 2026" (Booking.com)
+          /anreise\s+(?:[A-Za-zäöüÄÖÜ]+,?\s+)?(\d{1,2}\.\s+[A-Za-zäöüÄÖÜ]+\.?\s+\d{4})/i,
+          /anreise\s+(?:[A-Za-zäöüÄÖÜ]+,?\s+)?(\d{1,2}[./]\d{1,2}[./]\d{4})/i,
+          /anreise[^:\n]{0,10}:[^\n]{0,30}?(\d{1,2}\.?\s+\w+\.?\s+\d{4})/i,
+          /arrival[^:\n]{0,10}:[^\n]{0,30}?(\d{1,2}\.?\s+\w+\.?\s+\d{4})/i,
+        ]);
+        endDate = findDate([
+          /check[\s-]?out[^:\n]{0,10}:[^\n]{0,30}?(\d{1,2}\.?\s+\w+\.?\s+\d{4})/i,
+          /check[\s-]?out[^:\n]{0,10}:[^\n]{0,30}?(\d{1,2}[./]\d{1,2}[./]\d{4})/i,
+          /check[\s-]?out[^:\n]{0,10}:[^\n]{0,30}?(\d{4}-\d{2}-\d{2})/i,
+          // ohne Doppelpunkt: "Abreise Sonntag, 3. Mai 2026" (Booking.com)
+          /abreise\s+(?:[A-Za-zäöüÄÖÜ]+,?\s+)?(\d{1,2}\.\s+[A-Za-zäöüÄÖÜ]+\.?\s+\d{4})/i,
+          /abreise\s+(?:[A-Za-zäöüÄÖÜ]+,?\s+)?(\d{1,2}[./]\d{1,2}[./]\d{4})/i,
+          /abreise[^:\n]{0,10}:[^\n]{0,30}?(\d{1,2}\.?\s+\w+\.?\s+\d{4})/i,
+          /departure[^:\n]{0,10}:[^\n]{0,30}?(\d{1,2}\.?\s+\w+\.?\s+\d{4})/i,
+        ]);
+        // Uhrzeiten aus "(14:00 - 22:00)"-Format extrahieren
+        startTime = findTime([
+          /anreise[^\n]*\((\d{2}:\d{2})/i,
+          /check[\s-]?in[^\n]*?(\d{2}:\d{2})/i,
+        ]) || "15:00";
+        endTime = findTime([
+          /abreise[^\n]*\((\d{2}:\d{2})/i,
+          /check[\s-]?out[^\n]*?(\d{2}:\d{2})/i,
+        ]) || "11:00";
+      }
+
+      if (type === "flight") {
+        startDate = findDate([
+          /(?:abflug|departs?|departure)[^:\n]{0,10}:[^\n]{0,30}?(\d{1,2}\.?\s+\w+\.?\s+\d{4})/i,
+          /(?:abflug|departs?|departure)[^:\n]{0,10}:[^\n]{0,30}?(\d{4}-\d{2}-\d{2})/i,
+        ]);
+        endDate = findDate([
+          /(?:ankunft|arrives?|arrival)[^:\n]{0,10}:[^\n]{0,30}?(\d{1,2}\.?\s+\w+\.?\s+\d{4})/i,
+          /(?:ankunft|arrives?|arrival)[^:\n]{0,10}:[^\n]{0,30}?(\d{4}-\d{2}-\d{2})/i,
+        ]);
+        startTime = findTime([/(?:abflug|depart)[^\n]{0,50}?(\d{2}:\d{2})/i]);
+        endTime   = findTime([/(?:ankunft|arriv)[^\n]{0,50}?(\d{2}:\d{2})/i]);
+      }
+
+      if (type === "car") {
+        startDate = findDate([
+          /(?:abholung|pick[\s-]?up|abholdatum)[^:\n]{0,10}:[^\n]{0,30}?(\d{1,2}\.?\s+\w+\.?\s+\d{4})/i,
+        ]);
+        endDate = findDate([
+          /(?:rückgabe|drop[\s-]?off|rückgabedatum)[^:\n]{0,10}:[^\n]{0,30}?(\d{1,2}\.?\s+\w+\.?\s+\d{4})/i,
+        ]);
+        startTime = findTime([/(?:abholung|pick[\s-]?up)[^\n]{0,50}?(\d{2}:\d{2})/i]);
+        endTime   = findTime([/(?:rückgabe|drop[\s-]?off)[^\n]{0,50}?(\d{2}:\d{2})/i]);
+      }
+
+      if (type === "train") {
+        startDate = findDate([
+          /(?:abfahrt|departure)[^:\n]{0,10}:[^\n]{0,30}?(\d{1,2}\.?\s+\w+\.?\s+\d{4})/i,
+        ]);
+        startTime = findTime([/(?:abfahrt|departure)[^\n]{0,50}?(\d{2}:\d{2})/i]);
+        endTime   = findTime([/(?:ankunft|arrival)[^\n]{0,50}?(\d{2}:\d{2})/i]);
+      }
+
+      let title = subject || "";
+      const cleaned = title.replace(/(?:buchungsbestätigung|booking confirmation|reservation confirmed|reisebestätigung|flight confirmation|ihre buchung|your booking)[:\s–\-]*/gi, "").trim();
+      if (cleaned.length > 4) title = cleaned;
+      if (title.length > 70) title = title.slice(0, 70);
+
+      let location = "";
+      for (const p of [
+        /(?:unterkunft|hotel|property)[^:\n]{0,20}:\s*([A-ZÄÖÜ][^\n,]{3,60})/,
+        /(?:adresse|address)[^:\n]{0,10}:\s*([^\n]{5,60})/i,
+        /(?:destination|zielort)[^:\n]{0,10}:\s*([^\n]{3,50})/i,
+        // Booking.com: "Lage\n\n    Jalan Inovasi..."
+        /lage\s*\n+\s*([^\n]{8,80})/i,
+      ]) {
+        const m = full.match(p);
+        if (m) { location = m[1].trim(); break; }
+      }
+
+      let confirmation = "";
+      const confM = full.match(/(?:buchungsnummer|reservierungsnummer|bestätigungsnummer|booking\s*(?:number|nr\.?|#)|confirmation\s*(?:number|#|code)|referenz(?:nummer)?|pnr\b)[^:\n]{0,10}[:\s#]+([A-Z0-9]{4,20})/i);
+      if (confM) confirmation = confM[1].trim();
+
+      function cleanAmount(s) {
+        if (/^\d{1,3}(\.\d{3})+$/.test(s)) return s.replace(/\./g, "");
+        if (/^\d{1,3}(,\d{3})+$/.test(s)) return s.replace(/,/g, "");
+        return s.replace(/\.(?=\d{3})/g, "").replace(",", ".");
+      }
+
+      const CURRENCY_MAP = {
+        "rp":"IDR","idr":"IDR","€":"EUR","eur":"EUR","$":"USD","usd":"USD",
+        "thb":"THB","฿":"THB","£":"GBP","gbp":"GBP","¥":"JPY","jpy":"JPY",
+        "aud":"AUD","sgd":"SGD","chf":"CHF","czk":"CZK","pln":"PLN","huf":"HUF",
+        "dkk":"DKK","sek":"SEK","nok":"NOK","try":"TRY","myr":"MYR","php":"PHP",
+        "vnd":"VND","bdt":"BDT"
+      };
+
+      let cost = "", currency = "EUR";
+      const costM = full.match(/gesamtpreis[\s\S]{0,60}?(Rp|IDR|EUR|€|USD|\$|THB|฿|GBP|£|JPY|¥|AUD|SGD|CHF|MYR|PHP|VND|TRY)\s*([\d.,]+)/i) ||
+                   full.match(/(?:gesamtpreis|gesamtbetrag|total(?:\s+price)?|summe|amount\s+due)[^\n]{0,40}?(Rp|IDR|EUR|€|USD|\$)?\s*([\d.,]{4,})/i) ||
+                   full.match(/(EUR|€)\s*([\d.,]+)/i);
+      if (costM) {
+        const sym = (costM[1] || "EUR").trim().toLowerCase();
+        currency = CURRENCY_MAP[sym] || sym.toUpperCase() || "EUR";
+        const raw = cleanAmount(costM[2] || costM[1]);
+        if (!isNaN(parseFloat(raw))) cost = raw;
+      }
+
+      return { detected:true, type, title, startDate, startTime, endDate, endTime, location, confirmation, cost, currency };
+    }
+
+    // ──────────────────────────────────────────────────
+    //  DOCUMENT FORM
+    // ──────────────────────────────────────────────────
+    function DocumentForm({ doc, onSave, onClose }) {
+      const [type, setType] = useState(doc?.type||"ticket");
+      const [title, setTitle] = useState(doc?.title||"");
+      const [number, setNumber] = useState(doc?.number||"");
+      const [expiry, setExpiry] = useState(doc?.expiry||"");
+      const [note, setNote] = useState(doc?.note||"");
+      const [emailFrom, setEmailFrom] = useState(doc?.emailFrom||"");
+      const [emailDate, setEmailDate] = useState(doc?.emailDate||"");
+      const [emailBody, setEmailBody] = useState(doc?.emailBody||"");
+      const [emlError, setEmlError] = useState("");
+      const [error, setError] = useState("");
+
+      const isEmail = type === "email";
+
+      const handleEmlUpload = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        setEmlError("");
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          try {
+            const { subject, from, dateStr, body } = parseEml(ev.target.result);
+            if (subject) setTitle(subject);
+            if (from)    setEmailFrom(from);
+            if (dateStr) setEmailDate(dateStr);
+            if (body)    setEmailBody(body);
+          } catch {
+            setEmlError("Datei konnte nicht gelesen werden.");
+          }
+        };
+        reader.readAsText(file, "utf-8");
+      };
+
+      const save = () => {
+        if (!title) { setError("Bitte einen Titel eingeben."); return; }
+        onSave({ id:doc?.id||uid(), type, title, number, expiry, note,
+          emailFrom, emailDate, emailBody });
+        onClose();
+      };
+
+      return (
+        <Modal title={doc ? "Dokument bearbeiten" : "Neues Dokument"} onClose={onClose}>
+          {error && <div style={{background:"rgba(192,57,43,0.15)",border:"1px solid rgba(192,57,43,0.4)",
+            borderRadius:10,padding:"10px 14px",marginBottom:16,color:"#E74C3C",fontSize:13}}>{error}</div>}
+          <Field label="Dokumenttyp">
+            <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:4}}>
+              {DOC_TYPES.map(d=>(
+                <button key={d.key} onClick={()=>setType(d.key)} style={{
+                  background:type===d.key?"#D4A44C":"rgba(255,255,255,0.06)",
+                  border:"none",borderRadius:20,padding:"6px 12px",
+                  color:type===d.key?"#0A0E14":"#aaa",cursor:"pointer",fontSize:13,
+                  fontFamily:"inherit",fontWeight:600
+                }}>{d.icon} {d.label}</button>
+              ))}
+            </div>
+          </Field>
+
+          {isEmail && (
+            <Field label="EML-Datei hochladen (optional)">
+              <label style={{
+                display:"flex",alignItems:"center",gap:10,
+                background:"rgba(212,164,76,0.08)",border:"1px dashed rgba(212,164,76,0.4)",
+                borderRadius:10,padding:"12px 14px",cursor:"pointer"
+              }}>
+                <span style={{fontSize:20}}>📎</span>
+                <div>
+                  <div style={{color:"#D4A44C",fontWeight:600,fontSize:14}}>
+                    .eml Datei auswählen
+                  </div>
+                  <div style={{color:"#7A8899",fontSize:12,marginTop:2}}>
+                    Gmail: E-Mail öffnen → ⋮ Mehr → Nachricht herunterladen
+                  </div>
+                </div>
+                <input type="file" accept=".eml,message/rfc822"
+                  onChange={handleEmlUpload}
+                  style={{display:"none"}} />
+              </label>
+              {emlError && <div style={{color:"#C0392B",fontSize:12,marginTop:6}}>{emlError}</div>}
+            </Field>
+          )}
+
+          <Field label={isEmail ? "Betreff" : "Bezeichnung"}>
+            <Input value={title} onChange={v=>{setTitle(v);setError("");}}
+              placeholder={isEmail ? "E-Mail Betreff" : "z.B. Ryanair Ticket FR1234"} />
+          </Field>
+
+          {isEmail ? (
+            <>
+              <Field label="Von (Absender)">
+                <Input value={emailFrom} onChange={setEmailFrom} placeholder="z.B. hotel@example.com" />
+              </Field>
+              <Field label="Datum">
+                <Input type="date" value={emailDate} onChange={setEmailDate} />
+              </Field>
+              <Field label="E-Mail Inhalt">
+                <Textarea value={emailBody} onChange={setEmailBody}
+                  placeholder="E-Mail Text hier einfügen oder .eml hochladen…" rows={8} />
+              </Field>
+              <Field label="Notizen">
+                <Textarea value={note} onChange={setNote} placeholder="Eigene Anmerkungen…" rows={2} />
+              </Field>
+            </>
+          ) : (
+            <>
+              <Field label="Nummer / Buchungscode">
+                <Input value={number} onChange={setNumber} placeholder="z.B. ABC123XY" />
+              </Field>
+              <Field label="Gültig bis">
+                <Input type="date" value={expiry} onChange={setExpiry} />
+              </Field>
+              <Field label="Notizen">
+                <Textarea value={note} onChange={setNote} placeholder="Weitere Details…" />
+              </Field>
+            </>
+          )}
+
+          <Btn onClick={save} full>Speichern</Btn>
+        </Modal>
+      );
+    }
+
+    // ──────────────────────────────────────────────────
+    //  EMAIL BODY PREVIEW (aufklappbar)
+    // ──────────────────────────────────────────────────
+    function EmailBodyPreview({ body }) {
+      const [open, setOpen] = useState(false);
+      const preview = body.length > 120 ? body.slice(0, 120) + "…" : body;
+      return (
+        <div style={{marginTop:6}}>
+          <div style={{
+            fontSize:12,color:"#C0BAB0",lineHeight:1.5,
+            background:"rgba(255,255,255,0.04)",borderRadius:8,
+            padding:"8px 10px",whiteSpace:"pre-wrap",wordBreak:"break-word"
+          }}>
+            {open ? body : preview}
+          </div>
+          {body.length > 120 && (
+            <button onClick={e=>{e.stopPropagation();setOpen(o=>!o);}} style={{
+              background:"none",border:"none",color:"#D4A44C",fontSize:12,
+              cursor:"pointer",padding:"4px 0",fontFamily:"inherit",fontWeight:600
+            }}>{open ? "▲ Weniger" : "▼ Mehr anzeigen"}</button>
+          )}
+        </div>
+      );
+    }
+
+    // ──────────────────────────────────────────────────
+    //  BOOKING IMPORT MODAL
+    // ──────────────────────────────────────────────────
+    function BookingImportModal({ booking, onConfirm, onCancel }) {
+      const [data, setData] = useState({ ...booking });
+      const [costEur, setCostEur] = useState(booking.currency === "EUR" ? booking.cost : "");
+      const [converting, setConverting] = useState(false);
+      const [rateInfo, setRateInfo] = useState("");
+      const set = (k, v) => setData(d => ({ ...d, [k]: v }));
+
+      const CURRENCY_SYMBOLS = { EUR:"€", USD:"$", GBP:"£", JPY:"¥", IDR:"Rp", THB:"฿", MYR:"RM", PHP:"₱", VND:"₫", SGD:"S$", AUD:"A$", CHF:"Fr", SEK:"kr", NOK:"kr", DKK:"kr", TRY:"₺", CZK:"Kč", PLN:"zł", HUF:"Ft" };
+
+      const fetchRate = async (amount, from) => {
+        if (!amount || !from || from === "EUR") { setCostEur(amount); return; }
+        setConverting(true);
+        setRateInfo("");
+        try {
+          const url = `https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/${from.toLowerCase()}.json`;
+          const res = await fetch(url);
+          const json = await res.json();
+          const rate = json[from.toLowerCase()]?.eur;
+          if (rate) {
+            const eur = (parseFloat(amount) * rate).toFixed(2);
+            setCostEur(eur);
+            setRateInfo(`1 ${from} = ${rate.toFixed(8)} EUR (${json.date})`);
+          } else {
+            setRateInfo("Währung nicht gefunden – bitte manuell eingeben");
+          }
+        } catch { setRateInfo("Kurs nicht abrufbar – bitte manuell eingeben"); }
+        setConverting(false);
+      };
+
+      useEffect(() => { fetchRate(data.cost, data.currency); }, []);
+
+      const currSym = CURRENCY_SYMBOLS[data.currency] || data.currency || "";
+
+      return (
+        <Modal title="Buchung erkannt" onClose={onCancel}>
+          <div style={{fontSize:13,color:"#7A8899",marginBottom:20,marginTop:-8}}>
+            Felder prüfen und als Zeitplan-Eintrag speichern
+          </div>
+
+          <Field label="Typ">
+            <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+              {EVENT_TYPES.map(t => (
+                <button key={t.key} onClick={() => set("type", t.key)} style={{
+                  background: data.type===t.key ? t.color+"22" : "rgba(255,255,255,0.05)",
+                  border: `1px solid ${data.type===t.key ? t.color : "rgba(255,255,255,0.1)"}`,
+                  borderRadius:8, padding:"6px 12px", cursor:"pointer",
+                  color: data.type===t.key ? t.color : "#7A8899", fontSize:13,
+                  fontFamily:"inherit", fontWeight: data.type===t.key ? 700 : 400
+                }}>
+                  {t.icon} {t.label}
+                </button>
+              ))}
+            </div>
+          </Field>
+
+          <Field label="Titel">
+            <Input value={data.title} onChange={v=>set("title",v)} placeholder="z.B. Hotel Mitte, Flug MUC–BCN" />
+          </Field>
+
+          <div style={{display:"flex",gap:12}}>
+            <div style={{flex:1}}>
+              <Field label="Von (Datum)">
+                <Input type="date" value={data.startDate} onChange={v=>set("startDate",v)} />
+              </Field>
+            </div>
+            <div style={{flex:1}}>
+              <Field label="Uhrzeit">
+                <Input type="time" value={data.startTime} onChange={v=>set("startTime",v)} />
+              </Field>
+            </div>
+          </div>
+
+          <div style={{display:"flex",gap:12}}>
+            <div style={{flex:1}}>
+              <Field label="Bis (Datum)">
+                <Input type="date" value={data.endDate} onChange={v=>set("endDate",v)} />
+              </Field>
+            </div>
+            <div style={{flex:1}}>
+              <Field label="Uhrzeit">
+                <Input type="time" value={data.endTime} onChange={v=>set("endTime",v)} />
+              </Field>
+            </div>
+          </div>
+
+          <Field label="Ort / Adresse">
+            <Input value={data.location} onChange={v=>set("location",v)} placeholder="z.B. Hotel Name, Stadt" />
+          </Field>
+
+          <Field label="Bestätigungsnummer">
+            <Input value={data.confirmation} onChange={v=>set("confirmation",v)} placeholder="Buchungs-/Bestätigungscode" />
+          </Field>
+
+          <div style={{display:"flex",gap:12,alignItems:"flex-end"}}>
+            <div style={{flex:1}}>
+              <Field label={`Originalbetrag (${data.currency || "Währung"})`}>
+                <div style={{position:"relative"}}>
+                  <Input type="number" value={data.cost} onChange={v=>{ set("cost",v); if(data.currency!=="EUR") setCostEur(""); }}
+                    placeholder="0.00" style={{paddingRight:50}} />
+                  {currSym && <span style={{position:"absolute",right:14,top:"50%",transform:"translateY(-50%)",
+                    color:"#7A8899",fontSize:13,pointerEvents:"none"}}>{currSym}</span>}
+                </div>
+              </Field>
+            </div>
+            {data.currency !== "EUR" && (
+              <div style={{flex:1}}>
+                <Field label="Euro-Betrag (€)">
+                  <div style={{display:"flex",gap:6}}>
+                    <Input type="number" value={costEur} onChange={setCostEur} placeholder="0.00" />
+                    <button onClick={()=>fetchRate(data.cost,data.currency)} disabled={converting}
+                      title="Kurs aktualisieren"
+                      style={{background:"rgba(212,164,76,0.15)",border:"1px solid rgba(212,164,76,0.3)",
+                        borderRadius:10,padding:"0 12px",color:"#D4A44C",cursor:"pointer",
+                        fontSize:16,flexShrink:0,opacity:converting?0.5:1}}>
+                      {converting ? "…" : "🔄"}
+                    </button>
+                  </div>
+                </Field>
+              </div>
+            )}
+          </div>
+          {rateInfo && (
+            <div style={{fontSize:11,color:"#7A8899",marginTop:-10,marginBottom:12}}>
+              {rateInfo}
+            </div>
+          )}
+
+          <div style={{display:"flex",gap:12,marginTop:8}}>
+            <Btn onClick={onCancel} variant="secondary" full>Abbrechen</Btn>
+            <Btn onClick={()=>onConfirm({ ...data, costEur })} full>Als Eintrag speichern</Btn>
+          </div>
+        </Modal>
+      );
+    }
+
+    // ──────────────────────────────────────────────────
+    //  TRIP CARD
+    // ──────────────────────────────────────────────────
+    function TripCard({ trip, onClick, onPdf }) {
+      const days = daysUntil(trip.startDate);
+      const prog = tripProgress(trip.startDate, trip.endDate);
+      const isActive = prog > 0 && prog < 100;
+      const isPast = prog >= 100;
+      const totalDays = Math.ceil((new Date(trip.endDate)-new Date(trip.startDate))/86400000)+1;
+
+      return (
+        <div onClick={onClick} style={{
+          background:"#141921",borderRadius:20,overflow:"hidden",
+          cursor:"pointer",marginBottom:16,border:"1px solid rgba(255,255,255,0.07)",
+          transition:"transform .2s,box-shadow .2s",position:"relative"
+        }}
+        onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-2px)";e.currentTarget.style.boxShadow="0 8px 32px rgba(0,0,0,0.4)"}}
+        onMouseLeave={e=>{e.currentTarget.style.transform="";e.currentTarget.style.boxShadow=""}}>
+          <div style={{height:4,background:trip.color}} />
+          <div style={{padding:"16px 18px"}}>
+            <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between"}}>
+              <div>
+                <div style={{fontFamily:"'Playfair Display',serif",fontSize:19,
+                  fontWeight:700,color:"#F0EDE6",lineHeight:1.2}}>{trip.name}</div>
+                {trip.destination && (
+                  <div style={{fontSize:13,color:"#7A8899",marginTop:3}}>🌍 {trip.destination}</div>
+                )}
+              </div>
+              <div style={{textAlign:"right",display:"flex",flexDirection:"column",alignItems:"flex-end",gap:8}}>
+                {isActive ? (
+                  <span style={{background:`${trip.color}22`,color:trip.color,
+                    fontSize:11,fontWeight:700,padding:"3px 10px",borderRadius:20,letterSpacing:0.5}}>
+                    AKTIV
+                  </span>
+                ) : isPast ? (
+                  <span style={{background:"rgba(255,255,255,0.06)",color:"#7A8899",
+                    fontSize:11,fontWeight:700,padding:"3px 10px",borderRadius:20}}>
+                    VERGANGEN
+                  </span>
+                ) : (
+                  <span style={{background:"rgba(212,164,76,0.15)",color:"#D4A44C",
+                    fontSize:11,fontWeight:700,padding:"3px 10px",borderRadius:20}}>
+                    {days > 0 ? `in ${days} Tagen` : "Heute"}
+                  </span>
+                )}
+                <button onClick={e=>{e.stopPropagation();onPdf&&onPdf();}} title="PDF exportieren"
+                  style={{background:"rgba(255,255,255,0.07)",border:"1px solid rgba(255,255,255,0.12)",
+                    color:"#aaa",borderRadius:8,padding:"4px 10px",cursor:"pointer",
+                    fontSize:12,fontFamily:"inherit",display:"flex",alignItems:"center",gap:4}}>
+                  📄 PDF
+                </button>
+              </div>
+            </div>
+
+            <div style={{display:"flex",gap:20,marginTop:14,marginBottom:12}}>
+              <div>
+                <div style={{fontSize:11,color:"#7A8899",fontWeight:600,letterSpacing:0.5}}>ABREISE</div>
+                <div style={{fontSize:14,color:"#F0EDE6",marginTop:2}}>{formatDate(trip.startDate)}</div>
+              </div>
+              <div style={{color:"rgba(255,255,255,0.2)",alignSelf:"center",fontSize:18}}>→</div>
+              <div>
+                <div style={{fontSize:11,color:"#7A8899",fontWeight:600,letterSpacing:0.5}}>RÜCKKEHR</div>
+                <div style={{fontSize:14,color:"#F0EDE6",marginTop:2}}>{formatDate(trip.endDate)}</div>
+              </div>
+              <div style={{marginLeft:"auto",textAlign:"right"}}>
+                <div style={{fontSize:11,color:"#7A8899",fontWeight:600}}>DAUER</div>
+                <div style={{fontSize:14,color:"#F0EDE6",marginTop:2}}>{totalDays} Tage</div>
+              </div>
+            </div>
+
+            {isActive && (
+              <div>
+                <div style={{background:"rgba(255,255,255,0.08)",borderRadius:4,height:4,overflow:"hidden"}}>
+                  <div style={{background:trip.color,height:"100%",width:`${prog}%`,borderRadius:4,transition:"width 1s"}} />
+                </div>
+                <div style={{fontSize:11,color:"#7A8899",marginTop:4}}>{prog}% abgeschlossen</div>
+              </div>
+            )}
+
+            <div style={{display:"flex",gap:16,marginTop:10}}>
+              {trip.events?.length > 0 && (
+                <span style={{fontSize:12,color:"#7A8899"}}>📅 {trip.events.length} Einträge</span>
+              )}
+              {trip.documents?.length > 0 && (
+                <span style={{fontSize:12,color:"#7A8899"}}>📄 {trip.documents.length} Dokumente</span>
+              )}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // ──────────────────────────────────────────────────
+    //  ROUTEN-KARTE  (KML/GPX-Import + Leaflet)
+    // ──────────────────────────────────────────────────
+    function RouteMap({ tripId, tripColor, route, onSaveRoute }) {
+      const mapRef  = useRef(null);
+      const mapInst = useRef(null);
+      const lgRef   = useRef(null);
+      const [error, setError] = useState("");
+      const accent = tripColor || "#D4A44C";
+
+      useEffect(() => {
+        if (!mapRef.current) return;
+        const m = L.map(mapRef.current, { zoomControl:true, attributionControl:false });
+        L.tileLayer("https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png", { maxZoom:17 }).addTo(m);
+        mapInst.current = m;
+        lgRef.current   = L.layerGroup().addTo(m);
+        m.setView([20, 0], 2);
+        return () => { m.remove(); mapInst.current = null; lgRef.current = null; };
+      }, []);
+
+      useEffect(() => {
+        if (!mapInst.current || !lgRef.current) return;
+        const m  = mapInst.current;
+        const lg = lgRef.current;
+        lg.clearLayers();
+        m.invalidateSize();
+        if (!route) return;
+        const gl = L.geoJSON(route, {
+          style: () => ({ color:accent, weight:4, opacity:0.85 }),
+          pointToLayer: (f, ll) => L.circleMarker(ll, {
+            radius:5, color:accent, fillColor:accent, fillOpacity:0.7, weight:1
+          })
+        }).addTo(lg);
+        try {
+          const b = gl.getBounds();
+          if (b.isValid()) setTimeout(() => { try { m.invalidateSize(); m.fitBounds(b, { padding:[24,24], maxZoom:13 }); } catch {} }, 50);
+        } catch {}
+      }, [route]);
+
+      const parseAndSave = (text, format) => {
+        try {
+          const doc = new DOMParser().parseFromString(text, "text/xml");
+          const features = [];
+          if (format === "kml") {
+            doc.querySelectorAll("LineString > coordinates").forEach(el => {
+              const coords = el.textContent.trim().split(/\s+/).map(c => {
+                const p = c.split(",").map(Number);
+                return (p.length >= 2 && !isNaN(p[0]) && !isNaN(p[1])) ? [p[0], p[1]] : null;
+              }).filter(Boolean);
+              if (coords.length > 1) features.push({
+                type:"Feature", geometry:{ type:"LineString", coordinates:coords }, properties:{}
+              });
+            });
+            doc.querySelectorAll("Point > coordinates").forEach(el => {
+              const p = el.textContent.trim().split(",").map(Number);
+              if (p.length >= 2 && !isNaN(p[0]) && !isNaN(p[1])) features.push({
+                type:"Feature", geometry:{ type:"Point", coordinates:[p[0],p[1]] }, properties:{}
+              });
+            });
+          } else {
+            // GPX: getElementsByTagName ignoriert XML-Namespaces
+            const getEl = name => Array.from(doc.getElementsByTagName(name));
+            ["trkseg","rte"].forEach(seg => {
+              getEl(seg).forEach(segEl => {
+                const tag = seg === "trkseg" ? "trkpt" : "rtept";
+                const coords = Array.from(segEl.getElementsByTagName(tag)).map(pt => {
+                  const lat = parseFloat(pt.getAttribute("lat"));
+                  const lon = parseFloat(pt.getAttribute("lon"));
+                  return (!isNaN(lat) && !isNaN(lon)) ? [lon, lat] : null;
+                }).filter(Boolean);
+                if (coords.length > 1) features.push({
+                  type:"Feature", geometry:{ type:"LineString", coordinates:coords }, properties:{}
+                });
+              });
+            });
+            getEl("wpt").forEach(pt => {
+              const lat = parseFloat(pt.getAttribute("lat"));
+              const lon = parseFloat(pt.getAttribute("lon"));
+              if (!isNaN(lat) && !isNaN(lon)) features.push({
+                type:"Feature", geometry:{ type:"Point", coordinates:[lon, lat] }, properties:{}
+              });
+            });
+          }
+          if (features.length === 0) {
+            setError(`Keine Route in der ${format.toUpperCase()}-Datei gefunden.`);
+            return;
+          }
+          onSaveRoute(tripId, { type:"FeatureCollection", features, _source: format==="gpx" ? text : null, _format: format });
+        } catch { setError(`${format.toUpperCase()}-Datei konnte nicht gelesen werden.`); }
+      };
+
+      const handleFile = (ev, format) => {
+        const file = ev.target.files[0]; if (!file) return;
+        setError("");
+        const reader = new FileReader();
+        reader.onload = e => { parseAndSave(e.target.result, format); ev.target.value = ""; };
+        reader.readAsText(file);
+      };
+
+      const openGPX = async () => {
+        if (!route?._source) return;
+        const blob = new Blob([route._source], { type:"application/gpx+xml" });
+        const file = new File([blob], "route.gpx", { type:"application/gpx+xml" });
+        if (navigator.canShare && navigator.canShare({ files:[file] })) {
+          try { await navigator.share({ files:[file], title:"Route" }); return; } catch {}
+        }
+        // Fallback: normaler Download
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a"); a.href = url; a.download = "route.gpx";
+        a.click(); URL.revokeObjectURL(url);
+      };
+
+      const btnStyle = {
+        display:"inline-flex", alignItems:"center", gap:8, cursor:"pointer",
+        background:`${accent}18`, border:`1px dashed ${accent}`, borderRadius:10,
+        padding:"8px 14px", fontSize:13, color:accent, fontWeight:700, userSelect:"none",
+        fontFamily:"inherit"
+      };
+
+      return (
+        <div>
+          <div style={{display:"flex",gap:10,flexWrap:"wrap",marginBottom:14}}>
+            <label style={btnStyle}>
+              🗺️ KML importieren
+              <input type="file" accept=".kml" style={{display:"none"}}
+                onChange={ev => handleFile(ev,"kml")} />
+            </label>
+            <label style={btnStyle}>
+              📍 GPX importieren
+              <input type="file" accept=".gpx" style={{display:"none"}}
+                onChange={ev => handleFile(ev,"gpx")} />
+            </label>
+            {route?._source && (
+              <button onClick={openGPX} style={{
+                display:"inline-flex", alignItems:"center", gap:6, cursor:"pointer",
+                background:`${accent}18`, border:`1px solid ${accent}`, borderRadius:10,
+                padding:"8px 14px", fontSize:13, color:accent, fontWeight:700,
+                fontFamily:"inherit" }}>
+                📤 In MapOut öffnen
+              </button>
+            )}
+            {route && (
+              <button onClick={() => onSaveRoute(tripId, null)} style={{
+                background:"none", border:"none", color:"#C0392B", fontSize:13,
+                cursor:"pointer", fontFamily:"inherit", fontWeight:600 }}>
+                Route entfernen
+              </button>
+            )}
+          </div>
+          {error && <div style={{color:"#C0392B",fontSize:13,marginBottom:10}}>{error}</div>}
+          {!route && (
+            <div style={{textAlign:"center",padding:"32px 0 16px",color:"#7A8899"}}>
+              <div style={{fontSize:36,marginBottom:10}}>🗺️</div>
+              <div style={{fontSize:14,marginBottom:4,color:"#F0EDE6"}}>Keine Route vorhanden</div>
+              <div style={{fontSize:13}}>KML oder GPX-Datei importieren</div>
+            </div>
+          )}
+          <div ref={mapRef} style={{
+            height:380, borderRadius:14, overflow:"hidden",
+            border:"1px solid rgba(255,255,255,0.1)", marginBottom:12
+          }} />
+          <div style={{padding:14,background:"rgba(255,255,255,0.04)",borderRadius:12,
+            border:"1px solid rgba(255,255,255,0.08)",fontSize:12,color:"#7A8899",lineHeight:1.7}}>
+            <b style={{color:"#F0EDE6"}}>Route exportieren:</b><br/>
+            <b>KML:</b> maps.google.com/mymaps → Route → ⋮ → In KML exportieren<br/>
+            <b>GPX:</b> Google Maps Timeline → Einstellungen → Standortverlauf exportieren
+          </div>
+        </div>
+      );
+    }
+
+    // ──────────────────────────────────────────────────
+    //  TRIP DETAIL VIEW
+    // ──────────────────────────────────────────────────
+    function TripDetail({ trip, onUpdate, onBack, onDelete, route, onSaveRoute }) {
+      const [tab, setTab] = useState("timeline");
+      const [showEventForm, setShowEventForm] = useState(false);
+      const [showDocForm, setShowDocForm] = useState(false);
+      const [editEvent, setEditEvent] = useState(null);
+      const [editDoc, setEditDoc] = useState(null);
+      const [showTripForm, setShowTripForm] = useState(false);
+      const [confirmDelete, setConfirmDelete] = useState(false);
+      const [showBookingImport, setShowBookingImport] = useState(false);
+      const [detectedBooking, setDetectedBooking] = useState(null);
+      const [pendingEmailDoc, setPendingEmailDoc] = useState(null);
+      const bookingImportRef = useRef(null);
+
+      const saveEvent = (ev) => {
+        const events = trip.events||[];
+        const idx = events.findIndex(e=>e.id===ev.id);
+        const next = idx>=0 ? events.map(e=>e.id===ev.id?ev:e) : [...events,ev];
+        onUpdate({...trip, events:next});
+      };
+
+      const deleteEvent = (id) => {
+        onUpdate({...trip, events:(trip.events||[]).filter(e=>e.id!==id)});
+      };
+
+      const saveDoc = (d) => {
+        const docs = trip.documents||[];
+        const idx = docs.findIndex(x=>x.id===d.id);
+        const next = idx>=0 ? docs.map(x=>x.id===d.id?d:x) : [...docs,d];
+        onUpdate({...trip, documents:next});
+      };
+
+      const deleteDoc = (id) => {
+        onUpdate({...trip, documents:(trip.documents||[]).filter(d=>d.id!==id)});
+      };
+
+      const handleBookingEml = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        e.target.value = "";
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          try {
+            const { subject, from, dateStr, body } = parseEml(ev.target.result);
+            const detected = detectBookingFromEmail(subject, body);
+            if (detected.detected) {
+              setPendingEmailDoc({ type:"email", title:subject||"Buchungsbestätigung", emailFrom:from, emailDate:dateStr, emailBody:body });
+              setDetectedBooking(detected);
+              setShowBookingImport(true);
+            } else {
+              alert("Keine Buchung erkannt. Tipp: Nutze den Dokumente-Tab, um die E-Mail manuell zu speichern.");
+            }
+          } catch {
+            alert("Datei konnte nicht gelesen werden.");
+          }
+        };
+        reader.readAsText(file, "utf-8");
+      };
+
+      const handleBookingConfirm = (data) => {
+        const newEvent = {
+          id:uid(), type:data.type, title:data.title,
+          startDate:data.startDate, startTime:data.startTime,
+          endDate:data.endDate, endTime:data.endTime,
+          location:data.location, confirmation:data.confirmation,
+          kosten: data.costEur || data.cost,
+          kostenOrig: (data.currency && data.currency !== "EUR") ? data.cost : "",
+          kostenWaehrung: data.currency || "EUR",
+          note:"", photos:[], pdfs:[], gpxFiles:[]
+        };
+        // Alles in einem einzigen onUpdate zusammenfassen,
+        // sonst überschreibt das zweite Update das erste.
+        const updatedEvents = [...(trip.events||[]), newEvent];
+        const updatedDocs = pendingEmailDoc
+          ? [...(trip.documents||[]), { id:uid(), ...pendingEmailDoc }]
+          : (trip.documents||[]);
+        onUpdate({ ...trip, events:updatedEvents, documents:updatedDocs });
+        setShowBookingImport(false);
+        setPendingEmailDoc(null);
+        setDetectedBooking(null);
+      };
+
+      const sortedEvents = [...(trip.events||[])].sort((a,b)=>{
+        if (a.startDate<b.startDate) return -1;
+        if (a.startDate>b.startDate) return 1;
+        if ((a.startTime||"")<(b.startTime||"")) return -1;
+        return 1;
+      });
+
+      const groupedEvents = sortedEvents.reduce((acc, ev) => {
+        const k = ev.startDate||"Kein Datum";
+        if (!acc[k]) acc[k] = [];
+        acc[k].push(ev);
+        return acc;
+      }, {});
+
+      const totalDays = Math.ceil((new Date(trip.endDate)-new Date(trip.startDate))/86400000)+1;
+      const prog = tripProgress(trip.startDate, trip.endDate);
+      const isActive = prog > 0 && prog < 100;
+
+      return (
+        <div style={{minHeight:"100vh",background:"#0A0E14",paddingBottom:40}}>
+          <div style={{background:`linear-gradient(135deg, ${trip.color}33, ${trip.color}11)`,
+            borderBottom:"1px solid rgba(255,255,255,0.07)",padding:"16px 20px 0"}}>
+            <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:16}}>
+              <button onClick={onBack} style={{background:"rgba(255,255,255,0.1)",border:"none",
+                color:"#F0EDE6",width:36,height:36,borderRadius:"50%",cursor:"pointer",fontSize:18}}>
+                ←
+              </button>
+              <div style={{flex:1}}>
+                <div style={{fontFamily:"'Playfair Display',serif",fontSize:22,
+                  fontWeight:700,color:"#F0EDE6"}}>{trip.name}</div>
+                {trip.destination && <div style={{fontSize:13,color:"#7A8899"}}>🌍 {trip.destination}</div>}
+              </div>
+              <button onClick={()=>setShowTripForm(true)} style={{background:"rgba(255,255,255,0.08)",
+                border:"none",color:"#aaa",width:36,height:36,borderRadius:"50%",cursor:"pointer",fontSize:15}}>
+                ✏️
+              </button>
+            </div>
+
+            <div style={{display:"flex",gap:20,marginBottom:16,flexWrap:"wrap"}}>
+              <div style={{background:"rgba(0,0,0,0.3)",borderRadius:12,padding:"10px 14px",flex:1,minWidth:80}}>
+                <div style={{fontSize:10,color:"#7A8899",fontWeight:600,letterSpacing:0.5}}>ABREISE</div>
+                <div style={{fontSize:13,color:"#F0EDE6",marginTop:2,fontWeight:600}}>{formatDate(trip.startDate)}</div>
+              </div>
+              <div style={{background:"rgba(0,0,0,0.3)",borderRadius:12,padding:"10px 14px",flex:1,minWidth:80}}>
+                <div style={{fontSize:10,color:"#7A8899",fontWeight:600,letterSpacing:0.5}}>RÜCKKEHR</div>
+                <div style={{fontSize:13,color:"#F0EDE6",marginTop:2,fontWeight:600}}>{formatDate(trip.endDate)}</div>
+              </div>
+              <div style={{background:"rgba(0,0,0,0.3)",borderRadius:12,padding:"10px 14px",minWidth:70,textAlign:"center"}}>
+                <div style={{fontSize:10,color:"#7A8899",fontWeight:600,letterSpacing:0.5}}>DAUER</div>
+                <div style={{fontSize:16,color:trip.color,marginTop:2,fontWeight:700}}>{totalDays}</div>
+                <div style={{fontSize:10,color:"#7A8899"}}>Tage</div>
+              </div>
+            </div>
+
+            {isActive && (
+              <div style={{marginBottom:16}}>
+                <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
+                  <span style={{fontSize:12,color:"#7A8899"}}>Reise läuft</span>
+                  <span style={{fontSize:12,color:trip.color,fontWeight:700}}>{prog}%</span>
+                </div>
+                <div style={{background:"rgba(255,255,255,0.08)",borderRadius:6,height:6}}>
+                  <div style={{background:trip.color,height:"100%",width:`${prog}%`,borderRadius:6}} />
+                </div>
+              </div>
+            )}
+
+            <div style={{display:"flex",gap:0,borderBottom:"1px solid rgba(255,255,255,0.05)"}}>
+              {[["timeline","Zeitplan"],["documents","Dokumente"],["route","Route"],["info","Info"]].map(([k,l])=>(
+                <button key={k} onClick={()=>setTab(k)} style={{
+                  background:"none",border:"none",color:tab===k?"#F0EDE6":"#7A8899",
+                  padding:"10px 16px",cursor:"pointer",fontFamily:"inherit",fontSize:14,
+                  fontWeight:tab===k?700:400,borderBottom:tab===k?`2px solid ${trip.color}`:"2px solid transparent",
+                  transition:"color .15s"
+                }}>{l}</button>
+              ))}
+            </div>
+          </div>
+
+          <div style={{padding:"20px"}}>
+
+            {tab==="timeline" && (
+              <div>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
+                  <span style={{fontSize:13,color:"#7A8899"}}>{(trip.events||[]).length} Einträge</span>
+                  <div style={{display:"flex",gap:8}}>
+                    <input ref={bookingImportRef} type="file" accept=".eml,message/rfc822"
+                      style={{display:"none"}} onChange={handleBookingEml} />
+                    <Btn onClick={()=>bookingImportRef.current?.click()} small variant="secondary">📧 Buchung</Btn>
+                    <Btn onClick={()=>{setEditEvent(null);setShowEventForm(true);}} small>+ Eintrag</Btn>
+                  </div>
+                </div>
+                {Object.keys(groupedEvents).length===0 ? (
+                  <div style={{textAlign:"center",padding:"48px 0",color:"#7A8899"}}>
+                    <div style={{fontSize:36,marginBottom:12}}>📅</div>
+                    <div style={{fontSize:15,marginBottom:6}}>Noch keine Einträge</div>
+                    <div style={{fontSize:13}}>Füge Flüge, Hotels und Aktivitäten hinzu</div>
+                  </div>
+                ) : Object.entries(groupedEvents).map(([date, evs])=>(
+                  <div key={date} style={{marginBottom:24}}>
+                    <div style={{fontSize:11,fontWeight:700,letterSpacing:1,
+                      color:"#7A8899",textTransform:"uppercase",marginBottom:10,
+                      display:"flex",alignItems:"center",gap:8}}>
+                      <div style={{height:1,flex:1,background:"rgba(255,255,255,0.07)"}} />
+                      {formatDate(date)}
+                      <div style={{height:1,flex:1,background:"rgba(255,255,255,0.07)"}} />
+                    </div>
+                    {evs.map(ev=>{
+                      const et = EVENT_TYPES.find(e=>e.key===ev.type)||EVENT_TYPES[0];
+                      return (
+                        <div key={ev.id} style={{
+                          background:"#141921",borderRadius:14,padding:"14px 16px",
+                          marginBottom:8,border:"1px solid rgba(255,255,255,0.07)",
+                          borderLeft:`3px solid ${et.color}`,
+                          display:"flex",alignItems:"flex-start",gap:12
+                        }}>
+                          <div style={{fontSize:22,lineHeight:1,marginTop:2}}>{et.icon}</div>
+                          <div style={{flex:1,minWidth:0}}>
+                            <div style={{fontWeight:600,color:"#F0EDE6",fontSize:15,marginBottom:2}}>{ev.title}</div>
+                            {ev.startTime && (
+                              <div style={{fontSize:12,color:et.color,fontWeight:700,marginBottom:3}}>
+                                🕐 {ev.startTime}{ev.endTime?` – ${ev.endTime}`:""}
+                              </div>
+                            )}
+                            {ev.location && <div style={{fontSize:13,color:"#7A8899"}}>📍 {ev.location}</div>}
+                            {ev.confirmation && (
+                              <div style={{fontSize:12,color:"#7A8899",marginTop:3,
+                                background:"rgba(255,255,255,0.04)",borderRadius:6,
+                                padding:"4px 8px",display:"inline-block",fontFamily:"monospace"}}>
+                                #{ev.confirmation}
+                              </div>
+                            )}
+                            {(ev.kosten && parseFloat(ev.kosten) > 0) && (
+                              <div style={{fontSize:12,color:"#82E0AA",marginTop:3,fontWeight:600}}>
+                                {ev.kostenOrig && ev.kostenWaehrung && ev.kostenWaehrung !== "EUR"
+                                  ? `${parseFloat(ev.kostenOrig).toLocaleString("de-DE")} ${ev.kostenWaehrung}  ≈  ${parseFloat(ev.kosten).toFixed(2)} €`
+                                  : `${parseFloat(ev.kosten).toFixed(2)} €`}
+                              </div>
+                            )}
+                            {ev.note && <div style={{fontSize:13,color:"#666",marginTop:4,fontStyle:"italic"}}>{ev.note}</div>}
+                            {ev.photos && ev.photos.length>0 && (
+                              <div style={{display:"flex",gap:6,flexWrap:"wrap",marginTop:8}}>
+                                {ev.photos.map((p,i)=>(
+                                  <img key={i} src={p} style={{width:60,height:60,objectFit:"cover",borderRadius:8,border:"1px solid rgba(255,255,255,0.1)"}} />
+                                ))}
+                              </div>
+                            )}
+                            {ev.pdfs && ev.pdfs.length>0 && (
+                              <div style={{display:"flex",flexDirection:"column",gap:3,marginTop:6}}>
+                                {ev.pdfs.map((f,i)=>(
+                                  <a key={i} href={f.data} download={f.name}
+                                    style={{fontSize:12,color:"#7EB8F7",textDecoration:"none",
+                                      background:"rgba(126,184,247,0.08)",borderRadius:6,
+                                      padding:"4px 8px",display:"inline-block"}}>
+                                    {"PDF: "+f.name}
+                                  </a>
+                                ))}
+                              </div>
+                            )}
+                            {ev.gpxFiles && ev.gpxFiles.length>0 && (
+                              <div style={{display:"flex",flexDirection:"column",gap:3,marginTop:4}}>
+                                {ev.gpxFiles.map((f,i)=>(
+                                  <a key={i} href={f.data} download={f.name}
+                                    style={{fontSize:12,color:"#6FD99A",textDecoration:"none",
+                                      background:"rgba(111,217,154,0.08)",borderRadius:6,
+                                      padding:"4px 8px",display:"inline-block"}}>
+                                    {"GPX: "+f.name}
+                                  </a>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                          <div style={{display:"flex",gap:6}}>
+                            <button onClick={()=>{setEditEvent(ev);setShowEventForm(true);}} style={{
+                              background:"rgba(255,255,255,0.06)",border:"none",color:"#aaa",
+                              width:28,height:28,borderRadius:8,cursor:"pointer",fontSize:12}}>✏️</button>
+                            <button onClick={()=>deleteEvent(ev.id)} style={{
+                              background:"rgba(192,57,43,0.15)",border:"none",color:"#C0392B",
+                              width:28,height:28,borderRadius:8,cursor:"pointer",fontSize:12}}>🗑️</button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {tab==="documents" && (
+              <div>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
+                  <span style={{fontSize:13,color:"#7A8899"}}>{(trip.documents||[]).length} Dokumente</span>
+                  <Btn onClick={()=>{setEditDoc(null);setShowDocForm(true);}} small>+ Dokument</Btn>
+                </div>
+                {(trip.documents||[]).length===0 ? (
+                  <div style={{textAlign:"center",padding:"48px 0",color:"#7A8899"}}>
+                    <div style={{fontSize:36,marginBottom:12}}>📄</div>
+                    <div style={{fontSize:15,marginBottom:6}}>Keine Dokumente</div>
+                    <div style={{fontSize:13}}>Tickets, Buchungsbestätigungen und mehr</div>
+                  </div>
+                ) : (trip.documents||[]).map(d=>{
+                  const dt = DOC_TYPES.find(x=>x.key===d.type)||DOC_TYPES[0];
+                  const expired = d.expiry && new Date(d.expiry)<new Date();
+                  return (
+                    <div key={d.id} style={{
+                      background:"#141921",borderRadius:14,padding:"14px 16px",
+                      marginBottom:10,border:"1px solid rgba(255,255,255,0.07)",
+                      display:"flex",alignItems:"flex-start",gap:12
+                    }}>
+                      <div style={{
+                        width:44,height:44,borderRadius:12,
+                        background:"rgba(212,164,76,0.15)",
+                        display:"flex",alignItems:"center",justifyContent:"center",fontSize:22
+                      }}>{dt.icon}</div>
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{fontWeight:600,color:"#F0EDE6",fontSize:15}}>{d.title}</div>
+                        <div style={{fontSize:12,color:"#7A8899",marginTop:2}}>{dt.label}</div>
+
+                        {d.type === "email" ? (
+                          <>
+                            {d.emailFrom && (
+                              <div style={{fontSize:12,color:"#7A8899",marginTop:4}}>
+                                Von: <span style={{color:"#AED6F1"}}>{d.emailFrom}</span>
+                              </div>
+                            )}
+                            {d.emailDate && (
+                              <div style={{fontSize:12,color:"#7A8899",marginTop:2}}>
+                                📅 {formatDate(d.emailDate)}
+                              </div>
+                            )}
+                            {d.emailBody && (
+                              <EmailBodyPreview body={d.emailBody} />
+                            )}
+                          </>
+                        ) : (
+                          <>
+                            {d.number && (
+                              <div style={{fontSize:12,fontFamily:"monospace",
+                                color:"#D4A44C",marginTop:4,
+                                background:"rgba(212,164,76,0.08)",borderRadius:6,
+                                padding:"3px 8px",display:"inline-block"}}>
+                                {d.number}
+                              </div>
+                            )}
+                            {d.expiry && (
+                              <div style={{fontSize:12,color:expired?"#C0392B":"#7A8899",marginTop:4}}>
+                                {expired?"⚠️ Abgelaufen:":"Gültig bis:"} {formatDate(d.expiry)}
+                              </div>
+                            )}
+                          </>
+                        )}
+                        {d.note && <div style={{fontSize:13,color:"#666",marginTop:4,fontStyle:"italic"}}>{d.note}</div>}
+                      </div>
+                      <div style={{display:"flex",gap:6}}>
+                        <button onClick={()=>{setEditDoc(d);setShowDocForm(true);}} style={{
+                          background:"rgba(255,255,255,0.06)",border:"none",color:"#aaa",
+                          width:28,height:28,borderRadius:8,cursor:"pointer",fontSize:12}}>✏️</button>
+                        <button onClick={()=>deleteDoc(d.id)} style={{
+                          background:"rgba(192,57,43,0.15)",border:"none",color:"#C0392B",
+                          width:28,height:28,borderRadius:8,cursor:"pointer",fontSize:12}}>🗑️</button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {tab==="route" && (
+              <RouteMap
+                tripId={trip.id}
+                tripColor={trip.color}
+                route={route}
+                onSaveRoute={onSaveRoute}
+              />
+            )}
+
+            {tab==="info" && (
+              <div>
+                {trip.note && (
+                  <div style={{background:"#141921",borderRadius:14,padding:16,
+                    marginBottom:16,border:"1px solid rgba(255,255,255,0.07)"}}>
+                    <div style={{fontSize:11,color:"#7A8899",fontWeight:600,
+                      letterSpacing:0.5,marginBottom:8}}>NOTIZEN</div>
+                    <div style={{color:"#C0BAB0",fontSize:15,lineHeight:1.6}}>{trip.note}</div>
+                  </div>
+                )}
+                <div style={{background:"#141921",borderRadius:14,padding:16,
+                  marginBottom:16,border:"1px solid rgba(255,255,255,0.07)"}}>
+                  <div style={{fontSize:11,color:"#7A8899",fontWeight:600,letterSpacing:0.5,marginBottom:12}}>
+                    STATISTIKEN
+                  </div>
+                  {[
+                    ["Reise erstellt", formatDate(new Date(trip.createdAt).toISOString().split("T")[0])],
+                    ["Gesamtdauer", `${totalDays} Tage`],
+                    ["Einträge", `${(trip.events||[]).length}`],
+                    ["Dokumente", `${(trip.documents||[]).length}`],
+                    ["Flüge", `${(trip.events||[]).filter(e=>e.type==="flight").length}`],
+                    ["Hotels", `${(trip.events||[]).filter(e=>e.type==="hotel").length}`],
+                  ].map(([l,v])=>(
+                    <div key={l} style={{display:"flex",justifyContent:"space-between",
+                      padding:"8px 0",borderBottom:"1px solid rgba(255,255,255,0.05)"}}>
+                      <span style={{color:"#7A8899",fontSize:14}}>{l}</span>
+                      <span style={{color:"#F0EDE6",fontSize:14,fontWeight:600}}>{v}</span>
+                    </div>
+                  ))}
+                </div>
+                {(() => {
+                  const mitKosten = (trip.events||[]).filter(e => e.kosten && parseFloat(e.kosten) > 0);
+                  const reiseKosten = trip.kosten && parseFloat(trip.kosten) > 0 ? parseFloat(trip.kosten) : 0;
+                  const gesamtEvents = mitKosten.reduce((s,e)=>s+parseFloat(e.kosten||0),0);
+                  const gesamt = gesamtEvents + reiseKosten;
+                  return (
+                    <div style={{background:"#141921",borderRadius:14,padding:16,
+                      marginBottom:16,border:"1px solid rgba(255,255,255,0.07)"}}>
+                      <div style={{fontSize:11,color:"#7A8899",fontWeight:600,letterSpacing:0.5,marginBottom:12}}>
+                        KOSTENÜBERSICHT
+                      </div>
+                      {reiseKosten > 0 && (
+                        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",
+                          padding:"8px 0",borderBottom:"1px solid rgba(255,255,255,0.05)"}}>
+                          <span style={{color:"#C0BAB0",fontSize:14}}>🗺️ Allgemeine Reisekosten</span>
+                          <span style={{color:"#F0EDE6",fontSize:14,fontWeight:600}}>
+                            {parseFloat(trip.kosten).toFixed(2)} €
+                          </span>
+                        </div>
+                      )}
+                      {mitKosten.length === 0 && reiseKosten === 0 ? (
+                        <div style={{color:"#7A8899",fontSize:14,textAlign:"center",padding:"8px 0"}}>
+                          Noch keine Kosten eingetragen.
+                        </div>
+                      ) : (
+                        mitKosten.map(e => {
+                          const et = EVENT_TYPES.find(t=>t.key===e.type)||EVENT_TYPES[0];
+                          return (
+                            <div key={e.id} style={{display:"flex",justifyContent:"space-between",
+                              alignItems:"center",padding:"8px 0",borderBottom:"1px solid rgba(255,255,255,0.05)"}}>
+                              <span style={{color:"#C0BAB0",fontSize:14}}>
+                                {et.icon} {e.title || et.label}
+                              </span>
+                              <span style={{textAlign:"right"}}>
+                                {e.kostenOrig && e.kostenWaehrung && e.kostenWaehrung !== "EUR" && (
+                                  <div style={{fontSize:11,color:"#7A8899"}}>{parseFloat(e.kostenOrig).toLocaleString("de-DE")} {e.kostenWaehrung}</div>
+                                )}
+                                <span style={{color:"#F0EDE6",fontSize:14,fontWeight:600}}>
+                                  {parseFloat(e.kosten).toFixed(2)} €
+                                </span>
+                              </span>
+                            </div>
+                          );
+                        })
+                      )}
+                      {gesamt > 0 && (
+                        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",
+                          padding:"10px 0 2px 0",marginTop:4}}>
+                          <span style={{color:"#F0EDE6",fontSize:15,fontWeight:700}}>Gesamt</span>
+                          <span style={{color:trip.color||"#F0EDE6",fontSize:16,fontWeight:800}}>
+                            {gesamt.toFixed(2)} €
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+                <Btn onClick={()=>setConfirmDelete(true)} full danger>Reise löschen</Btn>
+              </div>
+            )}
+          </div>
+
+          {showEventForm && (
+            <EventForm event={editEvent}
+              onSave={ev=>{saveEvent(ev);setShowEventForm(false);}}
+              onClose={()=>setShowEventForm(false)} />
+          )}
+          {showDocForm && (
+            <DocumentForm doc={editDoc}
+              onSave={d=>{saveDoc(d);setShowDocForm(false);}}
+              onClose={()=>setShowDocForm(false)} />
+          )}
+          {showTripForm && (
+            <TripForm trip={trip}
+              onSave={t=>onUpdate(t)}
+              onClose={()=>setShowTripForm(false)} />
+          )}
+          {confirmDelete && (
+            <Modal title="Reise löschen?" onClose={()=>setConfirmDelete(false)}>
+              <p style={{color:"#aaa",marginBottom:20}}>
+                Diese Aktion löscht die Reise „{trip.name}" mit allen Einträgen und Dokumenten unwiderruflich.
+              </p>
+              <div style={{display:"flex",gap:10}}>
+                <Btn onClick={()=>setConfirmDelete(false)} full variant="secondary">Abbrechen</Btn>
+                <Btn onClick={()=>{onDelete(trip.id);setConfirmDelete(false);}} full danger>Löschen</Btn>
+              </div>
+            </Modal>
+          )}
+          {showBookingImport && detectedBooking && (
+            <BookingImportModal
+              booking={detectedBooking}
+              onConfirm={handleBookingConfirm}
+              onCancel={()=>{setShowBookingImport(false);setDetectedBooking(null);setPendingEmailDoc(null);}}
+            />
+          )}
+        </div>
+      );
+    }
+
+    // ──────────────────────────────────────────────────
+    //  HOME / TRIP LIST
+    // ──────────────────────────────────────────────────
+    function Home({ trips, onSelect, onAdd, onExport, onImport }) {
+      const [search, setSearch] = useState("");
+      const [filter, setFilter] = useState("all");
+
+      const filtered = trips.filter(t => {
+        const matchSearch = t.name.toLowerCase().includes(search.toLowerCase()) ||
+          (t.destination||"").toLowerCase().includes(search.toLowerCase());
+        if (!matchSearch) return false;
+        const prog = tripProgress(t.startDate, t.endDate);
+        if (filter==="upcoming") return prog===0;
+        if (filter==="active") return prog>0&&prog<100;
+        if (filter==="past") return prog>=100;
+        return true;
+      });
+
+      const upcoming = trips.filter(t=>tripProgress(t.startDate,t.endDate)===0).length;
+      const active = trips.filter(t=>{const p=tripProgress(t.startDate,t.endDate);return p>0&&p<100;}).length;
+
+      return (
+        <div style={{minHeight:"100vh",background:"#0A0E14",paddingBottom:40}}>
+          <div style={{
+            background:"linear-gradient(180deg,#141921 0%,#0A0E14 100%)",
+            padding:"24px 20px 20px",borderBottom:"1px solid rgba(255,255,255,0.06)"
+          }}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:20}}>
+              <div>
+                <div style={{fontFamily:"'Playfair Display',serif",fontSize:28,
+                  fontWeight:700,color:"#F0EDE6",lineHeight:1.1}}>Meine Reisen</div>
+                <div style={{fontSize:13,color:"#7A8899",marginTop:4}}>
+                  {trips.length} {trips.length===1?"Reise":"Reisen"} gespeichert
+                </div>
+              </div>
+              <div style={{display:"flex",gap:8,alignItems:"center"}}>
+                <button onClick={onImport} title="Daten importieren" style={{
+                  background:"rgba(255,255,255,0.07)",border:"1px solid rgba(255,255,255,0.12)",
+                  color:"#C0BAB0",width:38,height:38,borderRadius:"50%",cursor:"pointer",
+                  fontSize:17,display:"flex",alignItems:"center",justifyContent:"center"
+                }}>📥</button>
+                <button onClick={onExport} title="Daten exportieren" style={{
+                  background:"rgba(255,255,255,0.07)",border:"1px solid rgba(255,255,255,0.12)",
+                  color:"#C0BAB0",width:38,height:38,borderRadius:"50%",cursor:"pointer",
+                  fontSize:17,display:"flex",alignItems:"center",justifyContent:"center"
+                }}>📤</button>
+                <button onClick={onAdd} style={{
+                  background:"#D4A44C",border:"none",color:"#0A0E14",
+                  width:42,height:42,borderRadius:"50%",cursor:"pointer",
+                  fontSize:22,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center",
+                  boxShadow:"0 4px 16px rgba(212,164,76,0.4)"
+                }}>+</button>
+              </div>
+            </div>
+
+            {trips.length > 0 && (
+              <div style={{display:"flex",gap:10,marginBottom:16}}>
+                {active > 0 && (
+                  <div style={{background:"rgba(82,224,128,0.1)",borderRadius:10,
+                    padding:"8px 12px",flex:1,border:"1px solid rgba(82,224,128,0.2)"}}>
+                    <div style={{fontSize:18,fontWeight:700,color:"#52E080"}}>{active}</div>
+                    <div style={{fontSize:11,color:"#52E080",opacity:0.8}}>Aktiv</div>
+                  </div>
+                )}
+                <div style={{background:"rgba(212,164,76,0.1)",borderRadius:10,
+                  padding:"8px 12px",flex:1,border:"1px solid rgba(212,164,76,0.2)"}}>
+                  <div style={{fontSize:18,fontWeight:700,color:"#D4A44C"}}>{upcoming}</div>
+                  <div style={{fontSize:11,color:"#D4A44C",opacity:0.8}}>Bevorstehend</div>
+                </div>
+                <div style={{background:"rgba(255,255,255,0.05)",borderRadius:10,
+                  padding:"8px 12px",flex:1,border:"1px solid rgba(255,255,255,0.07)"}}>
+                  <div style={{fontSize:18,fontWeight:700,color:"#7A8899"}}>
+                    {trips.filter(t=>tripProgress(t.startDate,t.endDate)>=100).length}
+                  </div>
+                  <div style={{fontSize:11,color:"#7A8899"}}>Abgeschlossen</div>
+                </div>
+              </div>
+            )}
+
+            <div style={{position:"relative",marginBottom:12}}>
+              <span style={{position:"absolute",left:12,top:"50%",transform:"translateY(-50%)",color:"#7A8899",fontSize:16}}>🔍</span>
+              <input value={search} onChange={e=>setSearch(e.target.value)}
+                placeholder="Reise suchen…"
+                style={{width:"100%",background:"rgba(255,255,255,0.06)",
+                  border:"1px solid rgba(255,255,255,0.08)",borderRadius:12,
+                  padding:"10px 14px 10px 36px",color:"#F0EDE6",fontSize:15,outline:"none",
+                  fontFamily:"inherit",boxSizing:"border-box"}} />
+            </div>
+
+            <div style={{display:"flex",gap:8}}>
+              {[["all","Alle"],["upcoming","Bevorstehend"],["active","Aktiv"],["past","Vergangen"]].map(([k,l])=>(
+                <button key={k} onClick={()=>setFilter(k)} style={{
+                  background:filter===k?"#D4A44C":"rgba(255,255,255,0.06)",
+                  border:"none",color:filter===k?"#0A0E14":"#7A8899",
+                  borderRadius:20,padding:"5px 12px",cursor:"pointer",
+                  fontSize:12,fontWeight:600,fontFamily:"inherit",transition:"all .15s"
+                }}>{l}</button>
+              ))}
+            </div>
+          </div>
+
+          <div style={{padding:"20px"}}>
+            {trips.length===0 ? (
+              <div style={{textAlign:"center",padding:"64px 0",color:"#7A8899"}}>
+                <div style={{fontSize:56,marginBottom:16}}>🌍</div>
+                <div style={{fontFamily:"'Playfair Display',serif",fontSize:22,
+                  color:"#F0EDE6",marginBottom:8}}>Deine erste Reise</div>
+                <div style={{fontSize:15,marginBottom:28,lineHeight:1.6}}>
+                  Plane und organisiere deine Reisen,<br/>Flüge, Hotels und Dokumente
+                </div>
+                <Btn onClick={onAdd}>Reise erstellen</Btn>
+              </div>
+            ) : filtered.length===0 ? (
+              <div style={{textAlign:"center",padding:"48px 0",color:"#7A8899"}}>
+                <div style={{fontSize:32}}>🔍</div>
+                <div style={{marginTop:12}}>Keine Reisen gefunden</div>
+              </div>
+            ) : filtered.map(t=>(
+              <TripCard key={t.id} trip={t} onClick={()=>onSelect(t.id)} onPdf={()=>generateTripPDF(t)} />
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    // ──────────────────────────────────────────────────
+    //  ROOT APP
+    // ──────────────────────────────────────────────────
+    function App() {
+      const [trips, setTrips] = useLocalStorage(STORAGE_KEY, []);
+      const [routes, setRoutes] = useLocalStorage(STORAGE_ROUTES, {});
+      const [selectedId, setSelectedId] = useState(null);
+      const [showTripForm, setShowTripForm] = useState(false);
+      const importRef = useRef(null);
+
+      const saveTrip = (trip) => {
+        setTrips(prev => {
+          const idx = prev.findIndex(t=>t.id===trip.id);
+          return idx>=0 ? prev.map(t=>t.id===trip.id?trip:t) : [...prev, trip];
+        });
+      };
+
+      const deleteTrip = (id) => {
+        setTrips(prev => prev.filter(t=>t.id!==id));
+        setRoutes(prev => { const r = {...prev}; delete r[id]; return r; });
+        setSelectedId(null);
+      };
+
+      const saveRoute = (tripId, geoJson) => {
+        setRoutes(prev => geoJson
+          ? { ...prev, [tripId]: geoJson }
+          : Object.fromEntries(Object.entries(prev).filter(([k]) => k !== tripId))
+        );
+      };
+
+      const exportData = async () => {
+        const datum = new Date().toISOString().split("T")[0];
+        const json = JSON.stringify(trips, null, 2);
+        const filename = `reiseplaner_backup_${datum}.json`;
+        const file = new File([json], filename, { type: "application/json" });
+        // iOS: Share Sheet → "In Dateien sichern" → iCloud Drive
+        if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+          try {
+            await navigator.share({ files: [file], title: "Reiseplaner Backup" });
+            return;
+          } catch (err) {
+            if (err.name === "AbortError") return; // Nutzer hat abgebrochen
+          }
+        }
+        // Fallback für Desktop-Browser
+        const url = URL.createObjectURL(file);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = filename;
+        a.click();
+        URL.revokeObjectURL(url);
+      };
+
+      const importData = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          try {
+            const data = JSON.parse(ev.target.result);
+            if (!Array.isArray(data)) { alert("Ungültige Datei."); return; }
+            if (window.confirm(`${data.length} Reise(n) gefunden. Aktuelle Daten ersetzen?`)) {
+              setTrips(data);
+            }
+          } catch { alert("Datei konnte nicht gelesen werden."); }
+          e.target.value = "";
+        };
+        reader.readAsText(file);
+      };
+
+      const selectedTrip = trips.find(t=>t.id===selectedId);
+
+      return (
+        <div style={{maxWidth:480,margin:"0 auto",fontFamily:"'DM Sans',sans-serif",
+          minHeight:"100vh",background:"#0A0E14",position:"relative"}}>
+          <input ref={importRef} type="file" accept=".json" onChange={importData}
+            style={{display:"none"}} />
+          {selectedTrip ? (
+            <TripDetail
+              trip={selectedTrip}
+              onUpdate={saveTrip}
+              onBack={()=>setSelectedId(null)}
+              onDelete={deleteTrip}
+              route={routes[selectedId] || null}
+              onSaveRoute={saveRoute}
+            />
+          ) : (
+            <Home
+              trips={trips}
+              onSelect={setSelectedId}
+              onAdd={()=>setShowTripForm(true)}
+              onExport={exportData}
+              onImport={()=>importRef.current.click()}
+            />
+          )}
+          {showTripForm && (
+            <TripForm
+              trip={null}
+              onSave={t=>{saveTrip(t);setShowTripForm(false);}}
+              onClose={()=>setShowTripForm(false)}
+            />
+          )}
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById("root"));
+    root.render(<App />);
+  </script>
+  <script>
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", () => {
+        navigator.serviceWorker.register("./sw.js");
+      });
+    }
+  </script>
+</body>
+</html>
