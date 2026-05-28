@@ -1015,6 +1015,19 @@ document.addEventListener("keydown", e => {
     if (e.key === "Backspace") pinDelete();
   }
 });
+function fabToggle(){const p=document.getElementById('fab-panel');p.style.display=p.style.display==='none'?'block':'none';}
+function fabDownload(obj,name){const json=JSON.stringify(obj,null,2);const blob=new Blob([json],{type:'application/json'});const fn=name.replace(/[^a-zA-Z0-9äöüÄÖÜß _-]/g,'_')+'.json';if(navigator.share&&navigator.canShare?.({files:[new File([blob],fn)]})){navigator.share({files:[new File([blob],fn,{type:'application/json'})]});}else{const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=fn;a.click();URL.revokeObjectURL(a.href);}}
+function fabExport(){const name=document.getElementById('fab-name').value.trim()||'Vermoegen_'+new Date().toLocaleDateString('de-DE').replace(/\./g,'-');fabDownload({version:'1.0',savedAt:new Date().toISOString(),name,data},name);}
+function fabImport(input){const r=new FileReader();r.onload=e=>{try{const obj=JSON.parse(e.target.result);data=obj.data||obj;localStorage.setItem('vm_data',JSON.stringify(data));render();document.getElementById('fab-panel').style.display='none';}catch{alert('Datei konnte nicht geladen werden.');}};r.readAsText(input.files[0]);input.value='';}
 </script>
+<div id="fab-wrap" style="position:fixed;bottom:20px;right:16px;z-index:9000;display:flex;flex-direction:column;align-items:flex-end;gap:8px;">
+  <div id="fab-panel" style="display:none;background:white;border:1px solid #ddd;border-radius:12px;padding:14px;box-shadow:0 4px 24px rgba(0,0,0,0.18);width:230px;">
+    <div style="font-size:0.75rem;font-weight:700;color:#666;letter-spacing:.08em;text-transform:uppercase;margin-bottom:10px;">Daten sichern</div>
+    <input type="text" id="fab-name" placeholder="Name (z.B. 28.05.2026)" style="width:100%;padding:7px 10px;border:1px solid #ddd;border-radius:7px;font-size:16px;margin-bottom:8px;box-sizing:border-box;">
+    <button onclick="fabExport()" style="width:100%;padding:9px;background:#1b4332;color:#f0d080;border:1px solid #c8952a;border-radius:7px;font-weight:bold;cursor:pointer;margin-bottom:7px;font-size:0.88rem;">💾 Speichern (JSON)</button>
+    <label style="display:block;width:100%;padding:9px;background:#f5f5f5;border:1px solid #ddd;border-radius:7px;font-weight:bold;cursor:pointer;text-align:center;font-size:0.88rem;box-sizing:border-box;">📂 Laden (JSON)<input type="file" accept=".json" style="display:none" onchange="fabImport(this)"></label>
+  </div>
+  <button onclick="fabToggle()" style="width:50px;height:50px;border-radius:50%;background:#1b4332;color:#f0d080;border:2px solid #c8952a;font-size:1.4rem;cursor:pointer;box-shadow:0 3px 14px rgba(0,0,0,0.3);" title="Daten speichern / laden">💾</button>
+</div>
 </body>
 </html>
