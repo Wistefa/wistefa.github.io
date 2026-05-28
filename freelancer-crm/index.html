@@ -1,0 +1,1611 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FreelancerCRM</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <style>
+    :root {
+      --primary: #6366f1;
+      --primary-dark: #4f46e5;
+      --secondary: #8b5cf6;
+      --success: #10b981;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --info: #3b82f6;
+      --bg: #f1f5f9;
+      --sidebar-bg: #1e1b4b;
+      --card-bg: #ffffff;
+      --text: #1e293b;
+      --text-muted: #64748b;
+      --border: #e2e8f0;
+      --shadow-sm: 0 1px 3px rgba(0,0,0,0.07);
+      --shadow: 0 4px 16px rgba(0,0,0,0.08);
+      --shadow-lg: 0 12px 40px rgba(0,0,0,0.14);
+      --radius: 14px;
+      --radius-sm: 9px;
+      --radius-lg: 18px;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      display: flex;
+      min-height: 100vh;
+    }
+
+    /* ===== SIDEBAR ===== */
+    .sidebar {
+      width: 250px;
+      background: var(--sidebar-bg);
+      color: white;
+      display: flex;
+      flex-direction: column;
+      position: fixed;
+      top: 0; left: 0;
+      height: 100vh;
+      z-index: 100;
+    }
+
+    .sidebar-logo {
+      padding: 28px 20px 22px;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+    }
+
+    .sidebar-logo .logo-icon {
+      width: 42px; height: 42px;
+      background: linear-gradient(135deg, #6366f1, #8b5cf6);
+      border-radius: 12px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px;
+      margin-bottom: 12px;
+    }
+
+    .sidebar-logo h1 {
+      font-size: 17px; font-weight: 800; letter-spacing: -0.3px;
+      background: linear-gradient(135deg, #c7d2fe, #ddd6fe);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    }
+
+    .sidebar-logo p { font-size: 11px; color: rgba(255,255,255,0.35); margin-top: 2px; }
+
+    .sidebar-nav { padding: 16px 10px; flex: 1; overflow-y: auto; }
+
+    .nav-section {
+      font-size: 10px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.12em; color: rgba(255,255,255,0.25);
+      padding: 12px 12px 6px;
+    }
+
+    .nav-item {
+      display: flex; align-items: center; gap: 11px;
+      padding: 10px 14px;
+      border-radius: 10px;
+      cursor: pointer;
+      color: rgba(255,255,255,0.55);
+      font-size: 14px; font-weight: 500;
+      transition: all 0.18s;
+      margin-bottom: 2px;
+      position: relative;
+    }
+
+    .nav-item:hover { background: rgba(255,255,255,0.07); color: rgba(255,255,255,0.9); }
+
+    .nav-item.active {
+      background: linear-gradient(135deg, rgba(99,102,241,0.45), rgba(139,92,246,0.35));
+      color: white;
+      border: 1px solid rgba(165,180,252,0.18);
+    }
+
+    .nav-item i { width: 17px; text-align: center; font-size: 14px; }
+
+    .nav-badge {
+      margin-left: auto;
+      background: rgba(255,255,255,0.12);
+      border-radius: 100px;
+      font-size: 10px; font-weight: 700;
+      padding: 2px 7px; min-width: 20px; text-align: center;
+    }
+
+    .sidebar-footer {
+      padding: 16px 20px;
+      border-top: 1px solid rgba(255,255,255,0.07);
+      font-size: 11px; color: rgba(255,255,255,0.22);
+    }
+
+    /* ===== MAIN ===== */
+    .main { margin-left: 250px; flex: 1; display: flex; flex-direction: column; min-height: 100vh; }
+
+    .topbar {
+      background: white;
+      border-bottom: 1px solid var(--border);
+      padding: 0 32px;
+      height: 64px;
+      display: flex; align-items: center; justify-content: space-between;
+      position: sticky; top: 0; z-index: 50;
+    }
+
+    .topbar-left { display: flex; align-items: center; gap: 16px; }
+
+    .topbar h2 { font-size: 20px; font-weight: 800; letter-spacing: -0.3px; }
+
+    .topbar-right { display: flex; gap: 10px; align-items: center; }
+
+    .content { padding: 28px 32px; flex: 1; }
+
+    /* ===== BUTTONS ===== */
+    .btn {
+      display: inline-flex; align-items: center; gap: 7px;
+      padding: 9px 18px;
+      border-radius: var(--radius-sm);
+      font-size: 13.5px; font-weight: 600;
+      cursor: pointer; border: none;
+      transition: all 0.18s;
+      white-space: nowrap;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--primary), var(--secondary));
+      color: white;
+      box-shadow: 0 4px 14px rgba(99,102,241,0.35);
+    }
+
+    .btn-primary:hover { box-shadow: 0 6px 20px rgba(99,102,241,0.45); transform: translateY(-1px); }
+
+    .btn-secondary {
+      background: white; color: var(--text);
+      border: 1.5px solid var(--border);
+    }
+
+    .btn-secondary:hover { background: var(--bg); }
+
+    .btn-danger { background: #fff1f2; color: var(--danger); border: 1.5px solid #fecdd3; }
+    .btn-danger:hover { background: #ffe4e6; }
+
+    .btn-success { background: #f0fdf4; color: #15803d; border: 1.5px solid #bbf7d0; }
+    .btn-success:hover { background: #dcfce7; }
+
+    .btn-sm { padding: 6px 13px; font-size: 12.5px; }
+
+    .btn-icon { padding: 7px; width: 34px; height: 34px; justify-content: center; border-radius: 8px; }
+
+    /* ===== CARDS ===== */
+    .card {
+      background: var(--card-bg);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow-sm);
+      border: 1px solid var(--border);
+      padding: 24px;
+    }
+
+    /* ===== STATS ===== */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 18px;
+      margin-bottom: 28px;
+    }
+
+    .stat-card {
+      background: white;
+      border-radius: var(--radius);
+      padding: 20px 22px;
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow-sm);
+      display: flex; align-items: center; gap: 16px;
+      transition: box-shadow 0.2s;
+    }
+
+    .stat-card:hover { box-shadow: var(--shadow); }
+
+    .stat-icon {
+      width: 50px; height: 50px;
+      border-radius: 13px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 19px;
+      flex-shrink: 0;
+    }
+
+    .stat-icon.violet { background: linear-gradient(135deg, #ede9fe, #ddd6fe); color: #7c3aed; }
+    .stat-icon.blue   { background: linear-gradient(135deg, #eff6ff, #dbeafe); color: #2563eb; }
+    .stat-icon.green  { background: linear-gradient(135deg, #ecfdf5, #d1fae5); color: #059669; }
+    .stat-icon.amber  { background: linear-gradient(135deg, #fffbeb, #fde68a); color: #b45309; }
+
+    .stat-info h3 { font-size: 30px; font-weight: 800; color: var(--text); letter-spacing: -1px; }
+    .stat-info p { font-size: 12.5px; color: var(--text-muted); margin-top: 1px; font-weight: 500; }
+
+    /* ===== TABLE ===== */
+    .table-wrap { overflow-x: auto; }
+
+    table { width: 100%; border-collapse: collapse; }
+
+    thead th {
+      text-align: left;
+      padding: 11px 16px;
+      font-size: 11px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.06em;
+      color: var(--text-muted);
+      border-bottom: 1.5px solid var(--border);
+      background: #fafbff;
+    }
+
+    thead th:first-child { border-radius: var(--radius-sm) 0 0 0; }
+    thead th:last-child { border-radius: 0 var(--radius-sm) 0 0; }
+
+    tbody tr { border-bottom: 1px solid #f1f5f9; transition: background 0.12s; }
+    tbody tr:hover { background: #f8fafc; }
+    tbody tr:last-child { border-bottom: none; }
+
+    tbody td { padding: 14px 16px; font-size: 13.5px; color: var(--text); vertical-align: middle; }
+
+    /* ===== BADGES ===== */
+    .badge {
+      display: inline-flex; align-items: center;
+      padding: 3px 10px;
+      border-radius: 100px;
+      font-size: 11.5px; font-weight: 700;
+      letter-spacing: 0.01em;
+    }
+
+    .badge-green  { background: #dcfce7; color: #166534; }
+    .badge-blue   { background: #dbeafe; color: #1d4ed8; }
+    .badge-yellow { background: #fef9c3; color: #854d0e; }
+    .badge-red    { background: #fee2e2; color: #991b1b; }
+    .badge-gray   { background: #f1f5f9; color: #475569; }
+    .badge-purple { background: #ede9fe; color: #5b21b6; }
+    .badge-teal   { background: #ccfbf1; color: #0f766e; }
+
+    /* ===== AVATAR ===== */
+    .avatar {
+      width: 36px; height: 36px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 13px; font-weight: 800;
+      color: white; flex-shrink: 0;
+    }
+
+    .client-row { display: flex; align-items: center; gap: 10px; }
+
+    /* ===== MODAL ===== */
+    .modal-overlay {
+      position: fixed; inset: 0;
+      background: rgba(15,20,40,0.55);
+      backdrop-filter: blur(5px);
+      z-index: 1000;
+      display: flex; align-items: center; justify-content: center;
+      opacity: 0; pointer-events: none;
+      transition: opacity 0.22s;
+    }
+
+    .modal-overlay.active { opacity: 1; pointer-events: all; }
+
+    .modal {
+      background: white;
+      border-radius: var(--radius-lg);
+      width: 100%; max-width: 530px;
+      box-shadow: var(--shadow-lg);
+      transform: translateY(22px) scale(0.97);
+      transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+      max-height: 92vh; overflow-y: auto;
+    }
+
+    .modal-overlay.active .modal { transform: translateY(0) scale(1); }
+
+    .modal-header {
+      padding: 26px 28px 0;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+
+    .modal-header h3 { font-size: 18px; font-weight: 800; letter-spacing: -0.3px; }
+
+    .modal-close {
+      background: #f1f5f9; border: none; cursor: pointer;
+      font-size: 14px; color: var(--text-muted);
+      width: 30px; height: 30px;
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      transition: all 0.15s;
+    }
+
+    .modal-close:hover { background: #e2e8f0; color: var(--text); }
+
+    .modal-body { padding: 22px 28px 28px; }
+
+    /* ===== FORM ===== */
+    .form-group { margin-bottom: 17px; }
+
+    .form-group label {
+      display: block; font-size: 12.5px; font-weight: 700;
+      color: var(--text); margin-bottom: 6px;
+    }
+
+    .form-control {
+      width: 100%; padding: 9px 13px;
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius-sm);
+      font-size: 13.5px; color: var(--text);
+      background: white;
+      transition: border-color 0.18s, box-shadow 0.18s;
+      font-family: inherit;
+    }
+
+    .form-control:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(99,102,241,0.12);
+    }
+
+    textarea.form-control { resize: vertical; min-height: 80px; }
+
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+
+    .modal-footer {
+      display: flex; gap: 10px; justify-content: flex-end;
+      padding-top: 18px;
+      border-top: 1px solid var(--border);
+      margin-top: 8px;
+    }
+
+    /* ===== SEARCH ===== */
+    .search-wrap { position: relative; }
+
+    .search-wrap i {
+      position: absolute; left: 12px; top: 50%;
+      transform: translateY(-50%);
+      color: var(--text-muted); font-size: 13px;
+    }
+
+    .search-wrap input {
+      padding: 9px 14px 9px 36px;
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius-sm);
+      font-size: 13.5px; width: 240px;
+      background: white;
+      transition: border-color 0.18s;
+      font-family: inherit; color: var(--text);
+    }
+
+    .search-wrap input:focus { outline: none; border-color: var(--primary); }
+
+    /* ===== KANBAN ===== */
+    .kanban { display: grid; grid-template-columns: repeat(3,1fr); gap: 18px; }
+
+    .k-col {
+      background: #f1f5f9;
+      border-radius: var(--radius);
+      padding: 14px;
+      min-height: 200px;
+    }
+
+    .k-col-head {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 14px;
+    }
+
+    .k-col-title {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 13px; font-weight: 700; color: var(--text);
+    }
+
+    .k-col-dot { width: 8px; height: 8px; border-radius: 50%; }
+
+    .k-count {
+      background: white;
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      font-size: 11px; font-weight: 700;
+      padding: 2px 8px; border-radius: 100px;
+    }
+
+    .task-card {
+      background: white;
+      border-radius: 10px;
+      padding: 13px 14px;
+      margin-bottom: 10px;
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow-sm);
+      cursor: pointer;
+      transition: all 0.18s;
+    }
+
+    .task-card:hover { box-shadow: var(--shadow); transform: translateY(-2px); }
+
+    .task-card-title { font-size: 13.5px; font-weight: 700; color: var(--text); margin-bottom: 5px; }
+
+    .task-card-desc { font-size: 12px; color: var(--text-muted); margin-bottom: 10px; line-height: 1.4; }
+
+    .task-card-footer { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+
+    .priority-pip { width: 7px; height: 7px; border-radius: 50%; }
+    .priority-pip.high   { background: var(--danger); }
+    .priority-pip.medium { background: var(--warning); }
+    .priority-pip.low    { background: var(--success); }
+
+    .task-tag {
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 3px 9px;
+      background: #f1f5f9;
+      border-radius: 100px;
+      font-size: 11px; color: var(--text-muted); font-weight: 500;
+      margin-top: 8px;
+    }
+
+    /* ===== SECTION HEADER ===== */
+    .sect-head {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 18px; flex-wrap: wrap; gap: 12px;
+    }
+
+    .sect-head h3 { font-size: 16px; font-weight: 800; }
+
+    .filters { display: flex; gap: 9px; align-items: center; flex-wrap: wrap; }
+
+    .filter-select {
+      padding: 8px 12px;
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius-sm);
+      font-size: 13px; background: white;
+      cursor: pointer; color: var(--text);
+      font-family: inherit;
+    }
+
+    .filter-select:focus { outline: none; border-color: var(--primary); }
+
+    /* ===== EMPTY STATE ===== */
+    .empty {
+      text-align: center; padding: 56px 24px; color: var(--text-muted);
+    }
+
+    .empty-icon {
+      width: 72px; height: 72px;
+      background: var(--bg);
+      border-radius: 20px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 28px; color: #cbd5e1;
+      margin: 0 auto 18px;
+    }
+
+    .empty p { font-size: 14px; margin-bottom: 20px; }
+
+    /* ===== ACTIONS ===== */
+    .actions { display: flex; gap: 5px; }
+
+    /* ===== PROGRESS ===== */
+    .progress { background: #e2e8f0; border-radius: 100px; height: 5px; overflow: hidden; }
+
+    .progress-fill {
+      height: 100%; border-radius: 100px;
+      background: linear-gradient(90deg, var(--primary), var(--secondary));
+      transition: width 0.3s;
+    }
+
+    /* ===== PAGE ===== */
+    .page { display: none; }
+    .page.active { display: block; }
+
+    /* ===== DASHBOARD GRID ===== */
+    .dash-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+
+    .dash-project-item { padding: 12px 0; border-bottom: 1px solid #f1f5f9; }
+    .dash-project-item:last-child { border-bottom: none; }
+
+    .dash-task-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 0; border-bottom: 1px solid #f1f5f9;
+    }
+
+    .dash-task-item:last-child { border-bottom: none; }
+
+    /* ===== TOAST ===== */
+    .toast-wrap {
+      position: fixed; bottom: 22px; right: 22px;
+      z-index: 2000; display: flex; flex-direction: column; gap: 9px;
+    }
+
+    .toast {
+      background: white;
+      border-radius: 10px;
+      padding: 13px 17px;
+      box-shadow: var(--shadow-lg);
+      border-left: 4px solid var(--success);
+      font-size: 13.5px; font-weight: 500;
+      transform: translateX(120%);
+      transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+      min-width: 260px;
+      display: flex; align-items: center; gap: 10px;
+    }
+
+    .toast.show { transform: translateX(0); }
+    .toast.warn { border-left-color: var(--warning); }
+    .toast.error { border-left-color: var(--danger); }
+
+    /* ===== SCROLLBAR ===== */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+    /* ===== RESPONSIVE ===== */
+    @media (max-width: 1100px) {
+      .stats-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+
+    @media (max-width: 900px) {
+      .dash-grid { grid-template-columns: 1fr; }
+      .kanban { grid-template-columns: 1fr; }
+      .form-row { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 700px) {
+      .sidebar { transform: translateX(-250px); }
+      .main { margin-left: 0; }
+      .stats-grid { grid-template-columns: 1fr 1fr; }
+      .content { padding: 16px; }
+      .topbar { padding: 0 16px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ===== SIDEBAR ===== -->
+<aside class="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-icon">💼</div>
+    <h1>FreelancerCRM</h1>
+    <p>Dein Business-Dashboard</p>
+  </div>
+
+  <nav class="sidebar-nav">
+    <div class="nav-section">Übersicht</div>
+    <div class="nav-item active" onclick="navigate('dashboard', this)">
+      <i class="fas fa-chart-pie"></i><span>Dashboard</span>
+    </div>
+
+    <div class="nav-section" style="margin-top:8px">Verwaltung</div>
+    <div class="nav-item" onclick="navigate('clients', this)">
+      <i class="fas fa-users"></i><span>Kunden</span>
+      <span class="nav-badge" id="nb-clients">0</span>
+    </div>
+    <div class="nav-item" onclick="navigate('projects', this)">
+      <i class="fas fa-folder-open"></i><span>Projekte</span>
+      <span class="nav-badge" id="nb-projects">0</span>
+    </div>
+    <div class="nav-item" onclick="navigate('tasks', this)">
+      <i class="fas fa-tasks"></i><span>Aufgaben</span>
+      <span class="nav-badge" id="nb-tasks">0</span>
+    </div>
+  </nav>
+
+  <div class="sidebar-footer">
+    © 2026 FreelancerCRM · Alle Daten lokal gespeichert
+  </div>
+</aside>
+
+<!-- ===== MAIN ===== -->
+<main class="main">
+
+  <!-- Topbar -->
+  <div class="topbar">
+    <div class="topbar-left">
+      <h2 id="page-title">Dashboard</h2>
+    </div>
+    <div class="topbar-right">
+      <div class="search-wrap">
+        <i class="fas fa-search"></i>
+        <input type="text" placeholder="Suchen…" id="global-search" oninput="handleGlobalSearch(this.value)">
+      </div>
+    </div>
+  </div>
+
+  <div class="content">
+
+    <!-- ===== DASHBOARD ===== -->
+    <div class="page active" id="page-dashboard">
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-icon violet"><i class="fas fa-users"></i></div>
+          <div class="stat-info"><h3 id="s-clients">0</h3><p>Kunden gesamt</p></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon blue"><i class="fas fa-folder-open"></i></div>
+          <div class="stat-info"><h3 id="s-projects">0</h3><p>Aktive Projekte</p></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon green"><i class="fas fa-check-circle"></i></div>
+          <div class="stat-info"><h3 id="s-done">0</h3><p>Aufgaben erledigt</p></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon amber"><i class="fas fa-hourglass-half"></i></div>
+          <div class="stat-info"><h3 id="s-open">0</h3><p>Offene Aufgaben</p></div>
+        </div>
+      </div>
+
+      <div class="dash-grid">
+        <div class="card">
+          <div class="sect-head">
+            <h3>Aktuelle Projekte</h3>
+            <button class="btn btn-sm btn-secondary" onclick="navigate('projects')">Alle <i class="fas fa-arrow-right"></i></button>
+          </div>
+          <div id="dash-projects-list"></div>
+        </div>
+        <div class="card">
+          <div class="sect-head">
+            <h3>Offene Aufgaben</h3>
+            <button class="btn btn-sm btn-secondary" onclick="navigate('tasks')">Alle <i class="fas fa-arrow-right"></i></button>
+          </div>
+          <div id="dash-tasks-list"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== CLIENTS ===== -->
+    <div class="page" id="page-clients">
+      <div class="sect-head">
+        <div class="filters">
+          <div class="search-wrap">
+            <i class="fas fa-search"></i>
+            <input type="text" placeholder="Kunden suchen…" oninput="renderClients(this.value)">
+          </div>
+          <select class="filter-select" onchange="renderClients('', this.value)" id="client-status-filter">
+            <option value="">Alle Status</option>
+            <option value="active">Aktiv</option>
+            <option value="lead">Lead</option>
+            <option value="inactive">Inaktiv</option>
+          </select>
+        </div>
+        <button class="btn btn-primary" onclick="openModal('client')">
+          <i class="fas fa-plus"></i> Neuer Kunde
+        </button>
+      </div>
+
+      <div class="card">
+        <div class="table-wrap">
+          <table id="clients-table">
+            <thead>
+              <tr>
+                <th>Kunde</th>
+                <th>E-Mail</th>
+                <th>Telefon</th>
+                <th>Projekte</th>
+                <th>Status</th>
+                <th style="text-align:right">Aktionen</th>
+              </tr>
+            </thead>
+            <tbody id="clients-body"></tbody>
+          </table>
+        </div>
+        <div id="clients-empty" class="empty" style="display:none">
+          <div class="empty-icon"><i class="fas fa-users"></i></div>
+          <p>Noch keine Kunden angelegt</p>
+          <button class="btn btn-primary" onclick="openModal('client')"><i class="fas fa-plus"></i> Ersten Kunden anlegen</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== PROJECTS ===== -->
+    <div class="page" id="page-projects">
+      <div class="sect-head">
+        <div class="filters">
+          <div class="search-wrap">
+            <i class="fas fa-search"></i>
+            <input type="text" placeholder="Projekte suchen…" oninput="renderProjects(this.value)">
+          </div>
+          <select class="filter-select" onchange="renderProjects('', this.value)" id="project-status-filter">
+            <option value="">Alle Status</option>
+            <option value="active">Aktiv</option>
+            <option value="paused">Pausiert</option>
+            <option value="completed">Abgeschlossen</option>
+          </select>
+          <select class="filter-select" onchange="renderProjects('', '', this.value)" id="project-client-filter">
+            <option value="">Alle Kunden</option>
+          </select>
+        </div>
+        <button class="btn btn-primary" onclick="openModal('project')">
+          <i class="fas fa-plus"></i> Neues Projekt
+        </button>
+      </div>
+
+      <div class="card">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Projekt</th>
+                <th>Kunde</th>
+                <th>Status</th>
+                <th>Fortschritt</th>
+                <th>Budget</th>
+                <th>Fällig</th>
+                <th style="text-align:right">Aktionen</th>
+              </tr>
+            </thead>
+            <tbody id="projects-body"></tbody>
+          </table>
+        </div>
+        <div id="projects-empty" class="empty" style="display:none">
+          <div class="empty-icon"><i class="fas fa-folder-open"></i></div>
+          <p>Noch keine Projekte angelegt</p>
+          <button class="btn btn-primary" onclick="openModal('project')"><i class="fas fa-plus"></i> Erstes Projekt anlegen</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== TASKS ===== -->
+    <div class="page" id="page-tasks">
+      <div class="sect-head">
+        <div class="filters">
+          <select class="filter-select" onchange="renderTasks()" id="task-proj-filter">
+            <option value="">Alle Projekte</option>
+          </select>
+          <select class="filter-select" onchange="renderTasks()" id="task-prio-filter">
+            <option value="">Alle Prioritäten</option>
+            <option value="high">Hoch</option>
+            <option value="medium">Mittel</option>
+            <option value="low">Niedrig</option>
+          </select>
+        </div>
+        <button class="btn btn-primary" onclick="openModal('task')">
+          <i class="fas fa-plus"></i> Neue Aufgabe
+        </button>
+      </div>
+
+      <div class="kanban" id="kanban"></div>
+      <div id="tasks-empty" class="empty" style="display:none">
+        <div class="empty-icon"><i class="fas fa-tasks"></i></div>
+        <p>Noch keine Aufgaben angelegt</p>
+        <button class="btn btn-primary" onclick="openModal('task')"><i class="fas fa-plus"></i> Erste Aufgabe anlegen</button>
+      </div>
+    </div>
+
+  </div><!-- /content -->
+</main>
+
+<!-- ===== MODAL: CLIENT ===== -->
+<div class="modal-overlay" id="modal-client">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="cm-title">Neuer Kunde</h3>
+      <button class="modal-close" onclick="closeModal('client')"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="modal-body">
+      <form id="client-form" onsubmit="saveClient(event)">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Vorname *</label>
+            <input type="text" class="form-control" id="cf-fn" required placeholder="Max">
+          </div>
+          <div class="form-group">
+            <label>Nachname *</label>
+            <input type="text" class="form-control" id="cf-ln" required placeholder="Mustermann">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Unternehmen</label>
+          <input type="text" class="form-control" id="cf-co" placeholder="Musterfirma GmbH">
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>E-Mail *</label>
+            <input type="email" class="form-control" id="cf-em" required placeholder="max@firma.de">
+          </div>
+          <div class="form-group">
+            <label>Telefon</label>
+            <input type="tel" class="form-control" id="cf-ph" placeholder="+49 123 456789">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Status</label>
+            <select class="form-control" id="cf-st">
+              <option value="active">Aktiv</option>
+              <option value="lead">Lead</option>
+              <option value="inactive">Inaktiv</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Stundensatz (€)</label>
+            <input type="number" class="form-control" id="cf-rate" placeholder="90" min="0">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Notizen</label>
+          <textarea class="form-control" id="cf-notes" placeholder="Interne Notizen…"></textarea>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('client')">Abbrechen</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Speichern</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- ===== MODAL: PROJECT ===== -->
+<div class="modal-overlay" id="modal-project">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="pm-title">Neues Projekt</h3>
+      <button class="modal-close" onclick="closeModal('project')"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="modal-body">
+      <form id="project-form" onsubmit="saveProject(event)">
+        <div class="form-group">
+          <label>Projektname *</label>
+          <input type="text" class="form-control" id="pf-name" required placeholder="Website Redesign">
+        </div>
+        <div class="form-group">
+          <label>Beschreibung</label>
+          <textarea class="form-control" id="pf-desc" placeholder="Kurze Projektbeschreibung…"></textarea>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Kunde</label>
+            <select class="form-control" id="pf-client">
+              <option value="">Kein Kunde</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Status</label>
+            <select class="form-control" id="pf-status">
+              <option value="active">Aktiv</option>
+              <option value="paused">Pausiert</option>
+              <option value="completed">Abgeschlossen</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Startdatum</label>
+            <input type="date" class="form-control" id="pf-start">
+          </div>
+          <div class="form-group">
+            <label>Enddatum</label>
+            <input type="date" class="form-control" id="pf-end">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Budget (€)</label>
+            <input type="number" class="form-control" id="pf-budget" placeholder="5000" min="0">
+          </div>
+          <div class="form-group">
+            <label>Stundensatz (€)</label>
+            <input type="number" class="form-control" id="pf-rate" placeholder="90" min="0">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('project')">Abbrechen</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Speichern</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- ===== MODAL: TASK ===== -->
+<div class="modal-overlay" id="modal-task">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="tm-title">Neue Aufgabe</h3>
+      <button class="modal-close" onclick="closeModal('task')"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="modal-body">
+      <form id="task-form" onsubmit="saveTask(event)">
+        <div class="form-group">
+          <label>Titel *</label>
+          <input type="text" class="form-control" id="tf-title" required placeholder="Aufgabentitel">
+        </div>
+        <div class="form-group">
+          <label>Beschreibung</label>
+          <textarea class="form-control" id="tf-desc" placeholder="Details zur Aufgabe…"></textarea>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Projekt</label>
+            <select class="form-control" id="tf-project">
+              <option value="">Kein Projekt</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Priorität</label>
+            <select class="form-control" id="tf-prio">
+              <option value="low">Niedrig</option>
+              <option value="medium" selected>Mittel</option>
+              <option value="high">Hoch</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Status</label>
+            <select class="form-control" id="tf-status">
+              <option value="todo">Offen</option>
+              <option value="inprogress">In Bearbeitung</option>
+              <option value="done">Erledigt</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Fällig am</label>
+            <input type="date" class="form-control" id="tf-due">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('task')">Abbrechen</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Speichern</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- ===== MODAL: CONFIRM ===== -->
+<div class="modal-overlay" id="modal-confirm">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-header">
+      <h3>Löschen bestätigen</h3>
+      <button class="modal-close" onclick="closeModal('confirm')"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="modal-body">
+      <p id="confirm-text" style="color:var(--text-muted);font-size:14px;line-height:1.6;margin-bottom:20px"></p>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeModal('confirm')">Abbrechen</button>
+        <button class="btn btn-danger" onclick="confirmDelete()"><i class="fas fa-trash"></i> Endgültig löschen</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== TOASTS ===== -->
+<div class="toast-wrap" id="toast-wrap"></div>
+
+<!-- ===== SCRIPT ===== -->
+<script>
+// ══════════════════════════════════════
+//  DATA
+// ══════════════════════════════════════
+let db = { clients: [], projects: [], tasks: [] };
+let editId = null;
+let delCb  = null;
+let curPage = 'dashboard';
+
+const COLORS = ['#6366f1','#8b5cf6','#ec4899','#f59e0b','#10b981','#3b82f6','#14b8a6','#f97316'];
+
+function avatarColor(s) {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = s.charCodeAt(i) + ((h << 5) - h);
+  return COLORS[Math.abs(h) % COLORS.length];
+}
+
+function initials(s) {
+  return s.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
+}
+
+function uid() { return Date.now() + Math.random().toString(36).slice(2, 6); }
+
+// ══════════════════════════════════════
+//  STORAGE
+// ══════════════════════════════════════
+function persist() { localStorage.setItem('fcrm-v2', JSON.stringify(db)); }
+
+function hydrate() {
+  const raw = localStorage.getItem('fcrm-v2');
+  if (raw) { db = JSON.parse(raw); return; }
+
+  // ── Demo-Daten ──
+  db = {
+    clients: [
+      { id:'c1', fn:'Anna',   ln:'Müller', co:'Design AG',   em:'anna@design-ag.de',     ph:'+49 160 111 22 33', st:'active',   rate:95,  notes:'Stammkundin, bevorzugt E-Mail', createdAt: iso() },
+      { id:'c2', fn:'Thomas', ln:'Weber',  co:'Tech GmbH',   em:'t.weber@tech-gmbh.de',  ph:'+49 172 444 55 66', st:'active',   rate:120, notes:'', createdAt: iso() },
+      { id:'c3', fn:'Sophie', ln:'Koch',   co:'',            em:'sophie@mail.de',         ph:'',                  st:'lead',     rate:0,   notes:'Interessiert am Social-Media-Paket', createdAt: iso() },
+      { id:'c4', fn:'Leon',   ln:'Becker', co:'StartupX',    em:'leon@startupx.io',       ph:'+49 151 999 00 11', st:'inactive', rate:80,  notes:'Projekt pausiert', createdAt: iso() }
+    ],
+    projects: [
+      { id:'p1', name:'Website Redesign',   desc:'Komplette Überarbeitung der Corporate Website', clientId:'c1', st:'active',    start:'2026-01-15', end:'2026-03-31', budget:8000,  rate:95,  createdAt: iso() },
+      { id:'p2', name:'Mobile App',         desc:'Native iOS & Android App für Kunden',          clientId:'c2', st:'active',    start:'2026-02-01', end:'2026-06-30', budget:25000, rate:120, createdAt: iso() },
+      { id:'p3', name:'Logo & Branding',    desc:'Corporate Identity für Startup',               clientId:'c3', st:'paused',    start:'2026-01-01', end:'2026-02-28', budget:3500,  rate:90,  createdAt: iso() },
+      { id:'p4', name:'SEO Kampagne',       desc:'3-Monats SEO Betreuung',                       clientId:'c1', st:'completed', start:'2025-10-01', end:'2025-12-31', budget:4500,  rate:95,  createdAt: iso() }
+    ],
+    tasks: [
+      { id:'t1', title:'Wireframes erstellen',    desc:'Low-Fidelity Wireframes für alle Seiten',      projId:'p1', prio:'high',   st:'done',       due:'2026-02-10', createdAt: iso() },
+      { id:'t2', title:'Design System aufbauen',  desc:'Farben, Typo und Komponenten definieren',      projId:'p1', prio:'high',   st:'inprogress', due:'2026-02-25', createdAt: iso() },
+      { id:'t3', title:'Homepage Mockup',         desc:'High-Fidelity Design der Startseite',          projId:'p1', prio:'medium', st:'todo',       due:'2026-03-05', createdAt: iso() },
+      { id:'t4', title:'API Architektur',         desc:'Backend API Konzept und Dokumentation',        projId:'p2', prio:'high',   st:'inprogress', due:'2026-02-28', createdAt: iso() },
+      { id:'t5', title:'App Onboarding Flow',     desc:'Onboarding Screens designen',                  projId:'p2', prio:'medium', st:'todo',       due:'2026-03-15', createdAt: iso() },
+      { id:'t6', title:'Push Notifications',      desc:'Firebase Integration für Push Notifications',  projId:'p2', prio:'low',    st:'todo',       due:'2026-04-01', createdAt: iso() },
+      { id:'t7', title:'Logo Varianten',          desc:'3 Logo-Vorschläge ausarbeiten',                projId:'p3', prio:'high',   st:'done',       due:'2026-01-20', createdAt: iso() }
+    ]
+  };
+  persist();
+}
+
+function iso() { return new Date().toISOString(); }
+
+// ══════════════════════════════════════
+//  NAVIGATION
+// ══════════════════════════════════════
+function navigate(page, el) {
+  curPage = page;
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('page-' + page).classList.add('active');
+
+  const titles = { dashboard:'Dashboard', clients:'Kunden', projects:'Projekte', tasks:'Aufgaben' };
+  document.getElementById('page-title').textContent = titles[page];
+
+  if (el) {
+    el.classList.add('active');
+  } else {
+    document.querySelectorAll('.nav-item').forEach(n => {
+      if (n.getAttribute('onclick')?.includes(`'${page}'`)) n.classList.add('active');
+    });
+  }
+
+  renderPage(page);
+}
+
+function renderPage(p) {
+  updateBadges();
+  if (p === 'dashboard') renderDashboard();
+  if (p === 'clients')   renderClients();
+  if (p === 'projects')  renderProjects();
+  if (p === 'tasks')     renderTasks();
+}
+
+function updateBadges() {
+  document.getElementById('nb-clients').textContent  = db.clients.length;
+  document.getElementById('nb-projects').textContent = db.projects.filter(p => p.st === 'active').length;
+  document.getElementById('nb-tasks').textContent    = db.tasks.filter(t => t.st !== 'done').length;
+}
+
+// ══════════════════════════════════════
+//  DASHBOARD
+// ══════════════════════════════════════
+function renderDashboard() {
+  const activePrj = db.projects.filter(p => p.st === 'active');
+  const doneTasks = db.tasks.filter(t => t.st === 'done');
+  const openTasks = db.tasks.filter(t => t.st !== 'done');
+
+  document.getElementById('s-clients').textContent  = db.clients.length;
+  document.getElementById('s-projects').textContent = activePrj.length;
+  document.getElementById('s-done').textContent     = doneTasks.length;
+  document.getElementById('s-open').textContent     = openTasks.length;
+
+  // Projects list
+  const projEl = document.getElementById('dash-projects-list');
+  if (!db.projects.length) {
+    projEl.innerHTML = '<p style="color:var(--text-muted);font-size:13px;text-align:center;padding:24px 0">Keine Projekte vorhanden</p>';
+  } else {
+    projEl.innerHTML = db.projects.slice(0, 5).map(p => {
+      const client = db.clients.find(c => c.id === p.clientId);
+      const tasks  = db.tasks.filter(t => t.projId === p.id);
+      const done   = tasks.filter(t => t.st === 'done').length;
+      const pct    = tasks.length ? Math.round((done / tasks.length) * 100) : 0;
+      return `
+        <div class="dash-project-item">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:7px">
+            <div>
+              <div style="font-size:13.5px;font-weight:700">${esc(p.name)}</div>
+              <div style="font-size:11.5px;color:var(--text-muted)">${client ? esc(client.fn + ' ' + client.ln) : 'Kein Kunde'} &middot; ${done}/${tasks.length} Aufgaben</div>
+            </div>
+            ${prjBadge(p.st)}
+          </div>
+          <div class="progress"><div class="progress-fill" style="width:${pct}%"></div></div>
+        </div>`;
+    }).join('');
+  }
+
+  // Tasks list
+  const taskEl = document.getElementById('dash-tasks-list');
+  const list = db.tasks.filter(t => t.st !== 'done').slice(0, 6);
+  if (!list.length) {
+    taskEl.innerHTML = '<p style="color:var(--text-muted);font-size:13px;text-align:center;padding:24px 0">Alle Aufgaben erledigt ✓</p>';
+  } else {
+    taskEl.innerHTML = list.map(t => {
+      const proj = db.projects.find(p => p.id === t.projId);
+      return `
+        <div class="dash-task-item">
+          <div class="priority-pip ${t.prio}"></div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(t.title)}</div>
+            <div style="font-size:11.5px;color:var(--text-muted)">${proj ? esc(proj.name) : 'Kein Projekt'}${t.due ? ' · ' + fmtDate(t.due) : ''}</div>
+          </div>
+          ${taskBadge(t.st)}
+        </div>`;
+    }).join('');
+  }
+}
+
+// ══════════════════════════════════════
+//  CLIENTS
+// ══════════════════════════════════════
+function renderClients(search = '', statusF = '') {
+  if (!statusF) statusF = document.getElementById('client-status-filter')?.value || '';
+
+  let list = db.clients;
+  if (search) {
+    const q = search.toLowerCase();
+    list = list.filter(c =>
+      (c.fn + ' ' + c.ln).toLowerCase().includes(q) ||
+      c.em.toLowerCase().includes(q) ||
+      (c.co || '').toLowerCase().includes(q)
+    );
+  }
+  if (statusF) list = list.filter(c => c.st === statusF);
+
+  const tbody  = document.getElementById('clients-body');
+  const empty  = document.getElementById('clients-empty');
+  const table  = document.getElementById('clients-table');
+
+  if (!list.length) {
+    tbody.innerHTML = '';
+    table.style.display = 'none';
+    empty.style.display = 'block';
+    return;
+  }
+
+  table.style.display = 'table';
+  empty.style.display = 'none';
+
+  tbody.innerHTML = list.map(c => {
+    const name   = c.fn + ' ' + c.ln;
+    const prjCnt = db.projects.filter(p => p.clientId === c.id).length;
+    const col    = avatarColor(name);
+    return `
+      <tr>
+        <td>
+          <div class="client-row">
+            <div class="avatar" style="background:${col}">${initials(name)}</div>
+            <div>
+              <div style="font-weight:700;font-size:13.5px">${esc(name)}</div>
+              <div style="font-size:11.5px;color:var(--text-muted)">${esc(c.co || '—')}</div>
+            </div>
+          </div>
+        </td>
+        <td><a href="mailto:${esc(c.em)}" style="color:var(--primary);text-decoration:none;font-size:13px">${esc(c.em)}</a></td>
+        <td style="color:var(--text-muted);font-size:13px">${esc(c.ph || '—')}</td>
+        <td><span class="badge badge-blue">${prjCnt} Projekt${prjCnt !== 1 ? 'e' : ''}</span></td>
+        <td>${clientBadge(c.st)}</td>
+        <td>
+          <div class="actions" style="justify-content:flex-end">
+            <button class="btn btn-sm btn-secondary btn-icon" onclick="editClient('${c.id}')" title="Bearbeiten"><i class="fas fa-edit"></i></button>
+            <button class="btn btn-sm btn-danger btn-icon" onclick="askDelete('client','${c.id}')" title="Löschen"><i class="fas fa-trash"></i></button>
+          </div>
+        </td>
+      </tr>`;
+  }).join('');
+}
+
+// ══════════════════════════════════════
+//  PROJECTS
+// ══════════════════════════════════════
+function renderProjects(search = '', statusF = '', clientF = '') {
+  if (!statusF) statusF = document.getElementById('project-status-filter')?.value || '';
+  if (!clientF) clientF = document.getElementById('project-client-filter')?.value || '';
+
+  // Populate client filter
+  const cf = document.getElementById('project-client-filter');
+  if (cf) {
+    const cur = cf.value;
+    cf.innerHTML = '<option value="">Alle Kunden</option>' +
+      db.clients.map(c => `<option value="${c.id}" ${c.id === cur ? 'selected':''} >${esc(c.fn + ' ' + c.ln)}</option>`).join('');
+    if (!clientF && cur) clientF = cur;
+  }
+
+  let list = db.projects;
+  if (search)  list = list.filter(p => p.name.toLowerCase().includes(search.toLowerCase()) || (p.desc||'').toLowerCase().includes(search.toLowerCase()));
+  if (statusF) list = list.filter(p => p.st === statusF);
+  if (clientF) list = list.filter(p => p.clientId === clientF);
+
+  const tbody = document.getElementById('projects-body');
+  const empty = document.getElementById('projects-empty');
+
+  if (!list.length) {
+    tbody.innerHTML = '';
+    empty.style.display = 'block';
+    return;
+  }
+
+  empty.style.display = 'none';
+
+  tbody.innerHTML = list.map(p => {
+    const client = db.clients.find(c => c.id === p.clientId);
+    const tasks  = db.tasks.filter(t => t.projId === p.id);
+    const done   = tasks.filter(t => t.st === 'done').length;
+    const pct    = tasks.length ? Math.round((done / tasks.length) * 100) : 0;
+    const name   = client ? client.fn + ' ' + client.ln : null;
+    const col    = name ? avatarColor(name) : '#94a3b8';
+    return `
+      <tr>
+        <td>
+          <div style="font-weight:700;font-size:13.5px">${esc(p.name)}</div>
+          <div style="font-size:11.5px;color:var(--text-muted);margin-top:2px">${p.desc ? esc(p.desc.slice(0,60)) + (p.desc.length > 60 ? '…' : '') : '—'}</div>
+        </td>
+        <td>
+          ${client ? `<div class="client-row">
+            <div class="avatar" style="background:${col};width:28px;height:28px;font-size:10px">${initials(name)}</div>
+            <span style="font-size:13px">${esc(name)}</span>
+          </div>` : '<span style="color:var(--text-muted)">—</span>'}
+        </td>
+        <td>${prjBadge(p.st)}</td>
+        <td style="min-width:140px">
+          <div style="display:flex;align-items:center;gap:8px">
+            <div class="progress" style="flex:1"><div class="progress-fill" style="width:${pct}%"></div></div>
+            <span style="font-size:11.5px;color:var(--text-muted);min-width:30px">${pct}%</span>
+          </div>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:3px">${done}/${tasks.length} Tasks</div>
+        </td>
+        <td style="font-size:13px">${p.budget ? '€ ' + p.budget.toLocaleString('de-DE') : '—'}</td>
+        <td style="font-size:13px">${p.end ? fmtDate(p.end) : '—'}</td>
+        <td>
+          <div class="actions" style="justify-content:flex-end">
+            <button class="btn btn-sm btn-secondary btn-icon" onclick="editProject('${p.id}')" title="Bearbeiten"><i class="fas fa-edit"></i></button>
+            <button class="btn btn-sm btn-danger btn-icon" onclick="askDelete('project','${p.id}')" title="Löschen"><i class="fas fa-trash"></i></button>
+          </div>
+        </td>
+      </tr>`;
+  }).join('');
+}
+
+// ══════════════════════════════════════
+//  TASKS / KANBAN
+// ══════════════════════════════════════
+function renderTasks() {
+  const projF = document.getElementById('task-proj-filter')?.value || '';
+  const prioF = document.getElementById('task-prio-filter')?.value || '';
+
+  // Populate project dropdown
+  const pf = document.getElementById('task-proj-filter');
+  if (pf) {
+    const cur = pf.value;
+    pf.innerHTML = '<option value="">Alle Projekte</option>' +
+      db.projects.map(p => `<option value="${p.id}" ${p.id === cur ? 'selected':''} >${esc(p.name)}</option>`).join('');
+  }
+
+  let list = db.tasks;
+  if (projF) list = list.filter(t => t.projId === projF);
+  if (prioF) list = list.filter(t => t.prio  === prioF);
+
+  const kanban = document.getElementById('kanban');
+  const empty  = document.getElementById('tasks-empty');
+
+  if (!list.length) {
+    kanban.style.display = 'none';
+    empty.style.display  = 'block';
+    return;
+  }
+
+  kanban.style.display = 'grid';
+  empty.style.display  = 'none';
+
+  const cols = [
+    { key:'todo',       label:'Offen',          dot:'#94a3b8' },
+    { key:'inprogress', label:'In Bearbeitung',  dot:'#3b82f6' },
+    { key:'done',       label:'Erledigt',        dot:'#10b981' }
+  ];
+
+  kanban.innerHTML = cols.map(col => {
+    const items = list.filter(t => t.st === col.key);
+    return `
+      <div class="k-col">
+        <div class="k-col-head">
+          <div class="k-col-title">
+            <span class="k-col-dot" style="background:${col.dot}"></span>
+            ${col.label}
+          </div>
+          <span class="k-count">${items.length}</span>
+        </div>
+        ${items.map(taskCard).join('')}
+        <button class="btn btn-sm btn-secondary" style="width:100%;margin-top:4px;justify-content:center;font-size:12px;opacity:0.7"
+          onclick="openTaskWithStatus('${col.key}')">
+          <i class="fas fa-plus"></i> Hinzufügen
+        </button>
+      </div>`;
+  }).join('');
+}
+
+function taskCard(t) {
+  const proj = db.projects.find(p => p.id === t.projId);
+  const prioLabel = { high:'Hoch', medium:'Mittel', low:'Niedrig' };
+  const prioBadge = { high:'badge-red', medium:'badge-yellow', low:'badge-green' };
+  const overdue   = t.due && t.st !== 'done' && new Date(t.due) < new Date();
+  return `
+    <div class="task-card" onclick="editTask('${t.id}')">
+      <div class="task-card-title">${esc(t.title)}</div>
+      ${t.desc ? `<div class="task-card-desc">${esc(t.desc.slice(0,90))}${t.desc.length > 90 ? '…' : ''}</div>` : ''}
+      <div class="task-card-footer">
+        <span class="badge ${prioBadge[t.prio]}">${prioLabel[t.prio]}</span>
+        <div style="display:flex;align-items:center;gap:6px">
+          ${t.due ? `<span style="font-size:11px;color:${overdue ? 'var(--danger)' : 'var(--text-muted)'};font-weight:${overdue?'700':'400'}">${overdue?'⚠ ':''}${fmtDate(t.due)}</span>` : ''}
+          <button class="btn btn-sm btn-danger btn-icon" style="width:26px;height:26px" onclick="event.stopPropagation();askDelete('task','${t.id}')" title="Löschen"><i class="fas fa-trash" style="font-size:10px"></i></button>
+        </div>
+      </div>
+      ${proj ? `<div><span class="task-tag"><i class="fas fa-folder" style="font-size:9px"></i>${esc(proj.name)}</span></div>` : ''}
+    </div>`;
+}
+
+function openTaskWithStatus(status) {
+  openModal('task');
+  document.getElementById('tf-status').value = status;
+}
+
+// ══════════════════════════════════════
+//  MODAL OPEN / CLOSE
+// ══════════════════════════════════════
+function openModal(type) {
+  editId = null;
+
+  if (type === 'client') {
+    document.getElementById('cm-title').textContent = 'Neuer Kunde';
+    document.getElementById('client-form').reset();
+  }
+
+  if (type === 'project') {
+    document.getElementById('pm-title').textContent = 'Neues Projekt';
+    document.getElementById('project-form').reset();
+    populateClientSel('pf-client', null);
+  }
+
+  if (type === 'task') {
+    document.getElementById('tm-title').textContent = 'Neue Aufgabe';
+    document.getElementById('task-form').reset();
+    document.getElementById('tf-prio').value = 'medium';
+    populateProjSel('tf-project', null);
+  }
+
+  document.getElementById('modal-' + type).classList.add('active');
+}
+
+function closeModal(type) {
+  document.getElementById('modal-' + type).classList.remove('active');
+  editId = null;
+}
+
+document.querySelectorAll('.modal-overlay').forEach(o => {
+  o.addEventListener('click', e => {
+    if (e.target === o) { o.classList.remove('active'); editId = null; }
+  });
+});
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    document.querySelectorAll('.modal-overlay.active').forEach(o => {
+      o.classList.remove('active'); editId = null;
+    });
+  }
+});
+
+// ══════════════════════════════════════
+//  SAVE
+// ══════════════════════════════════════
+function saveClient(e) {
+  e.preventDefault();
+  const c = {
+    id:   editId || uid(),
+    fn:   val('cf-fn'),
+    ln:   val('cf-ln'),
+    co:   val('cf-co'),
+    em:   val('cf-em'),
+    ph:   val('cf-ph'),
+    st:   val('cf-st'),
+    rate: parseFloat(document.getElementById('cf-rate').value) || 0,
+    notes: val('cf-notes'),
+    createdAt: editId ? db.clients.find(c => c.id === editId)?.createdAt : iso()
+  };
+
+  if (editId) {
+    db.clients = db.clients.map(x => x.id === editId ? c : x);
+    toast('Kunde aktualisiert');
+  } else {
+    db.clients.push(c);
+    toast('Kunde angelegt');
+  }
+
+  persist();
+  closeModal('client');
+  renderPage(curPage);
+}
+
+function saveProject(e) {
+  e.preventDefault();
+  const p = {
+    id:       editId || uid(),
+    name:     val('pf-name'),
+    desc:     val('pf-desc'),
+    clientId: val('pf-client') || null,
+    st:       val('pf-status'),
+    start:    val('pf-start'),
+    end:      val('pf-end'),
+    budget:   parseFloat(document.getElementById('pf-budget').value) || 0,
+    rate:     parseFloat(document.getElementById('pf-rate').value) || 0,
+    createdAt: editId ? db.projects.find(x => x.id === editId)?.createdAt : iso()
+  };
+
+  if (editId) {
+    db.projects = db.projects.map(x => x.id === editId ? p : x);
+    toast('Projekt aktualisiert');
+  } else {
+    db.projects.push(p);
+    toast('Projekt angelegt');
+  }
+
+  persist();
+  closeModal('project');
+  renderPage(curPage);
+}
+
+function saveTask(e) {
+  e.preventDefault();
+  const t = {
+    id:    editId || uid(),
+    title: val('tf-title'),
+    desc:  val('tf-desc'),
+    projId: val('tf-project') || null,
+    prio:  val('tf-prio'),
+    st:    val('tf-status'),
+    due:   val('tf-due'),
+    createdAt: editId ? db.tasks.find(x => x.id === editId)?.createdAt : iso()
+  };
+
+  if (editId) {
+    db.tasks = db.tasks.map(x => x.id === editId ? t : x);
+    toast('Aufgabe aktualisiert');
+  } else {
+    db.tasks.push(t);
+    toast('Aufgabe angelegt');
+  }
+
+  persist();
+  closeModal('task');
+  renderPage(curPage);
+}
+
+// ══════════════════════════════════════
+//  EDIT
+// ══════════════════════════════════════
+function editClient(id) {
+  const c = db.clients.find(x => x.id === id);
+  if (!c) return;
+  editId = id;
+  document.getElementById('cm-title').textContent = 'Kunde bearbeiten';
+  set('cf-fn', c.fn); set('cf-ln', c.ln); set('cf-co', c.co);
+  set('cf-em', c.em); set('cf-ph', c.ph); set('cf-st', c.st);
+  document.getElementById('cf-rate').value  = c.rate || '';
+  set('cf-notes', c.notes);
+  document.getElementById('modal-client').classList.add('active');
+}
+
+function editProject(id) {
+  const p = db.projects.find(x => x.id === id);
+  if (!p) return;
+  editId = id;
+  document.getElementById('pm-title').textContent = 'Projekt bearbeiten';
+  populateClientSel('pf-client', p.clientId);
+  set('pf-name', p.name); set('pf-desc', p.desc); set('pf-status', p.st);
+  set('pf-start', p.start); set('pf-end', p.end);
+  document.getElementById('pf-budget').value = p.budget || '';
+  document.getElementById('pf-rate').value   = p.rate   || '';
+  document.getElementById('modal-project').classList.add('active');
+}
+
+function editTask(id) {
+  const t = db.tasks.find(x => x.id === id);
+  if (!t) return;
+  editId = id;
+  document.getElementById('tm-title').textContent = 'Aufgabe bearbeiten';
+  populateProjSel('tf-project', t.projId);
+  set('tf-title', t.title); set('tf-desc', t.desc);
+  set('tf-prio', t.prio); set('tf-status', t.st); set('tf-due', t.due);
+  document.getElementById('modal-task').classList.add('active');
+}
+
+// ══════════════════════════════════════
+//  DELETE
+// ══════════════════════════════════════
+function askDelete(type, id) {
+  const labels = { client:'diesen Kunden', project:'dieses Projekt', task:'diese Aufgabe' };
+  document.getElementById('confirm-text').textContent =
+    `Möchten Sie ${labels[type]} wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.`;
+
+  delCb = () => {
+    if (type === 'client')  db.clients  = db.clients.filter(x => x.id !== id);
+    if (type === 'project') db.projects = db.projects.filter(x => x.id !== id);
+    if (type === 'task')    db.tasks    = db.tasks.filter(x => x.id !== id);
+    persist();
+    closeModal('confirm');
+    toast('Eintrag gelöscht', 'warn');
+    renderPage(curPage);
+  };
+
+  document.getElementById('modal-confirm').classList.add('active');
+}
+
+function confirmDelete() { if (delCb) { delCb(); delCb = null; } }
+
+// ══════════════════════════════════════
+//  GLOBAL SEARCH
+// ══════════════════════════════════════
+function handleGlobalSearch(q) {
+  if (!q.trim()) return;
+  const lq = q.toLowerCase();
+
+  const clients  = db.clients.filter(c  => (c.fn+' '+c.ln+' '+c.co+' '+c.em).toLowerCase().includes(lq));
+  const projects = db.projects.filter(p => (p.name+' '+(p.desc||'')).toLowerCase().includes(lq));
+  const tasks    = db.tasks.filter(t    => (t.title+' '+(t.desc||'')).toLowerCase().includes(lq));
+
+  if (clients.length)  { navigate('clients');  return; }
+  if (projects.length) { navigate('projects'); return; }
+  if (tasks.length)    { navigate('tasks');    return; }
+}
+
+// ══════════════════════════════════════
+//  HELPERS
+// ══════════════════════════════════════
+function val(id) { return (document.getElementById(id)?.value || '').trim(); }
+function set(id, v) { const el = document.getElementById(id); if (el) el.value = v || ''; }
+
+function esc(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function fmtDate(d) {
+  if (!d) return '—';
+  const dt = new Date(d + 'T12:00:00');
+  return dt.toLocaleDateString('de-DE', { day:'2-digit', month:'2-digit', year:'numeric' });
+}
+
+function prjBadge(s) {
+  const m = { active:'badge-green', paused:'badge-yellow', completed:'badge-blue' };
+  const l = { active:'Aktiv', paused:'Pausiert', completed:'Abgeschlossen' };
+  return `<span class="badge ${m[s]||'badge-gray'}">${l[s]||s}</span>`;
+}
+
+function taskBadge(s) {
+  const m = { todo:'badge-gray', inprogress:'badge-blue', done:'badge-green' };
+  const l = { todo:'Offen', inprogress:'Läuft', done:'Erledigt' };
+  return `<span class="badge ${m[s]||'badge-gray'}">${l[s]||s}</span>`;
+}
+
+function clientBadge(s) {
+  const m = { active:'badge-green', lead:'badge-purple', inactive:'badge-gray' };
+  const l = { active:'Aktiv', lead:'Lead', inactive:'Inaktiv' };
+  return `<span class="badge ${m[s]||'badge-gray'}">${l[s]||s}</span>`;
+}
+
+function populateClientSel(selId, selectedId) {
+  const sel = document.getElementById(selId);
+  sel.innerHTML = '<option value="">Kein Kunde</option>' +
+    db.clients.map(c => `<option value="${c.id}" ${c.id === selectedId ? 'selected':''}>${esc(c.fn + ' ' + c.ln)}${c.co ? ' – ' + esc(c.co) : ''}</option>`).join('');
+}
+
+function populateProjSel(selId, selectedId) {
+  const sel = document.getElementById(selId);
+  sel.innerHTML = '<option value="">Kein Projekt</option>' +
+    db.projects.map(p => `<option value="${p.id}" ${p.id === selectedId ? 'selected':''}>${esc(p.name)}</option>`).join('');
+}
+
+// ══════════════════════════════════════
+//  TOAST
+// ══════════════════════════════════════
+function toast(msg, type = 'success') {
+  const wrap = document.getElementById('toast-wrap');
+  const t = document.createElement('div');
+  t.className = `toast ${type}`;
+  const icon = type === 'warn' ? 'fa-trash-alt' : type === 'error' ? 'fa-exclamation-circle' : 'fa-check-circle';
+  const col  = type === 'warn' ? 'var(--warning)' : type === 'error' ? 'var(--danger)' : 'var(--success)';
+  t.innerHTML = `<i class="fas ${icon}" style="color:${col}"></i><span>${msg}</span>`;
+  wrap.appendChild(t);
+  requestAnimationFrame(() => t.classList.add('show'));
+  setTimeout(() => { t.classList.remove('show'); setTimeout(() => t.remove(), 350); }, 3000);
+}
+
+// ══════════════════════════════════════
+//  INIT
+// ══════════════════════════════════════
+hydrate();
+renderPage('dashboard');
+</script>
+</body>
+</html>

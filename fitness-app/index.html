@@ -1,0 +1,919 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fitness-App – Tägliches Programm</title>
+<style>
+@page { size: A4 portrait; margin: 12mm 15mm; }
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Helvetica Neue', Arial, sans-serif; background: #f0ede6; color: #1c1a16; font-size: 10pt; }
+
+@media print {
+  body { background: white; }
+  .page { box-shadow: none; margin: 0 !important; width: 180mm !important; min-height: 273mm !important; }
+  * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .print-btn-bar { display: none !important; }
+}
+
+.print-btn-bar {
+  position: fixed; bottom: 20px; right: 20px; z-index: 1000;
+  display: flex; gap: 10px;
+}
+.print-btn {
+  background: linear-gradient(135deg, #1a4731, #2d6a4f);
+  color: white; border: none; border-radius: 50px;
+  padding: 12px 24px; font-size: 13pt; font-weight: 700;
+  cursor: pointer; box-shadow: 0 4px 16px rgba(26,71,49,.4);
+  display: flex; align-items: center; gap: 8px;
+  transition: transform .15s, box-shadow .15s;
+}
+.print-btn:hover {
+  transform: translateY(-2px); box-shadow: 0 6px 20px rgba(26,71,49,.5);
+}
+.print-btn svg { width: 18px; height: 18px; flex-shrink: 0; }
+
+.page {
+  width: 180mm; min-height: 273mm; background: white;
+  margin: 8mm auto; page-break-after: always;
+  display: flex; flex-direction: column; overflow: hidden;
+  box-shadow: 0 4px 24px rgba(0,0,0,.15);
+}
+
+/* ── Title page ── */
+.title-page {
+  background: linear-gradient(160deg, #1a4731 0%, #2d6a4f 55%, #1a4731 100%);
+  color: white; align-items: center; justify-content: center;
+  text-align: center; position: relative; overflow: hidden;
+}
+.title-page::before {
+  content:''; position:absolute; top:-40mm; left:-20mm;
+  width:120mm; height:120mm; border-radius:50%; background:rgba(201,168,76,.12);
+}
+.title-page::after {
+  content:''; position:absolute; bottom:-30mm; right:-20mm;
+  width:100mm; height:100mm; border-radius:50%; background:rgba(255,255,255,.06);
+}
+.gold-bar { width:60mm; height:1.5mm; background:linear-gradient(90deg,transparent,#c9a84c,transparent); margin:6mm auto; }
+.title-page h1 { font-size:26pt; font-weight:900; letter-spacing:1px; line-height:1.1; z-index:1; }
+.title-page .subtitle { font-size:11pt; opacity:.85; letter-spacing:2px; text-transform:uppercase; z-index:1; }
+.title-page .tagline { font-size:9pt; opacity:.65; max-width:120mm; line-height:1.6; z-index:1; }
+.title-page .sections-list { display:flex; gap:3mm; flex-wrap:wrap; justify-content:center; z-index:1; margin-top:4mm; }
+.title-page .sections-list span { background:rgba(255,255,255,.12); border:1px solid rgba(201,168,76,.4); border-radius:10mm; padding:2mm 4mm; font-size:7.5pt; letter-spacing:.5px; }
+
+/* ── Section header ── */
+.section-header { background:linear-gradient(135deg,#1a4731 0%,#2d6a4f 100%); color:white; padding:5mm 6mm 4mm; position:relative; }
+.section-header::after { content:''; position:absolute; bottom:0; left:0; right:0; height:1.5mm; background:linear-gradient(90deg,#c9a84c,#e8d49a,#c9a84c); }
+.section-header .section-num { font-size:7pt; letter-spacing:2px; text-transform:uppercase; opacity:.7; margin-bottom:1mm; }
+.section-header h2 { font-size:16pt; font-weight:900; letter-spacing:.5px; }
+.section-header .section-note { font-size:7.5pt; opacity:.8; margin-top:1mm; font-style:italic; }
+
+/* ── Exercise grid ── */
+.exercises {
+  flex:1; display:grid; grid-template-columns:repeat(3,1fr);
+  gap:3mm; padding:4mm; background:#f4f1eb;
+}
+.exercises .card:nth-child(4) { grid-column:1; }
+.exercises .card:nth-child(5) { grid-column:2; }
+
+/* ── Card ── */
+.card {
+  background:white; border-radius:3mm; border:1px solid #e0dbd0;
+  padding:3mm 2.5mm; display:flex; flex-direction:column;
+  align-items:center; text-align:center; gap:1.5mm;
+}
+.card .icon-wrap { width:100%; display:flex; justify-content:center; align-items:center; }
+.card .icon-wrap svg { width:50mm; height:50mm; }
+.card h3 { font-size:8pt; font-weight:800; color:#1a4731; line-height:1.2; }
+.card .reps { font-size:6.5pt; color:#c9a84c; font-weight:700; background:#fdf8ee; border:1px solid #e8d49a; border-radius:6mm; padding:.8mm 3mm; }
+.card p { font-size:6.5pt; color:#5a5549; line-height:1.5; text-align:left; width:100%; }
+
+.page-footer { background:#1a4731; color:rgba(255,255,255,.55); font-size:6pt; text-align:center; padding:1.5mm; letter-spacing:.5px; }
+</style>
+</head>
+<body>
+
+<!-- ══ TITELSEITE ══════════════════════════════════════════ -->
+<div class="page title-page">
+  <svg viewBox="0 0 120 120" width="50mm" height="50mm" style="z-index:1;opacity:.9">
+    <g stroke-linecap="round" stroke-linejoin="round">
+      <!-- Fig 1: standing arms up -->
+      <circle cx="22" cy="18" r="7" fill="#c9a84c" stroke="white" stroke-width="2"/>
+      <line x1="22" y1="25" x2="22" y2="52" stroke="white" stroke-width="5"/>
+      <line x1="22" y1="34" x2="6" y2="26" stroke="white" stroke-width="4"/>
+      <line x1="22" y1="34" x2="38" y2="22" stroke="white" stroke-width="4"/>
+      <line x1="22" y1="52" x2="14" y2="72" stroke="white" stroke-width="5"/>
+      <line x1="22" y1="52" x2="30" y2="62" stroke="white" stroke-width="5"/>
+      <!-- Fig 2: squat -->
+      <circle cx="60" cy="58" r="7" fill="#c9a84c" stroke="white" stroke-width="2"/>
+      <line x1="60" y1="65" x2="60" y2="84" stroke="white" stroke-width="5"/>
+      <line x1="60" y1="74" x2="44" y2="82" stroke="white" stroke-width="4"/>
+      <line x1="60" y1="74" x2="76" y2="82" stroke="white" stroke-width="4"/>
+      <line x1="60" y1="84" x2="50" y2="100" stroke="white" stroke-width="5"/>
+      <line x1="60" y1="84" x2="70" y2="100" stroke="white" stroke-width="5"/>
+      <!-- Fig 3: stretch side -->
+      <circle cx="96" cy="22" r="7" fill="#c9a84c" stroke="white" stroke-width="2"/>
+      <path d="M96 29 Q90 44 86 58 Q83 68 84 78" stroke="white" stroke-width="5" fill="none"/>
+      <line x1="90" y1="42" x2="74" y2="52" stroke="white" stroke-width="4"/>
+      <line x1="90" y1="42" x2="110" y2="30" stroke="white" stroke-width="4"/>
+      <line x1="84" y1="78" x2="76" y2="95" stroke="white" stroke-width="5"/>
+      <line x1="84" y1="78" x2="92" y2="92" stroke="white" stroke-width="5"/>
+    </g>
+  </svg>
+  <div class="gold-bar"></div>
+  <p class="subtitle" style="z-index:1">Tägliches Fitnessprogramm</p>
+  <h1 style="z-index:1">Bewegt &<br>Gesund</h1>
+  <div class="gold-bar"></div>
+  <p class="tagline" style="z-index:1;margin-top:2mm">Fünf Bereiche für Körper und Geist —<br>jeden Morgen in ca. 40 Minuten</p>
+  <div class="sections-list">
+    <span>① Die Fünf Tibeter</span><span>② Tai Chi</span>
+    <span>③ Stretching</span><span>④ Kraft</span><span>⑤ Stuhlübungen</span><span>⑥ AOK Rücken</span>
+  </div>
+  <div style="z-index:1;margin-top:8mm;opacity:.5;font-size:7pt;letter-spacing:1px">FITNESS-APP MOCKUP · 2026</div>
+</div>
+
+
+<!-- ══ SEITE 1: FÜNF TIBETER ══════════════════════════════ -->
+<div class="page">
+  <div class="section-header">
+    <div class="section-num">Bereich 01 von 05</div>
+    <h2>Die Fünf Tibeter</h2>
+    <div class="section-note">Täglich · Start mit 3 Wdh., steigern bis 21 · Atemkoordination beachten</div>
+  </div>
+  <div class="exercises">
+
+    <!-- T1 Kreisel -->
+    <div class="card"><div class="icon-wrap"><svg viewBox="0 0 100 100" fill="none" stroke-linecap="round" stroke-linejoin="round">
+      <ellipse cx="50" cy="54" rx="42" ry="40" fill="#edf7f2"/>
+      <line x1="5" y1="92" x2="95" y2="92" stroke="#d4cfc6" stroke-width="1.5"/>
+      <path d="M18 62 A34 34 0 1 1 56 96" stroke="#c9a84c" stroke-width="2.5" stroke-dasharray="5,3"/>
+      <path d="M52 97 L56 94 L52 90" stroke="#c9a84c" stroke-width="2"/>
+      <line x1="50" y1="21" x2="50" y2="58" stroke="#1a4731" stroke-width="7"/>
+      <line x1="50" y1="35" x2="6" y2="38" stroke="#1a4731" stroke-width="6"/>
+      <line x1="50" y1="35" x2="94" y2="38" stroke="#1a4731" stroke-width="6"/>
+      <line x1="50" y1="58" x2="36" y2="92" stroke="#1a4731" stroke-width="7"/>
+      <line x1="50" y1="58" x2="64" y2="92" stroke="#1a4731" stroke-width="7"/>
+      <circle cx="6" cy="38" r="4.5" fill="#c9a84c"/>
+      <circle cx="94" cy="38" r="4.5" fill="#c9a84c"/>
+      <circle cx="50" cy="58" r="4" fill="#1a4731"/>
+      <circle cx="50" cy="12" r="9" fill="#c9a84c" stroke="#1a4731" stroke-width="2.5"/>
+    </svg></div>
+    <h3>Der Kreisel</h3><div class="reps">3 – 21 Wdh.</div>
+    <p>Aufrecht stehen, Arme seitlich ausgestreckt. Im Uhrzeigersinn um die eigene Achse drehen. Links einatmen, rechts ausatmen. Langsam beginnen.</p></div>
+
+    <!-- T2 Kerze -->
+    <div class="card"><div class="icon-wrap"><svg viewBox="0 0 100 100" fill="none" stroke-linecap="round" stroke-linejoin="round">
+      <ellipse cx="48" cy="55" rx="44" ry="38" fill="#edf7f2"/>
+      <line x1="5" y1="84" x2="95" y2="84" stroke="#d4cfc6" stroke-width="1.5"/>
+      <line x1="14" y1="73" x2="12" y2="84" stroke="#1a4731" stroke-width="5"/>
+      <line x1="34" y1="73" x2="32" y2="84" stroke="#1a4731" stroke-width="5"/>
+      <line x1="14" y1="73" x2="62" y2="73" stroke="#1a4731" stroke-width="7"/>
+      <line x1="60" y1="73" x2="64" y2="42" stroke="#1a4731" stroke-width="7"/>
+      <line x1="60" y1="73" x2="72" y2="38" stroke="#1a4731" stroke-width="7"/>
+      <circle cx="64" cy="36" r="4.5" fill="#c9a84c"/>
+      <circle cx="72" cy="32" r="4.5" fill="#c9a84c"/>
+      <path d="M82 62 L82 30" stroke="#c9a84c" stroke-width="2.5"/>
+      <path d="M78 34 L82 26 L86 34" stroke="#c9a84c" stroke-width="2"/>
+      <circle cx="9" cy="67" r="9" fill="#c9a84c" stroke="#1a4731" stroke-width="2.5"/>
+    </svg></div>
+    <h3>Die Kerze</h3><div class="reps">3 – 21 Wdh.</div>
+    <p>Auf dem Rücken liegen, Arme am Körper. Beim Einatmen beide Beine senkrecht heben. Beim Ausatmen langsam absenken. Kopf und Schultern bleiben am Boden.</p></div>
+
+    <!-- T3 Halbmond -->
+    <div class="card"><div class="icon-wrap"><svg viewBox="0 0 100 100" fill="none" stroke-linecap="round" stroke-linejoin="round">
+      <ellipse cx="50" cy="56" rx="42" ry="38" fill="#edf7f2"/>
+      <line x1="5" y1="90" x2="95" y2="90" stroke="#d4cfc6" stroke-width="1.5"/>
+      <line x1="32" y1="90" x2="32" y2="72" stroke="#1a4731" stroke-width="7"/>
+      <line x1="60" y1="90" x2="60" y2="72" stroke="#1a4731" stroke-width="7"/>
+      <line x1="32" y1="72" x2="46" y2="56" stroke="#1a4731" stroke-width="7"/>
+      <line x1="60" y1="72" x2="46" y2="56" stroke="#1a4731" stroke-width="7"/>
+      <circle cx="46" cy="56" r="4.5" fill="#1a4731"/>
+      <path d="M46 56 Q40 40 42 24" stroke="#1a4731" stroke-width="7" fill="none"/>
+      <circle cx="42" cy="30" r="4" fill="#1a4731"/>
+      <line x1="42" y1="36" x2="24" y2="52" stroke="#1a4731" stroke-width="6"/>
+      <line x1="42" y1="36" x2="62" y2="50" stroke="#1a4731" stroke-width="6"/>
+      <circle cx="24" cy="52" r="4.5" fill="#c9a84c"/>
+      <circle cx="62" cy="50" r="4.5" fill="#c9a84c"/>
+      <circle cx="44" cy="14" r="9" fill="#c9a84c" stroke="#1a4731" stroke-width="2.5"/>
+    </svg></div>
+    <h3>Der Halbmond</h3><div class="reps">3 – 21 Wdh.</div>
+    <p>Kniend, Hüfte vorgeschoben, Schultern zurückkreisen und Hohlkreuz. Kopf in den Nacken. Beim Einatmen strecken, beim Ausatmen aufrichten.</p></div>
+
+    <!-- T4 Tisch -->
+    <div class="card"><div class="icon-wrap"><svg viewBox="0 0 100 100" fill="none" stroke-linecap="round" stroke-linejoin="round">
+      <ellipse cx="50" cy="58" rx="44" ry="36" fill="#edf7f2"/>
+      <line x1="5" y1="92" x2="95" y2="92" stroke="#d4cfc6" stroke-width="1.5"/>
+      <line x1="20" y1="92" x2="20" y2="70" stroke="#1a4731" stroke-width="6"/>
+      <line x1="38" y1="92" x2="38" y2="70" stroke="#1a4731" stroke-width="6"/>
+      <line x1="20" y1="70" x2="78" y2="70" stroke="#1a4731" stroke-width="7"/>
+      <line x1="60" y1="92" x2="60" y2="70" stroke="#1a4731" stroke-width="7"/>
+      <line x1="78" y1="92" x2="78" y2="70" stroke="#1a4731" stroke-width="7"/>
+      <circle cx="20" cy="92" r="4.5" fill="#c9a84c"/>
+      <circle cx="38" cy="92" r="4.5" fill="#c9a84c"/>
+      <circle cx="60" cy="92" r="4.5" fill="#c9a84c"/>
+      <circle cx="78" cy="92" r="4.5" fill="#c9a84c"/>
+      <line x1="78" y1="66" x2="82" y2="60" stroke="#1a4731" stroke-width="6"/>
+      <circle cx="84" cy="56" r="9" fill="#c9a84c" stroke="#1a4731" stroke-width="2.5"/>
+      <path d="M50 58 L50 44" stroke="#c9a84c" stroke-width="2.5"/>
+      <path d="M46 48 L50 42 L54 48" stroke="#c9a84c" stroke-width="2"/>
+    </svg></div>
+    <h3>Der Tisch</h3><div class="reps">3 – 21 Wdh.</div>
+    <p>Sitzen, Hände hinter dem Gesäß. Einatmen: Hüfte heben bis Körper eine Tischplatte bildet, Kopf zurück. Ausatmen: absenken.</p></div>
+
+    <!-- T5 Pendel -->
+    <div class="card"><div class="icon-wrap"><svg viewBox="0 0 100 100" fill="none" stroke-linecap="round" stroke-linejoin="round">
+      <ellipse cx="50" cy="56" rx="44" ry="38" fill="#edf7f2"/>
+      <line x1="5" y1="92" x2="95" y2="92" stroke="#d4cfc6" stroke-width="1.5"/>
+      <circle cx="18" cy="92" r="4.5" fill="#c9a84c"/>
+      <circle cx="30" cy="92" r="4.5" fill="#c9a84c"/>
+      <line x1="18" y1="92" x2="48" y2="36" stroke="#1a4731" stroke-width="6"/>
+      <line x1="30" y1="92" x2="48" y2="36" stroke="#1a4731" stroke-width="6"/>
+      <circle cx="48" cy="36" r="5" fill="#1a4731"/>
+      <line x1="48" y1="36" x2="74" y2="92" stroke="#1a4731" stroke-width="7"/>
+      <line x1="48" y1="36" x2="84" y2="84" stroke="#1a4731" stroke-width="7"/>
+      <circle cx="74" cy="92" r="4.5" fill="#c9a84c"/>
+      <circle cx="84" cy="84" r="4.5" fill="#c9a84c"/>
+      <circle cx="28" cy="60" r="9" fill="#c9a84c" stroke="#1a4731" stroke-width="2.5"/>
+      <line x1="28" y1="51" x2="34" y2="44" stroke="#1a4731" stroke-width="6"/>
+      <circle cx="76" cy="28" r="7" stroke="#c9a84c" stroke-width="2" stroke-dasharray="3,2" fill="none"/>
+      <path d="M70 34 Q78 42 72 52" stroke="#c9a84c" stroke-width="2" stroke-dasharray="3,2"/>
+    </svg></div>
+    <h3>Das Pendel</h3><div class="reps">3 – 21 Wdh.</div>
+    <p>Wechsel zwischen Hundeblick (Hüfte hoch, umgekehrtes V) und Kobra (Hüften unten, Oberkörper gestreckt). Einatmen beim Strecken, ausatmen beim Hundeblick.</p></div>
+
+  </div>
+  <div class="page-footer">BEREICH 01 · DIE FÜNF TIBETER</div>
+</div>
+
+
+<!-- ══ SEITE 2: TAI CHI ════════════════════════════════════ -->
+<div class="page">
+  <div class="section-header">
+    <div class="section-num">Bereich 02 von 05</div>
+    <h2>Tai Chi – 5 Grundformen</h2>
+    <div class="section-note">Täglich 20–30 Min. · langsam und fließend · Bauch-Atmung (Dantian)</div>
+  </div>
+  <div class="exercises">
+
+    <!-- TC1 Qi wecken -->
+    <div class="card"><div class="icon-wrap"><svg viewBox="0 0 100 100" fill="none" stroke-linecap="round" stroke-linejoin="round">
+      <ellipse cx="50" cy="55" rx="40" ry="38" fill="#edf7f2"/>
+      <line x1="5" y1="92" x2="95" y2="92" stroke="#d4cfc6" stroke-width="1.5"/>
+      <line x1="50" y1="21" x2="50" y2="62" stroke="#1a4731" stroke-width="7"/>
+      <line x1="50" y1="35" x2="20" y2="50" stroke="#1a4731" stroke-width="6"/>
+      <line x1="50" y1="35" x2="80" y2="50" stroke="#1a4731" stroke-width="6"/>
+      <circle cx="20" cy="50" r="4.5" fill="#c9a84c"/>
+      <circle cx="80" cy="50" r="4.5" fill="#c9a84c"/>
+      <line x1="50" y1="62" x2="38" y2="92" stroke="#1a4731" stroke-width="7"/>
+      <line x1="50" y1="62" x2="62" y2="92" stroke="#1a4731" stroke-width="7"/>
+      <circle cx="50" cy="62" r="4" fill="#1a4731"/>
+      <path d="M50 8 L50 3" stroke="#c9a84c" stroke-width="2.5"/>
+      <path d="M46 6 L50 1 L54 6" stroke="#c9a84c" stroke-width="2"/>
+      <path d="M14 56 Q17 50 20 50" stroke="#c9a84c" stroke-width="1.8" stroke-dasharray="2,2"/>
+      <path d="M86 56 Q83 50 80 50" stroke="#c9a84c" stroke-width="1.8" stroke-dasharray="2,2"/>
+      <circle cx="50" cy="12" r="9" fill="#c9a84c" stroke="#1a4731" stroke-width="2.5"/>
+    </svg></div>
+    <h3>Qi wecken</h3><div class="reps">8 Wdh. · langsam</div>
+    <p>Hüftbreit stehen, Knie leicht gebeugt. Arme locker nach vorne-oben heben (Handflächen unten). Einatmen beim Heben, ausatmen beim Senken.</p></div>
+
+    <!-- TC2 Weißer Kranich -->
+    <div class="card"><div class="icon-wrap"><svg viewBox="0 0 100 100" fill="none" stroke-linecap="round" stroke-linejoin="round">
+      <ellipse cx="50" cy="52" rx="42" ry="40" fill="#edf7f2"/>
+      <line x1="5" y1="92" x2="95" y2="92" stroke="#d4cfc6" stroke-width="1.5"/>
+      <line x1="50" y1="21" x2="48" y2="58" stroke="#1a4731" stroke-width="7"/>
+      <line x1="48" y1="34" x2="74" y2="10" stroke="#1a4731" stroke-width="6"/>
+      <circle cx="74" cy="10" r="4.5" fill="#c9a84c"/>
+      <line x1="48" y1="34" x2="22" y2="55" stroke="#1a4731" stroke-width="6"/>
+      <circle cx="22" cy="55" r="4.5" fill="#c9a84c"/>
+      <circle cx="48" cy="34" r="4" fill="#1a4731"/>
+      <line x1="48" y1="58" x2="38" y2="92" stroke="#1a4731" stroke-width="8"/>
+      <line x1="48" y1="58" x2="60" y2="80" stroke="#1a4731" stroke-width="5"/>
+      <circle cx="60" cy="80" r="3.5" fill="#c9a84c"/>
+      <circle cx="48" cy="58" r="4.5" fill="#1a4731"/>
+      <path d="M76 6 Q82 10 78 14" stroke="#c9a84c" stroke-width="2" fill="none"/>
+      <circle cx="52" cy="12" r="9" fill="#c9a84c" stroke="#1a4731" stroke-width="2.5"/>
+    </svg></div>
+    <h3>Weißer Kranich breitet Flügel aus</h3><div class="reps">8 Wdh. je Seite</div>
+    <p>Einen Arm schwingend nach oben, den anderen gleichzeitig nach unten-vorne. Gewicht auf ein Bein verlagern. Fließend wechseln.</p></div>
+
+    <!-- TC3 Wolkenhände -->
+    <div class="card"><div class="icon-wrap"><svg viewBox="0 0 100 100" fill="none" stroke-linecap="round" stroke-linejoin="round">
+      <ellipse cx="50" cy="55" rx="42" ry="38" fill="#edf7f2"/>
+      <line x1="5" y1="92" x2="95" y2="92" stroke="#d4cfc6" stroke-width="1.5"/>
+      <line x1="50" y1="21" x2="50" y2="60" stroke="#1a4731" stroke-width="7"/>
+      <path d="M50 32 Q28 20 16 35 Q10 50 28 57" stroke="#1a4731" stroke-width="6" fill="none"/>
+      <circle cx="28" cy="57" r="4.5" fill="#c9a84c"/>
+      <path d="M50 40 Q68 28 78 44 Q84 58 66 65" stroke="#1a4731" stroke-width="6" fill="none"/>
+      <circle cx="66" cy="65" r="4.5" fill="#c9a84c"/>
+      <path d="M10 40 L11 34 L17 37" stroke="#c9a84c" stroke-width="2" fill="none"/>
+      <path d="M80 60 L66 65 L68 59" stroke="#c9a84c" stroke-width="2" fill="none"/>
+      <line x1="50" y1="60" x2="34" y2="92" stroke="#1a4731" stroke-width="7"/>
+      <line x1="50" y1="60" x2="66" y2="92" stroke="#1a4731" stroke-width="7"/>
+      <circle cx="50" cy="12" r="9" fill="#c9a84c" stroke="#1a4731" stroke-width="2.5"/>
+    </svg></div>
+    <h3>Wolkenhände</h3><div class="reps">8 Wdh. je Seite</div>
+    <p>Beide Hände kreisen gegenläufig vor dem Körper wie langsam rotierende Wolken. Seitlich in Schrittfolge bewegen. Blick folgt der oberen Hand.</p></div>
+
+    <!-- TC4 Bürste Knie -->
+    <div class="card"><div class="icon-wrap"><svg viewBox="0 0 100 100" fill="none" stroke-linecap="round" stroke-linejoin="round">
+      <ellipse cx="50" cy="52" rx="42" ry="40" fill="#edf7f2"/>
+      <line x1="5" y1="92" x2="95" y2="92" stroke="#d4cfc6" stroke-width="1.5"/>
+      <line x1="44" y1="20" x2="46" y2="54" stroke="#1a4731" stroke-width="7"/>
+      <line x1="46" y1="54" x2="66" y2="74" stroke="#1a4731" stroke-width="7"/>
+      <line x1="66" y1="74" x2="70" y2="92" stroke="#1a4731" stroke-width="7"/>
+      <circle cx="66" cy="74" r="4.5" fill="#1a4731"/>
+      <line x1="46" y1="54" x2="28" y2="72" stroke="#1a4731" stroke-width="7"/>
+      <line x1="28" y1="72" x2="24" y2="92" stroke="#1a4731" stroke-width="7"/>
+      <circle cx="28" cy="72" r="4.5" fill="#1a4731"/>
+      <circle cx="46" cy="54" r="4.5" fill="#1a4731"/>
+      <line x1="46" y1="36" x2="22" y2="55" stroke="#1a4731" stroke-width="6"/>
+      <circle cx="22" cy="55" r="4.5" fill="#c9a84c"/>
+      <line x1="46" y1="36" x2="76" y2="32" stroke="#1a4731" stroke-width="6"/>
+      <circle cx="76" cy="32" r="4.5" fill="#c9a84c"/>
+      <path d="M78 32 L88 32" stroke="#c9a84c" stroke-width="2.5"/>
+      <path d="M84 28 L89 32 L84 36" stroke="#c9a84c" stroke-width="2"/>
+      <circle cx="44" cy="11" r="9" fill="#c9a84c" stroke="#1a4731" stroke-width="2.5"/>
+    </svg></div>
+    <h3>Bürste Knie und schiebe</h3><div class="reps">8 Wdh. je Seite</div>
+    <p>Ausfallschritt nach vorne. Eine Hand fährt über das Knie, die andere schiebt auf Brusthöhe nach vorne. Fließend wechseln links/rechts.</p></div>
+
+    <!-- TC5 Greife Vogelschwanz -->
+    <div class="card"><div class="icon-wrap"><svg viewBox="0 0 100 100" fill="none" stroke-linecap="round" stroke-linejoin="round">
+      <ellipse cx="50" cy="52" rx="42" ry="40" fill="#edf7f2"/>
+      <line x1="5" y1="92" x2="95" y2="92" stroke="#d4cfc6" stroke-width="1.5"/>
+      <line x1="40" y1="20" x2="42" y2="56" stroke="#1a4731" stroke-width="7"/>
+      <circle cx="42" cy="56" r="4.5" fill="#1a4731"/>
+      <path d="M42 33 Q60 22 70 32 Q76 42 68 52" stroke="#1a4731" stroke-width="6" fill="none"/>
+      <path d="M42 44 Q52 58 64 54 Q72 50 68 52" stroke="#1a4731" stroke-width="6" fill="none"/>
+      <circle cx="68" cy="52" r="4.5" fill="#c9a84c"/>
+      <circle cx="62" cy="40" r="12" stroke="#c9a84c" stroke-width="2" stroke-dasharray="4,3" fill="rgba(201,168,76,0.12)"/>
+      <line x1="42" y1="56" x2="58" y2="78" stroke="#1a4731" stroke-width="7"/>
+      <line x1="58" y1="78" x2="62" y2="92" stroke="#1a4731" stroke-width="7"/>
+      <line x1="42" y1="56" x2="24" y2="74" stroke="#1a4731" stroke-width="7"/>
+      <line x1="24" y1="74" x2="22" y2="92" stroke="#1a4731" stroke-width="7"/>
+      <circle cx="40" cy="11" r="9" fill="#c9a84c" stroke="#1a4731" stroke-width="2.5"/>
+    </svg></div>
+    <h3>Greife den Vogelschwanz</h3><div class="reps">8 Wdh. je Seite</div>
+    <p>Beide Arme formen einen Kreis, als würde man einen Ball halten. Abwechselnd schieben, lenken und zurückziehen. Fließend und kontinuierlich.</p></div>
+
+  </div>
+  <div class="page-footer">BEREICH 02 · TAI CHI – GRUNDFORMEN</div>
+</div>
+
+
+<!-- ══ SEITE 3: STRETCHING ════════════════════════════════ -->
+<div class="page">
+  <div class="section-header">
+    <div class="section-num">Bereich 03 von 05</div>
+    <h2>Stretching – Dehnung</h2>
+    <div class="section-note">Jede Position 20–30 Sek. halten · niemals federn · tief ausatmen in die Dehnung</div>
+  </div>
+  <div class="exercises">
+
+    <!-- S1 Nacken -->
+    <div class="card"><div class="icon-wrap"><svg viewBox="0 0 100 100" fill="none" stroke-linecap="round" stroke-linejoin="round">
+      <ellipse cx="50" cy="55" rx="40" ry="38" fill="#edf7f2"/>
+      <line x1="5" y1="92" x2="95" y2="92" stroke="#d4cfc6" stroke-width="1.5"/>
+      <line x1="50" y1="24" x2="48" y2="32" stroke="#1a4731" stroke-width="6"/>
+      <line x1="48" y1="32" x2="48" y2="64" stroke="#1a4731" stroke-width="7"/>
+      <line x1="48" y1="40" x2="70" y2="24" stroke="#1a4731" stroke-width="6"/>
+      <line x1="70" y1="24" x2="58" y2="14" stroke="#1a4731" stroke-width="6"/>
+      <circle cx="70" cy="24" r="4.5" fill="#1a4731"/>
+      <line x1="48" y1="40" x2="26" y2="54" stroke="#1a4731" stroke-width="6"/>
+      <circle cx="26" cy="54" r="4.5" fill="#c9a84c"/>
+      <line x1="48" y1="64" x2="38" y2="92" stroke="#1a4731" stroke-width="7"/>
+      <line x1="48" y1="64" x2="58" y2="92" stroke="#1a4731" stroke-width="7"/>
+      <circle cx="48" cy="64" r="4" fill="#1a4731"/>
+      <path d="M56 10 Q62 5 68 8" stroke="#c9a84c" stroke-width="2" fill="none"/>
+      <path d="M64 6 L68 9 L64 13" stroke="#c9a84c" stroke-width="2" fill="none"/>
+      <circle cx="58" cy="14" r="9" fill="#c9a84c" stroke="#1a4731" stroke-width="2.5"/>
+    </svg></div>
+    <h3>Nacken- & Schulterdehnung</h3><div class="reps">20–30 Sek. je Seite</div>
+    <p>Kopf seitlich zur Schulter neigen. Gegenüberliegenden Arm zum Boden strecken. Eine Hand zieht sanft den Kopf weiter zur Schulter. Schultern unten halten.</p></div>
+
+    <!-- S2 Seitlich -->
+    <div class="card"><div class="icon-wrap"><svg viewBox="0 0 100 100" fill="none" stroke-linecap="round" stroke-linejoin="round">
+      <ellipse cx="50" cy="52" rx="42" ry="42" fill="#edf7f2"/>
+      <line x1="5" y1="92" x2="95" y2="92" stroke="#d4cfc6" stroke-width="1.5"/>
+      <path d="M56 21 Q50 38 44 56 Q40 66 42 78" stroke="#1a4731" stroke-width="7" fill="none"/>
+      <line x1="52" y1="38" x2="78" y2="22" stroke="#1a4731" stroke-width="6"/>
+      <circle cx="78" cy="22" r="4.5" fill="#c9a84c"/>
+      <line x1="52" y1="38" x2="30" y2="52" stroke="#1a4731" stroke-width="6"/>
+      <circle cx="30" cy="52" r="4.5" fill="#c9a84c"/>
+      <line x1="42" y1="78" x2="32" y2="92" stroke="#1a4731" stroke-width="7"/>
+      <line x1="42" y1="78" x2="52" y2="92" stroke="#1a4731" stroke-width="7"/>
+      <path d="M80 16 Q88 34 80 52" stroke="#c9a84c" stroke-width="2" fill="none" stroke-dasharray="3,2"/>
+      <path d="M76 50 L80 54 L77 47" stroke="#c9a84c" stroke-width="2" fill="none"/>
+      <circle cx="62" cy="12" r="9" fill="#c9a84c" stroke="#1a4731" stroke-width="2.5"/>
+    </svg></div>
+    <h3>Seitliche Oberkörperdehnung</h3><div class="reps">20–30 Sek. je Seite</div>
+    <p>Schulterbreit stehen. Einen Arm über den Kopf strecken und Oberkörper zur Gegenseite neigen. Die gesamte Seite von Fuß bis Fingerspitzen dehnt sich.</p></div>
+
+    <!-- S3 Hüftbeuger -->
+    <div class="card"><div class="icon-wrap"><svg viewBox="0 0 100 100" fill="none" stroke-linecap="round" stroke-linejoin="round">
+      <ellipse cx="50" cy="52" rx="42" ry="42" fill="#edf7f2"/>
+      <line x1="5" y1="92" x2="95" y2="92" stroke="#d4cfc6" stroke-width="1.5"/>
+      <line x1="50" y1="21" x2="50" y2="52" stroke="#1a4731" stroke-width="7"/>
+      <line x1="50" y1="34" x2="34" y2="44" stroke="#1a4731" stroke-width="6"/>
+      <circle cx="34" cy="44" r="4" fill="#c9a84c"/>
+      <line x1="50" y1="34" x2="66" y2="44" stroke="#1a4731" stroke-width="6"/>
+      <circle cx="66" cy="44" r="4" fill="#c9a84c"/>
+      <circle cx="50" cy="52" r="4.5" fill="#1a4731"/>
+      <line x1="50" y1="52" x2="68" y2="72" stroke="#1a4731" stroke-width="7"/>
+      <circle cx="68" cy="72" r="4.5" fill="#1a4731"/>
+      <line x1="68" y1="72" x2="72" y2="92" stroke="#1a4731" stroke-width="7"/>
+      <line x1="50" y1="52" x2="28" y2="68" stroke="#1a4731" stroke-width="7"/>
+      <circle cx="28" cy="68" r="4.5" fill="#1a4731"/>
+      <line x1="28" y1="68" x2="18" y2="92" stroke="#1a4731" stroke-width="7"/>
+      <circle cx="18" cy="88" r="5.5" fill="#c9a84c"/>
+      <path d="M44 56 L44 66" stroke="#c9a84c" stroke-width="2.5"/>
+      <path d="M40 63 L44 68 L48 63" stroke="#c9a84c" stroke-width="2"/>
+      <circle cx="50" cy="12" r="9" fill="#c9a84c" stroke="#1a4731" stroke-width="2.5"/>
+    </svg></div>
+    <h3>Hüftbeuger-Dehnung</h3><div class="reps">20–30 Sek. je Seite</div>
+    <p>Ausfallschritt nach vorne, hinteres Knie auf dem Boden. Hüfte nach vorne-unten absenken. Oberkörper aufrecht. Dehnung im vorderen Bereich der hinteren Hüfte.</p></div>
+
+    <!-- S4 Katze -->
+    <div class="card"><div class="icon-wrap"><svg viewBox="0 0 100 100" fill="none" stroke-linecap="round" stroke-linejoin="round">
+      <ellipse cx="50" cy="60" rx="44" ry="34" fill="#edf7f2"/>
+      <line x1="5" y1="90" x2="95" y2="90" stroke="#d4cfc6" stroke-width="1.5"/>
+      <circle cx="22" cy="90" r="4.5" fill="#c9a84c"/>
+      <circle cx="36" cy="90" r="4.5" fill="#c9a84c"/>
+      <line x1="22" y1="90" x2="28" y2="70" stroke="#1a4731" stroke-width="6"/>
+      <line x1="36" y1="90" x2="28" y2="70" stroke="#1a4731" stroke-width="6"/>
+      <circle cx="28" cy="70" r="4.5" fill="#1a4731"/>
+      <path d="M28 70 Q34 46 52 42 Q68 46 70 70" stroke="#1a4731" stroke-width="7" fill="none"/>
+      <circle cx="70" cy="70" r="4.5" fill="#1a4731"/>
+      <line x1="70" y1="70" x2="64" y2="90" stroke="#1a4731" stroke-width="7"/>
+      <line x1="70" y1="70" x2="76" y2="90" stroke="#1a4731" stroke-width="7"/>
+      <circle cx="64" cy="90" r="4.5" fill="#c9a84c"/>
+      <circle cx="76" cy="90" r="4.5" fill="#c9a84c"/>
+      <line x1="26" y1="72" x2="18" y2="76" stroke="#1a4731" stroke-width="6"/>
+      <circle cx="18" cy="76" r="9" fill="#c9a84c" stroke="#1a4731" stroke-width="2.5"/>
+      <path d="M52 34 L52 24" stroke="#c9a84c" stroke-width="2.5"/>
+      <path d="M48 28 L52 22 L56 28" stroke="#c9a84c" stroke-width="2"/>
+    </svg></div>
+    <h3>Katzendehnung (Rücken)</h3><div class="reps">8 Wdh. + 20 Sek. halten</div>
+    <p>Vierfüßlerstand. Einatmen: Rücken wölben (Katzenbuckel), Kopf senken. Ausatmen: Hohlkreuz, Kopf heben. Oder: Katzenbuckel 20 Sek. halten.</p></div>
+
+    <!-- S5 Brust -->
+    <div class="card"><div class="icon-wrap"><svg viewBox="0 0 100 100" fill="none" stroke-linecap="round" stroke-linejoin="round">
+      <ellipse cx="50" cy="55" rx="40" ry="38" fill="#edf7f2"/>
+      <line x1="5" y1="92" x2="95" y2="92" stroke="#d4cfc6" stroke-width="1.5"/>
+      <line x1="50" y1="21" x2="50" y2="62" stroke="#1a4731" stroke-width="7"/>
+      <line x1="50" y1="36" x2="28" y2="52" stroke="#1a4731" stroke-width="6"/>
+      <line x1="50" y1="36" x2="72" y2="52" stroke="#1a4731" stroke-width="6"/>
+      <line x1="28" y1="52" x2="50" y2="61" stroke="#1a4731" stroke-width="6"/>
+      <line x1="72" y1="52" x2="50" y2="61" stroke="#1a4731" stroke-width="6"/>
+      <circle cx="50" cy="61" r="7" fill="#c9a84c" stroke="#1a4731" stroke-width="2"/>
+      <line x1="50" y1="62" x2="40" y2="92" stroke="#1a4731" stroke-width="7"/>
+      <line x1="50" y1="62" x2="60" y2="92" stroke="#1a4731" stroke-width="7"/>
+      <circle cx="50" cy="62" r="4" fill="#1a4731"/>
+      <path d="M50 28 Q60 34 58 44" stroke="#c9a84c" stroke-width="2" fill="none" stroke-dasharray="3,2"/>
+      <path d="M54 42 L58 45 L55 39" stroke="#c9a84c" stroke-width="2" fill="none"/>
+      <circle cx="50" cy="12" r="9" fill="#c9a84c" stroke="#1a4731" stroke-width="2.5"/>
+    </svg></div>
+    <h3>Brust- & Schulterdehnung</h3><div class="reps">20–30 Sek. halten</div>
+    <p>Aufrecht stehen, Hände hinter dem Rücken verschränken. Arme strecken, Schulterblätter zusammenziehen, Brust nach vorne öffnen. Kinn leicht anheben.</p></div>
+
+  </div>
+  <div class="page-footer">BEREICH 03 · STRETCHING – DEHNUNG</div>
+</div>
+
+
+<!-- ══ SEITE 4: KRAFT ══════════════════════════════════════ -->
+<div class="page">
+  <div class="section-header">
+    <div class="section-num">Bereich 04 von 05</div>
+    <h2>Kraft – ohne Geräte</h2>
+    <div class="section-note">3 Sätze · 10–15 Wdh. · 60 Sek. Pause zwischen Sätzen · kontrolliert ausführen</div>
+  </div>
+  <div class="exercises">
+
+    <!-- K1 Liegestütz -->
+    <div class="card"><div class="icon-wrap"><svg viewBox="0 0 100 100" fill="none" stroke-linecap="round" stroke-linejoin="round">
+      <ellipse cx="50" cy="60" rx="45" ry="34" fill="#edf7f2"/>
+      <line x1="5" y1="84" x2="95" y2="84" stroke="#d4cfc6" stroke-width="1.5"/>
+      <circle cx="14" cy="84" r="4.5" fill="#c9a84c"/>
+      <circle cx="30" cy="84" r="4.5" fill="#c9a84c"/>
+      <line x1="14" y1="84" x2="24" y2="66" stroke="#1a4731" stroke-width="6"/>
+      <line x1="30" y1="84" x2="24" y2="66" stroke="#1a4731" stroke-width="6"/>
+      <circle cx="24" cy="66" r="5" fill="#1a4731"/>
+      <line x1="24" y1="66" x2="80" y2="55" stroke="#1a4731" stroke-width="8"/>
+      <line x1="80" y1="55" x2="76" y2="84" stroke="#1a4731" stroke-width="7"/>
+      <line x1="80" y1="55" x2="86" y2="80" stroke="#1a4731" stroke-width="7"/>
+      <circle cx="76" cy="84" r="4.5" fill="#c9a84c"/>
+      <circle cx="86" cy="80" r="4.5" fill="#c9a84c"/>
+      <line x1="22" y1="63" x2="24" y2="66" stroke="#1a4731" stroke-width="5"/>
+      <path d="M46 50 L46 40" stroke="#c9a84c" stroke-width="2.5"/>
+      <path d="M42 44 L46 38 L50 44" stroke="#c9a84c" stroke-width="2"/>
+      <circle cx="16" cy="57" r="9" fill="#c9a84c" stroke="#1a4731" stroke-width="2.5"/>
+    </svg></div>
+    <h3>Liegestütz</h3><div class="reps">3 × 10–15 Wdh.</div>
+    <p>Schulterbreiter Handstand, Körper gerade. Einatmen: Brust zum Boden, Ellenbogen nah am Körper. Ausatmen: hochdrücken. Bauch angespannt halten.</p></div>
+
+    <!-- K2 Kniebeugen -->
+    <div class="card"><div class="icon-wrap"><svg viewBox="0 0 100 100" fill="none" stroke-linecap="round" stroke-linejoin="round">
+      <ellipse cx="50" cy="55" rx="42" ry="40" fill="#edf7f2"/>
+      <line x1="5" y1="92" x2="95" y2="92" stroke="#d4cfc6" stroke-width="1.5"/>
+      <line x1="50" y1="23" x2="48" y2="54" stroke="#1a4731" stroke-width="7"/>
+      <line x1="50" y1="36" x2="22" y2="46" stroke="#1a4731" stroke-width="6"/>
+      <circle cx="22" cy="46" r="4.5" fill="#c9a84c"/>
+      <line x1="50" y1="36" x2="78" y2="46" stroke="#1a4731" stroke-width="6"/>
+      <circle cx="78" cy="46" r="4.5" fill="#c9a84c"/>
+      <circle cx="48" cy="54" r="4.5" fill="#1a4731"/>
+      <line x1="48" y1="54" x2="26" y2="72" stroke="#1a4731" stroke-width="8"/>
+      <circle cx="26" cy="72" r="5.5" fill="#1a4731"/>
+      <line x1="26" y1="72" x2="24" y2="92" stroke="#1a4731" stroke-width="8"/>
+      <line x1="48" y1="54" x2="70" y2="72" stroke="#1a4731" stroke-width="8"/>
+      <circle cx="70" cy="72" r="5.5" fill="#1a4731"/>
+      <line x1="70" y1="72" x2="72" y2="92" stroke="#1a4731" stroke-width="8"/>
+      <circle cx="24" cy="92" r="4.5" fill="#c9a84c"/>
+      <circle cx="72" cy="92" r="4.5" fill="#c9a84c"/>
+      <path d="M50 60 L50 70" stroke="#c9a84c" stroke-width="2.5"/>
+      <path d="M46 67 L50 73 L54 67" stroke="#c9a84c" stroke-width="2"/>
+      <circle cx="50" cy="14" r="9" fill="#c9a84c" stroke="#1a4731" stroke-width="2.5"/>
+    </svg></div>
+    <h3>Kniebeugen</h3><div class="reps">3 × 12–15 Wdh.</div>
+    <p>Hüftbreit stehen, Arme nach vorne. Hüfte nach hinten-unten schieben, Knie folgen Fußspitzen. Oberschenkel mindestens parallel zum Boden. Rücken gerade.</p></div>
+
+    <!-- K3 Plank -->
+    <div class="card"><div class="icon-wrap"><svg viewBox="0 0 100 100" fill="none" stroke-linecap="round" stroke-linejoin="round">
+      <ellipse cx="50" cy="62" rx="44" ry="30" fill="#edf7f2"/>
+      <line x1="5" y1="82" x2="95" y2="82" stroke="#d4cfc6" stroke-width="1.5"/>
+      <circle cx="14" cy="82" r="4.5" fill="#c9a84c"/>
+      <circle cx="30" cy="82" r="4.5" fill="#c9a84c"/>
+      <line x1="10" y1="82" x2="28" y2="82" stroke="#1a4731" stroke-width="5"/>
+      <line x1="10" y1="82" x2="16" y2="70" stroke="#1a4731" stroke-width="6"/>
+      <line x1="28" y1="82" x2="26" y2="70" stroke="#1a4731" stroke-width="6"/>
+      <circle cx="16" cy="70" r="5" fill="#1a4731"/>
+      <line x1="16" y1="70" x2="78" y2="57" stroke="#1a4731" stroke-width="8"/>
+      <line x1="78" y1="57" x2="74" y2="82" stroke="#1a4731" stroke-width="7"/>
+      <line x1="78" y1="57" x2="84" y2="80" stroke="#1a4731" stroke-width="7"/>
+      <circle cx="74" cy="82" r="4.5" fill="#c9a84c"/>
+      <circle cx="84" cy="80" r="4.5" fill="#c9a84c"/>
+      <line x1="18" y1="67" x2="16" y2="70" stroke="#1a4731" stroke-width="5"/>
+      <line x1="16" y1="52" x2="82" y2="42" stroke="#c9a84c" stroke-width="1.5" stroke-dasharray="4,3"/>
+      <circle cx="84" cy="34" r="8" stroke="#c9a84c" stroke-width="1.8" fill="rgba(201,168,76,.1)"/>
+      <line x1="84" y1="30" x2="84" y2="34" stroke="#c9a84c" stroke-width="1.8"/>
+      <line x1="84" y1="34" x2="87" y2="36" stroke="#c9a84c" stroke-width="1.8"/>
+      <circle cx="12" cy="62" r="9" fill="#c9a84c" stroke="#1a4731" stroke-width="2.5"/>
+    </svg></div>
+    <h3>Unterarmstütz (Plank)</h3><div class="reps">3 × 20–45 Sek.</div>
+    <p>Auf Unterarme stützen, Ellenbogen unter Schultern. Körper bildet eine gerade Linie von Kopf bis Fersen. Bauch, Gesäß und Beine fest anspannen.</p></div>
+
+    <!-- K4 Ausfallschritte -->
+    <div class="card"><div class="icon-wrap"><svg viewBox="0 0 100 100" fill="none" stroke-linecap="round" stroke-linejoin="round">
+      <ellipse cx="50" cy="52" rx="42" ry="42" fill="#edf7f2"/>
+      <line x1="5" y1="92" x2="95" y2="92" stroke="#d4cfc6" stroke-width="1.5"/>
+      <line x1="50" y1="21" x2="50" y2="52" stroke="#1a4731" stroke-width="7"/>
+      <line x1="50" y1="34" x2="34" y2="46" stroke="#1a4731" stroke-width="6"/>
+      <circle cx="34" cy="46" r="4" fill="#c9a84c"/>
+      <line x1="50" y1="34" x2="66" y2="46" stroke="#1a4731" stroke-width="6"/>
+      <circle cx="66" cy="46" r="4" fill="#c9a84c"/>
+      <circle cx="50" cy="52" r="4.5" fill="#1a4731"/>
+      <line x1="50" y1="52" x2="68" y2="72" stroke="#1a4731" stroke-width="8"/>
+      <circle cx="68" cy="72" r="5.5" fill="#1a4731"/>
+      <line x1="68" y1="72" x2="72" y2="92" stroke="#1a4731" stroke-width="8"/>
+      <line x1="50" y1="52" x2="30" y2="68" stroke="#1a4731" stroke-width="8"/>
+      <circle cx="30" cy="68" r="5.5" fill="#1a4731"/>
+      <line x1="30" y1="68" x2="22" y2="92" stroke="#1a4731" stroke-width="8"/>
+      <circle cx="22" cy="88" r="5.5" fill="#c9a84c"/>
+      <path d="M64 72 L68 72 L68 68" stroke="#c9a84c" stroke-width="1.8" fill="none"/>
+      <path d="M26 68 L30 68 L30 64" stroke="#c9a84c" stroke-width="1.8" fill="none"/>
+      <circle cx="50" cy="12" r="9" fill="#c9a84c" stroke="#1a4731" stroke-width="2.5"/>
+    </svg></div>
+    <h3>Ausfallschritte (Lunges)</h3><div class="reps">3 × 10 Wdh. je Bein</div>
+    <p>Schritt nach vorne, beide Knie im 90°-Winkel beugen. Hinteres Knie kurz über den Boden, vorderes nicht über Fußspitze. Rücken gerade halten.</p></div>
+
+    <!-- K5 Beckenbrücke -->
+    <div class="card"><div class="icon-wrap"><svg viewBox="0 0 100 100" fill="none" stroke-linecap="round" stroke-linejoin="round">
+      <ellipse cx="50" cy="60" rx="44" ry="34" fill="#edf7f2"/>
+      <line x1="5" y1="88" x2="95" y2="88" stroke="#d4cfc6" stroke-width="1.5"/>
+      <line x1="20" y1="74" x2="52" y2="80" stroke="#1a4731" stroke-width="7"/>
+      <line x1="26" y1="78" x2="24" y2="88" stroke="#1a4731" stroke-width="5"/>
+      <line x1="42" y1="80" x2="40" y2="88" stroke="#1a4731" stroke-width="5"/>
+      <circle cx="24" cy="88" r="4" fill="#c9a84c"/>
+      <circle cx="40" cy="88" r="4" fill="#c9a84c"/>
+      <line x1="52" y1="80" x2="57" y2="55" stroke="#1a4731" stroke-width="7"/>
+      <circle cx="57" cy="55" r="4.5" fill="#1a4731"/>
+      <line x1="57" y1="55" x2="70" y2="78" stroke="#1a4731" stroke-width="7"/>
+      <circle cx="70" cy="78" r="5" fill="#1a4731"/>
+      <line x1="70" y1="78" x2="70" y2="88" stroke="#1a4731" stroke-width="7"/>
+      <line x1="52" y1="80" x2="78" y2="74" stroke="#1a4731" stroke-width="7"/>
+      <line x1="78" y1="74" x2="80" y2="88" stroke="#1a4731" stroke-width="7"/>
+      <circle cx="70" cy="88" r="4.5" fill="#c9a84c"/>
+      <circle cx="80" cy="88" r="4.5" fill="#c9a84c"/>
+      <path d="M46 64 L46 50" stroke="#c9a84c" stroke-width="2.5"/>
+      <path d="M42 54 L46 48 L50 54" stroke="#c9a84c" stroke-width="2"/>
+      <circle cx="12" cy="72" r="9" fill="#c9a84c" stroke="#1a4731" stroke-width="2.5"/>
+    </svg></div>
+    <h3>Beckenbrücke (Glute Bridge)</h3><div class="reps">3 × 12–15 Wdh.</div>
+    <p>Rückenlage, Knie angewinkelt, Füße hüftbreit. Hüfte beim Einatmen nach oben drücken. Gesäß oben anspannen. Langsam absenken beim Ausatmen.</p></div>
+
+  </div>
+  <div class="page-footer">BEREICH 04 · KRAFT OHNE GERÄTE</div>
+</div>
+
+
+<!-- ══ SEITE 5: STUHLÜBUNGEN ══════════════════════════════ -->
+<div class="page">
+  <div class="section-header">
+    <div class="section-num">Bereich 05 von 05</div>
+    <h2>Stuhlübungen</h2>
+    <div class="section-note">Geeignet für alle Fitnesslevel · stabilen Stuhl ohne Rollen verwenden · langsam und kontrolliert</div>
+  </div>
+  <div class="exercises">
+
+    <!-- ST1 Knieheber -->
+    <div class="card"><div class="icon-wrap"><svg viewBox="0 0 100 100" fill="none" stroke-linecap="round" stroke-linejoin="round">
+      <ellipse cx="52" cy="54" rx="42" ry="40" fill="#edf7f2"/>
+      <line x1="5" y1="95" x2="95" y2="95" stroke="#d4cfc6" stroke-width="1.5"/>
+      <line x1="18" y1="95" x2="18" y2="58" stroke="#b0a898" stroke-width="2.5"/>
+      <line x1="46" y1="95" x2="46" y2="58" stroke="#b0a898" stroke-width="2.5"/>
+      <line x1="58" y1="95" x2="58" y2="58" stroke="#b0a898" stroke-width="2.5"/>
+      <line x1="18" y1="58" x2="60" y2="58" stroke="#b0a898" stroke-width="2.5"/>
+      <line x1="18" y1="58" x2="18" y2="30" stroke="#b0a898" stroke-width="2.5"/>
+      <line x1="18" y1="30" x2="30" y2="30" stroke="#b0a898" stroke-width="2.5"/>
+      <line x1="58" y1="29" x2="54" y2="53" stroke="#1a4731" stroke-width="7"/>
+      <circle cx="56" cy="38" r="4.5" fill="#1a4731"/>
+      <line x1="56" y1="38" x2="38" y2="50" stroke="#1a4731" stroke-width="6"/>
+      <line x1="56" y1="38" x2="74" y2="48" stroke="#1a4731" stroke-width="6"/>
+      <circle cx="38" cy="50" r="4" fill="#c9a84c"/>
+      <line x1="54" y1="53" x2="66" y2="42" stroke="#1a4731" stroke-width="8"/>
+      <circle cx="66" cy="42" r="5.5" fill="#1a4731"/>
+      <line x1="66" y1="42" x2="74" y2="54" stroke="#1a4731" stroke-width="7"/>
+      <circle cx="74" cy="54" r="4.5" fill="#c9a84c"/>
+      <line x1="54" y1="53" x2="38" y2="58" stroke="#1a4731" stroke-width="8"/>
+      <line x1="38" y1="58" x2="36" y2="95" stroke="#1a4731" stroke-width="7"/>
+      <path d="M78 47 L78 33" stroke="#c9a84c" stroke-width="2.5"/>
+      <path d="M74 37 L78 31 L82 37" stroke="#c9a84c" stroke-width="2"/>
+      <circle cx="58" cy="19" r="9" fill="#c9a84c" stroke="#1a4731" stroke-width="2.5"/>
+    </svg></div>
+    <h3>Sitzende Knieheber</h3><div class="reps">3 × 15 Wdh. je Bein</div>
+    <p>Aufrecht auf dem Stuhl sitzen, Rücken nicht anlehnen. Abwechselnd ein Knie so weit wie möglich zur Brust heben. Einatmen beim Heben, ausatmen beim Absenken.</p></div>
+
+    <!-- ST2 Sit-to-Stand -->
+    <div class="card"><div class="icon-wrap"><svg viewBox="0 0 100 100" fill="none" stroke-linecap="round" stroke-linejoin="round">
+      <ellipse cx="50" cy="52" rx="44" ry="42" fill="#edf7f2"/>
+      <line x1="5" y1="95" x2="95" y2="95" stroke="#d4cfc6" stroke-width="1.5"/>
+      <line x1="10" y1="95" x2="10" y2="62" stroke="#b0a898" stroke-width="2.5"/>
+      <line x1="36" y1="95" x2="36" y2="62" stroke="#b0a898" stroke-width="2.5"/>
+      <line x1="46" y1="95" x2="46" y2="62" stroke="#b0a898" stroke-width="2.5"/>
+      <line x1="10" y1="62" x2="48" y2="62" stroke="#b0a898" stroke-width="2.5"/>
+      <line x1="10" y1="62" x2="10" y2="36" stroke="#b0a898" stroke-width="2.5"/>
+      <line x1="10" y1="36" x2="20" y2="36" stroke="#b0a898" stroke-width="2.5"/>
+      <circle cx="37" cy="38" r="7" fill="none" stroke="#b0a898" stroke-width="2" stroke-dasharray="3,2"/>
+      <path d="M37 45 Q34 54 30 62" stroke="#b0a898" stroke-width="4" fill="none" stroke-dasharray="4,3"/>
+      <line x1="72" y1="23" x2="72" y2="58" stroke="#1a4731" stroke-width="7"/>
+      <line x1="72" y1="36" x2="54" y2="47" stroke="#1a4731" stroke-width="6"/>
+      <line x1="72" y1="36" x2="88" y2="45" stroke="#1a4731" stroke-width="6"/>
+      <circle cx="54" cy="47" r="4.5" fill="#c9a84c"/>
+      <circle cx="88" cy="45" r="4.5" fill="#c9a84c"/>
+      <circle cx="72" cy="58" r="4.5" fill="#1a4731"/>
+      <line x1="72" y1="58" x2="62" y2="95" stroke="#1a4731" stroke-width="7"/>
+      <line x1="72" y1="58" x2="82" y2="95" stroke="#1a4731" stroke-width="7"/>
+      <path d="M58 28 L58 14" stroke="#c9a84c" stroke-width="2.5"/>
+      <path d="M54 18 L58 12 L62 18" stroke="#c9a84c" stroke-width="2"/>
+      <circle cx="72" cy="13" r="9" fill="#c9a84c" stroke="#1a4731" stroke-width="2.5"/>
+    </svg></div>
+    <h3>Aufstehen (Sit-to-Stand)</h3><div class="reps">3 × 10–15 Wdh.</div>
+    <p>Vorderkante des Stuhls sitzen, Füße hüftbreit. Oberkörper leicht vorbeugen und aus den Beinen heraus aufstehen — ohne Armschwung. Langsam wieder hinsetzen.</p></div>
+
+    <!-- ST3 Rumpfdrehung -->
+    <div class="card"><div class="icon-wrap"><svg viewBox="0 0 100 100" fill="none" stroke-linecap="round" stroke-linejoin="round">
+      <ellipse cx="50" cy="52" rx="44" ry="42" fill="#edf7f2"/>
+      <line x1="5" y1="95" x2="95" y2="95" stroke="#d4cfc6" stroke-width="1.5"/>
+      <line x1="20" y1="95" x2="20" y2="58" stroke="#b0a898" stroke-width="2.5"/>
+      <line x1="52" y1="95" x2="52" y2="58" stroke="#b0a898" stroke-width="2.5"/>
+      <line x1="62" y1="95" x2="62" y2="58" stroke="#b0a898" stroke-width="2.5"/>
+      <line x1="20" y1="58" x2="64" y2="58" stroke="#b0a898" stroke-width="2.5"/>
+      <line x1="20" y1="58" x2="20" y2="30" stroke="#b0a898" stroke-width="2.5"/>
+      <line x1="20" y1="30" x2="30" y2="30" stroke="#b0a898" stroke-width="2.5"/>
+      <line x1="50" y1="25" x2="50" y2="54" stroke="#1a4731" stroke-width="7"/>
+      <circle cx="50" cy="38" r="4.5" fill="#1a4731"/>
+      <line x1="50" y1="38" x2="28" y2="48" stroke="#1a4731" stroke-width="6"/>
+      <line x1="50" y1="38" x2="76" y2="30" stroke="#1a4731" stroke-width="6"/>
+      <circle cx="76" cy="30" r="4.5" fill="#c9a84c"/>
+      <circle cx="28" cy="48" r="4.5" fill="#c9a84c"/>
+      <circle cx="50" cy="54" r="4.5" fill="#1a4731"/>
+      <line x1="50" y1="54" x2="34" y2="58" stroke="#1a4731" stroke-width="8"/>
+      <line x1="34" y1="58" x2="32" y2="95" stroke="#1a4731" stroke-width="7"/>
+      <line x1="50" y1="54" x2="58" y2="58" stroke="#1a4731" stroke-width="8"/>
+      <line x1="58" y1="58" x2="60" y2="95" stroke="#1a4731" stroke-width="7"/>
+      <path d="M64 14 A18 18 0 0 1 80 28" stroke="#c9a84c" stroke-width="2.5" fill="none"/>
+      <path d="M76 28 L81 28 L78 23" stroke="#c9a84c" stroke-width="2" fill="none"/>
+      <circle cx="52" cy="15" r="9" fill="#c9a84c" stroke="#1a4731" stroke-width="2.5"/>
+    </svg></div>
+    <h3>Sitzende Rumpfdrehung</h3><div class="reps">3 × 10 Wdh. je Seite</div>
+    <p>Aufrecht sitzen, Füße fest am Boden. Arme vor der Brust verschränken. Oberkörper langsam nach rechts und links drehen. Hüfte bleibt ruhig.</p></div>
+
+    <!-- ST4 Dips -->
+    <div class="card"><div class="icon-wrap"><svg viewBox="0 0 100 100" fill="none" stroke-linecap="round" stroke-linejoin="round">
+      <ellipse cx="50" cy="56" rx="44" ry="38" fill="#edf7f2"/>
+      <line x1="5" y1="95" x2="95" y2="95" stroke="#d4cfc6" stroke-width="1.5"/>
+      <line x1="8" y1="95" x2="8" y2="54" stroke="#b0a898" stroke-width="2.5"/>
+      <line x1="36" y1="95" x2="36" y2="54" stroke="#b0a898" stroke-width="2.5"/>
+      <line x1="8" y1="54" x2="38" y2="54" stroke="#b0a898" stroke-width="3"/>
+      <line x1="8" y1="54" x2="8" y2="26" stroke="#b0a898" stroke-width="2.5"/>
+      <line x1="8" y1="26" x2="18" y2="26" stroke="#b0a898" stroke-width="2.5"/>
+      <circle cx="18" cy="54" r="5" fill="#c9a84c"/>
+      <circle cx="34" cy="54" r="5" fill="#c9a84c"/>
+      <line x1="18" y1="54" x2="24" y2="38" stroke="#1a4731" stroke-width="6"/>
+      <line x1="34" y1="54" x2="32" y2="38" stroke="#1a4731" stroke-width="6"/>
+      <circle cx="24" cy="38" r="4.5" fill="#1a4731"/>
+      <circle cx="32" cy="38" r="4.5" fill="#1a4731"/>
+      <line x1="24" y1="38" x2="38" y2="28" stroke="#1a4731" stroke-width="6"/>
+      <line x1="32" y1="38" x2="38" y2="28" stroke="#1a4731" stroke-width="6"/>
+      <line x1="62" y1="22" x2="38" y2="34" stroke="#1a4731" stroke-width="7"/>
+      <line x1="38" y1="34" x2="58" y2="56" stroke="#1a4731" stroke-width="7"/>
+      <line x1="58" y1="56" x2="62" y2="95" stroke="#1a4731" stroke-width="7"/>
+      <line x1="38" y1="34" x2="68" y2="52" stroke="#1a4731" stroke-width="7"/>
+      <line x1="68" y1="52" x2="74" y2="95" stroke="#1a4731" stroke-width="7"/>
+      <path d="M82 40 L82 56" stroke="#c9a84c" stroke-width="2.5"/>
+      <path d="M78 53 L82 59 L86 53" stroke="#c9a84c" stroke-width="2"/>
+      <circle cx="62" cy="13" r="9" fill="#c9a84c" stroke="#1a4731" stroke-width="2.5"/>
+    </svg></div>
+    <h3>Stuhl-Dips (Trizeps)</h3><div class="reps">3 × 8–12 Wdh.</div>
+    <p>Hände auf Stuhlvorderkante, Beine gestreckt. Körper vor dem Stuhl absenken (Ellenbogen ~90°), dann hochdrücken. Rücken nahe an der Stuhllehne.</p></div>
+
+    <!-- ST5 Beinstrecke -->
+    <div class="card"><div class="icon-wrap"><svg viewBox="0 0 100 100" fill="none" stroke-linecap="round" stroke-linejoin="round">
+      <ellipse cx="50" cy="56" rx="44" ry="38" fill="#edf7f2"/>
+      <line x1="5" y1="95" x2="95" y2="95" stroke="#d4cfc6" stroke-width="1.5"/>
+      <line x1="8" y1="95" x2="8" y2="58" stroke="#b0a898" stroke-width="2.5"/>
+      <line x1="34" y1="95" x2="34" y2="58" stroke="#b0a898" stroke-width="2.5"/>
+      <line x1="46" y1="95" x2="46" y2="58" stroke="#b0a898" stroke-width="2.5"/>
+      <line x1="8" y1="58" x2="48" y2="58" stroke="#b0a898" stroke-width="2.5"/>
+      <line x1="8" y1="58" x2="8" y2="30" stroke="#b0a898" stroke-width="2.5"/>
+      <line x1="8" y1="30" x2="18" y2="30" stroke="#b0a898" stroke-width="2.5"/>
+      <line x1="54" y1="25" x2="52" y2="53" stroke="#1a4731" stroke-width="7"/>
+      <circle cx="52" cy="36" r="4.5" fill="#1a4731"/>
+      <line x1="52" y1="36" x2="34" y2="48" stroke="#1a4731" stroke-width="6"/>
+      <line x1="52" y1="36" x2="70" y2="46" stroke="#1a4731" stroke-width="6"/>
+      <circle cx="34" cy="48" r="4" fill="#c9a84c"/>
+      <circle cx="52" cy="53" r="4.5" fill="#1a4731"/>
+      <line x1="52" y1="53" x2="26" y2="58" stroke="#1a4731" stroke-width="8"/>
+      <line x1="26" y1="58" x2="22" y2="95" stroke="#1a4731" stroke-width="7"/>
+      <line x1="52" y1="53" x2="60" y2="55" stroke="#1a4731" stroke-width="8"/>
+      <line x1="60" y1="55" x2="90" y2="52" stroke="#1a4731" stroke-width="7"/>
+      <circle cx="90" cy="52" r="5.5" fill="#c9a84c"/>
+      <path d="M90 45 L90 38" stroke="#c9a84c" stroke-width="2.5"/>
+      <path d="M86 42 L90 36 L94 42" stroke="#c9a84c" stroke-width="2"/>
+      <circle cx="54" cy="15" r="9" fill="#c9a84c" stroke="#1a4731" stroke-width="2.5"/>
+    </svg></div>
+    <h3>Sitzende Beinstrecke</h3><div class="reps">3 × 12 Wdh. je Bein</div>
+    <p>Aufrecht sitzen. Ein Bein langsam strecken bis es waagrecht ist, 2 Sek. halten, Fuß anziehen. Langsam absenken. Trainiert Oberschenkel und Bauch.</p></div>
+
+  </div>
+  <div class="page-footer">BEREICH 05 · STUHLÜBUNGEN</div>
+</div>
+
+<!-- ══ AOK RÜCKEN ════════════════════════════════════════════ -->
+<div class="page">
+  <div class="section-header">
+    <div class="section-num">BEREICH 06</div>
+    <h2>AOK Rückenprogramm</h2>
+    <div class="section-note">5 empfohlene Übungen der AOK Bayern · 2–3× pro Woche · Matte empfohlen</div>
+  </div>
+  <div class="exercises">
+
+    <!-- AOK1 Katzenbuckel -->
+    <div class="card"><div class="icon-wrap"><svg viewBox="0 0 100 100" fill="none" stroke-linecap="round" stroke-linejoin="round">
+      <ellipse cx="50" cy="56" rx="44" ry="38" fill="#edf7f2"/>
+      <!-- body arch (cat hump) -->
+      <path d="M18 70 Q30 30 50 28 Q70 30 82 70" stroke="#1a4731" stroke-width="7" fill="none"/>
+      <!-- arms -->
+      <line x1="18" y1="70" x2="18" y2="95" stroke="#1a4731" stroke-width="7"/>
+      <line x1="82" y1="70" x2="82" y2="95" stroke="#1a4731" stroke-width="7"/>
+      <!-- knees -->
+      <line x1="26" y1="82" x2="26" y2="95" stroke="#1a4731" stroke-width="7"/>
+      <line x1="74" y1="82" x2="74" y2="95" stroke="#1a4731" stroke-width="7"/>
+      <!-- head -->
+      <circle cx="50" cy="20" r="9" fill="#c9a84c" stroke="#1a4731" stroke-width="2.5"/>
+      <!-- joints -->
+      <circle cx="18" cy="70" r="5" fill="#1a4731"/>
+      <circle cx="82" cy="70" r="5" fill="#1a4731"/>
+      <!-- arrow upward -->
+      <path d="M50 44 L50 36" stroke="#c9a84c" stroke-width="2.5"/>
+      <path d="M46 39 L50 33 L54 39" stroke="#c9a84c" stroke-width="2" fill="none"/>
+    </svg></div>
+    <h3>Katzenbuckel</h3><div class="reps">5–6 Wdh. · langsam</div>
+    <p>Vierfüßlerstand, Rücken gerade. Mit Ausatmung Rücken nach oben wölben (Katzenbuckel), Bauchnabel einziehen. Mit Einatmung zurück. Wirbelkörper entlasten und Durchblutung fördern.</p></div>
+
+    <!-- AOK2 Vogelhund -->
+    <div class="card"><div class="icon-wrap"><svg viewBox="0 0 100 100" fill="none" stroke-linecap="round" stroke-linejoin="round">
+      <ellipse cx="50" cy="56" rx="44" ry="38" fill="#edf7f2"/>
+      <!-- torso horizontal -->
+      <line x1="28" y1="52" x2="68" y2="52" stroke="#1a4731" stroke-width="7"/>
+      <!-- left arm forward -->
+      <line x1="28" y1="52" x2="10" y2="45" stroke="#1a4731" stroke-width="6"/>
+      <circle cx="10" cy="45" r="4.5" fill="#c9a84c"/>
+      <!-- right leg back -->
+      <line x1="68" y1="52" x2="90" y2="48" stroke="#1a4731" stroke-width="6"/>
+      <circle cx="90" cy="48" r="4.5" fill="#c9a84c"/>
+      <!-- support arm -->
+      <line x1="42" y1="52" x2="42" y2="72" stroke="#1a4731" stroke-width="6"/>
+      <circle cx="42" cy="72" r="4.5" fill="#1a4731"/>
+      <!-- support knee -->
+      <line x1="60" y1="52" x2="60" y2="72" stroke="#1a4731" stroke-width="6"/>
+      <circle cx="60" cy="72" r="4.5" fill="#1a4731"/>
+      <!-- head -->
+      <circle cx="22" cy="44" r="9" fill="#c9a84c" stroke="#1a4731" stroke-width="2.5"/>
+    </svg></div>
+    <h3>Vogelhund</h3><div class="reps">3 × 15 Wdh. je Seite</div>
+    <p>Vierfüßlerstand. Linken Arm und rechtes Bein gleichzeitig waagrecht strecken, 2 Sek. halten, zurück. Kräftigt tiefer Rücken, Gesäß und Schultern. Rumpf dabei stabil halten.</p></div>
+
+    <!-- AOK3 Schulterbrücke -->
+    <div class="card"><div class="icon-wrap"><svg viewBox="0 0 100 100" fill="none" stroke-linecap="round" stroke-linejoin="round">
+      <ellipse cx="50" cy="56" rx="44" ry="38" fill="#edf7f2"/>
+      <!-- floor line -->
+      <line x1="5" y1="88" x2="95" y2="88" stroke="#d4cfc6" stroke-width="1.5"/>
+      <!-- torso arch -->
+      <path d="M20 88 L24 72 L50 62 L76 72 L80 88" stroke="#1a4731" stroke-width="7" fill="none"/>
+      <!-- arms flat -->
+      <line x1="24" y1="72" x2="10" y2="80" stroke="#1a4731" stroke-width="6"/>
+      <line x1="76" y1="72" x2="90" y2="80" stroke="#1a4731" stroke-width="6"/>
+      <circle cx="10" cy="80" r="4.5" fill="#c9a84c"/>
+      <circle cx="90" cy="80" r="4.5" fill="#c9a84c"/>
+      <!-- head -->
+      <circle cx="50" cy="52" r="9" fill="#c9a84c" stroke="#1a4731" stroke-width="2.5"/>
+      <!-- joints -->
+      <circle cx="24" cy="72" r="4.5" fill="#1a4731"/>
+      <circle cx="76" cy="72" r="4.5" fill="#1a4731"/>
+      <circle cx="20" cy="88" r="4" fill="#1a4731"/>
+      <circle cx="80" cy="88" r="4" fill="#1a4731"/>
+      <!-- arrow up -->
+      <path d="M50 50 L50 42" stroke="#c9a84c" stroke-width="2.5"/>
+      <path d="M46 45 L50 39 L54 45" stroke="#c9a84c" stroke-width="2" fill="none"/>
+    </svg></div>
+    <h3>Schulterbrücke</h3><div class="reps">3 × 5–6 Atemzüge</div>
+    <p>Rückenlage, Fersen nah ans Gesäß. Mit Einatmung Becken anheben bis Schultern–Hüfte–Knie eine Linie bilden. Position halten, ruhig atmen. Stärkt Gesäß und untere Rückenmuskulatur.</p></div>
+
+    <!-- AOK4 Dreh-Dehn -->
+    <div class="card"><div class="icon-wrap"><svg viewBox="0 0 100 100" fill="none" stroke-linecap="round" stroke-linejoin="round">
+      <ellipse cx="50" cy="56" rx="44" ry="38" fill="#edf7f2"/>
+      <!-- floor -->
+      <line x1="5" y1="88" x2="95" y2="88" stroke="#d4cfc6" stroke-width="1.5"/>
+      <!-- torso lying -->
+      <line x1="20" y1="60" x2="60" y2="60" stroke="#1a4731" stroke-width="7"/>
+      <!-- arms out -->
+      <line x1="40" y1="60" x2="16" y2="48" stroke="#1a4731" stroke-width="6"/>
+      <line x1="40" y1="60" x2="62" y2="50" stroke="#1a4731" stroke-width="6"/>
+      <circle cx="16" cy="48" r="4.5" fill="#c9a84c"/>
+      <circle cx="62" cy="50" r="4.5" fill="#c9a84c"/>
+      <!-- knees rotated to side -->
+      <line x1="60" y1="60" x2="74" y2="72" stroke="#1a4731" stroke-width="7"/>
+      <line x1="74" y1="72" x2="88" y2="72" stroke="#1a4731" stroke-width="7"/>
+      <circle cx="74" cy="72" r="4.5" fill="#1a4731"/>
+      <circle cx="88" cy="72" r="5" fill="#1a4731"/>
+      <!-- head -->
+      <circle cx="20" cy="52" r="9" fill="#c9a84c" stroke="#1a4731" stroke-width="2.5"/>
+      <!-- rotation arrow -->
+      <path d="M68 58 A10 10 0 0 1 76 68" stroke="#c9a84c" stroke-width="2.5" fill="none"/>
+      <path d="M73 68 L77 69 L75 64" stroke="#c9a84c" stroke-width="2" fill="none"/>
+    </svg></div>
+    <h3>Dreh-Dehn-Lagerung</h3><div class="reps">3–4 Atemzüge · je Seite</div>
+    <p>Rückenlage, Arme seitlich. Knie anziehen (90°), mit Ausatmung langsam zur Seite senken. Schultern bleiben am Boden. Sanfte Rotation der Lendenwirbelsäule — löst Verspannungen.</p></div>
+
+    <!-- AOK5 Päckchen -->
+    <div class="card"><div class="icon-wrap"><svg viewBox="0 0 100 100" fill="none" stroke-linecap="round" stroke-linejoin="round">
+      <ellipse cx="50" cy="56" rx="44" ry="38" fill="#edf7f2"/>
+      <!-- floor -->
+      <line x1="5" y1="88" x2="95" y2="88" stroke="#d4cfc6" stroke-width="1.5"/>
+      <!-- rounded back (child's pose) -->
+      <path d="M28 88 Q30 60 50 50 Q70 60 72 88" stroke="#1a4731" stroke-width="7" fill="none"/>
+      <!-- arms extended forward -->
+      <line x1="50" y1="50" x2="20" y2="45" stroke="#1a4731" stroke-width="6"/>
+      <line x1="50" y1="50" x2="80" y2="45" stroke="#1a4731" stroke-width="6"/>
+      <circle cx="20" cy="45" r="4.5" fill="#c9a84c"/>
+      <circle cx="80" cy="45" r="4.5" fill="#c9a84c"/>
+      <!-- head on floor -->
+      <circle cx="50" cy="40" r="9" fill="#c9a84c" stroke="#1a4731" stroke-width="2.5"/>
+      <!-- joints hips -->
+      <circle cx="28" cy="88" r="4.5" fill="#1a4731"/>
+      <circle cx="72" cy="88" r="4.5" fill="#1a4731"/>
+      <!-- breath wave -->
+      <path d="M55 68 Q60 64 65 68 Q70 72 75 68" stroke="#c9a84c" stroke-width="2" fill="none"/>
+    </svg></div>
+    <h3>Das Päckchen</h3><div class="reps">8–10 Atemzüge · entspannen</div>
+    <p>Sitzende Hocke, Gesäß auf die Fersen. Stirn sanft auf die Matte ablegen, Arme neben dem Körper, Handrücken auf der Matte. Ruhig atmen. Dehnt sanft den gesamten unteren Rücken.</p></div>
+
+  </div>
+  <div class="page-footer">BEREICH 06 · AOK RÜCKENPROGRAMM · Quelle: aok.de/bayern</div>
+</div>
+
+<!-- Print Button -->
+<div class="print-btn-bar">
+  <button class="print-btn" onclick="window.print()">
+    <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+      <polyline points="6 9 6 2 18 2 18 9"/>
+      <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/>
+      <rect x="6" y="14" width="12" height="8"/>
+    </svg>
+    Als PDF drucken
+  </button>
+</div>
+
+</body>
+</html>

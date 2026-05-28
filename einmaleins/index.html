@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Einmaleins – Mathe lernen macht Spaß!</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- STARTBILDSCHIRM -->
+  <div id="screen-start" class="screen active">
+    <div class="logo">🧮</div>
+    <h1>Einmaleins</h1>
+    <p class="subtitle">Mathe lernen macht Spaß!</p>
+
+    <div class="level-select">
+      <p>Wähle deinen Level:</p>
+      <div class="level-buttons">
+        <button class="level-btn active" data-level="1">⭐ Einfach<br><small>Zahlen 1–10</small></button>
+        <button class="level-btn" data-level="2">⭐⭐ Mittel<br><small>Zahlen 1–20</small></button>
+        <button class="level-btn" data-level="3">⭐⭐⭐ Profi<br><small>Zahlen 1–100</small></button>
+      </div>
+    </div>
+
+    <p>Wähle eine Rechenart:</p>
+    <div class="operation-grid">
+      <button class="op-btn" data-op="add">
+        <span class="op-icon">➕</span>
+        <span>Addieren</span>
+      </button>
+      <button class="op-btn" data-op="sub">
+        <span class="op-icon">➖</span>
+        <span>Subtrahieren</span>
+      </button>
+      <button class="op-btn" data-op="mul">
+        <span class="op-icon">✖️</span>
+        <span>Multiplizieren</span>
+      </button>
+      <button class="op-btn" data-op="div">
+        <span class="op-icon">➗</span>
+        <span>Dividieren</span>
+      </button>
+      <button class="op-btn op-mix" data-op="mix">
+        <span class="op-icon">🎲</span>
+        <span>Gemischt</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- ERKLÄRBILDSCHIRM -->
+  <div id="screen-explain" class="screen">
+
+    <!-- Kopfzeile: Figur + Titel -->
+    <div class="exp-topbar">
+      <div id="exp-char" class="exp-character"></div>
+      <div class="exp-title-block">
+        <div id="exp-op-title" class="exp-op-title"></div>
+        <div id="exp-example-counter" class="exp-example-counter"></div>
+      </div>
+      <button id="btn-skip" class="btn-skip">⏭</button>
+    </div>
+
+    <!-- Große Formel -->
+    <div id="exp-formula-big" class="exp-formula-big"></div>
+
+    <!-- Visuelle Bühne -->
+    <div id="exp-stage" class="exp-stage"></div>
+
+    <!-- Unten: Sprechen + Navigation -->
+    <div class="exp-bottom">
+      <button id="btn-speak" class="btn-speak" title="Nochmal vorlesen">🔊</button>
+      <div class="exp-dots" id="exp-dots"></div>
+    </div>
+
+    <div class="exp-nav-btns">
+      <button id="btn-prev-step" class="btn-nav">◀</button>
+      <button id="btn-next-step" class="btn-nav btn-nav-next">Weiter ▶</button>
+      <button id="btn-lets-go" class="btn-primary hidden">Los geht's! 🚀</button>
+    </div>
+
+  </div>
+
+  <!-- SPIELBILDSCHIRM -->
+  <div id="screen-game" class="screen">
+    <div class="game-header">
+      <button id="btn-back" class="btn-icon">🏠</button>
+      <div class="score-box">
+        <span>⭐ <span id="score">0</span></span>
+        <span>❌ <span id="errors">0</span></span>
+      </div>
+      <div id="progress-bar-wrap">
+        <div id="progress-bar"></div>
+      </div>
+    </div>
+
+    <div class="question-area">
+      <div id="question-number">Frage <span id="q-current">1</span> / <span id="q-total">10</span></div>
+      <div id="task-display">
+        <span id="num1"></span>
+        <span id="op-symbol"></span>
+        <span id="num2"></span>
+        <span class="equals">=</span>
+        <span id="answer-display">?</span>
+      </div>
+    </div>
+
+    <div class="input-area">
+      <input type="number" id="answer-input" placeholder="?" inputmode="numeric" autocomplete="off">
+      <button id="btn-check" class="btn-primary">Prüfen ✓</button>
+    </div>
+
+    <div id="feedback" class="feedback hidden"></div>
+
+    <!-- Numpad für kleine Kinder -->
+    <div class="numpad">
+      <button class="np-btn" data-val="7">7</button>
+      <button class="np-btn" data-val="8">8</button>
+      <button class="np-btn" data-val="9">9</button>
+      <button class="np-btn" data-val="4">4</button>
+      <button class="np-btn" data-val="5">5</button>
+      <button class="np-btn" data-val="6">6</button>
+      <button class="np-btn" data-val="1">1</button>
+      <button class="np-btn" data-val="2">2</button>
+      <button class="np-btn" data-val="3">3</button>
+      <button class="np-btn np-zero" data-val="0">0</button>
+      <button class="np-btn np-del" data-val="del">⌫</button>
+    </div>
+  </div>
+
+  <!-- ERGEBNISBILDSCHIRM -->
+  <div id="screen-result" class="screen">
+    <div id="result-emoji" class="result-big-emoji"></div>
+    <h2 id="result-title"></h2>
+    <p id="result-msg"></p>
+    <div class="result-stats">
+      <div class="stat-box">
+        <div class="stat-num" id="res-correct"></div>
+        <div class="stat-label">Richtig ✅</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-num" id="res-errors"></div>
+        <div class="stat-label">Falsch ❌</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-num" id="res-stars"></div>
+        <div class="stat-label">Punkte ⭐</div>
+      </div>
+    </div>
+    <div class="result-buttons">
+      <button id="btn-retry" class="btn-primary">Nochmal 🔁</button>
+      <button id="btn-home" class="btn-secondary">Startseite 🏠</button>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

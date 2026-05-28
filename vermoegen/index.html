@@ -1,0 +1,1020 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vermögensverwaltung</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f0f4f8; color: #1a202c; min-height: 100vh; }
+
+  /* Login Screen */
+  #login-screen { position: fixed; inset: 0; background: #1e3a5f; z-index: 999; display: flex; align-items: center; justify-content: center; }
+  #login-screen.hidden { display: none; }
+  .login-box { background: white; border-radius: 20px; padding: 40px 36px; width: 100%; max-width: 360px; margin: 16px; text-align: center; box-shadow: 0 20px 60px rgba(0,0,0,.3); }
+  .login-box .lock { font-size: 2.8rem; margin-bottom: 12px; }
+  .login-box h2 { font-size: 1.3rem; font-weight: 700; color: #1e3a5f; margin-bottom: 6px; }
+  .login-box p { font-size: 0.85rem; color: #718096; margin-bottom: 28px; }
+  .pin-dots { display: flex; justify-content: center; gap: 12px; margin-bottom: 28px; }
+  .pin-dot { width: 14px; height: 14px; border-radius: 50%; border: 2px solid #cbd5e0; transition: all .2s; }
+  .pin-dot.filled { background: #1e3a5f; border-color: #1e3a5f; }
+  .pin-dot.error { background: #e53e3e; border-color: #e53e3e; }
+  .pin-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; max-width: 240px; margin: 0 auto; }
+  .pin-btn { background: #f7fafc; border: 1.5px solid #e2e8f0; border-radius: 12px; padding: 16px; font-size: 1.3rem; font-weight: 700; color: #2d3748; cursor: pointer; transition: all .15s; }
+  .pin-btn:hover { background: #ebf4ff; border-color: #1e3a5f; }
+  .pin-btn:active { background: #1e3a5f; color: white; }
+  .pin-btn.del { font-size: 1rem; color: #718096; }
+  .login-error { color: #e53e3e; font-size: 0.82rem; margin-top: 14px; min-height: 18px; }
+  .btn-change-pw { background: none; border: none; color: #a0aec0; font-size: 0.78rem; cursor: pointer; margin-top: 16px; text-decoration: underline; }
+
+  header { background: #1e3a5f; color: white; padding: 20px 24px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
+  .export-btns { display: flex; gap: 8px; }
+  .btn-export { background: rgba(255,255,255,0.15); color: white; border: 1px solid rgba(255,255,255,0.3); border-radius: 7px; padding: 6px 14px; font-size: 0.82rem; font-weight: 600; cursor: pointer; }
+  .btn-export:hover { background: rgba(255,255,255,0.25); }
+  header h1 { font-size: 1.4rem; font-weight: 700; letter-spacing: 0.5px; }
+  header span { font-size: 0.85rem; opacity: 0.7; }
+
+  .container { max-width: 900px; margin: 0 auto; padding: 24px 16px; }
+
+  /* Kacheln */
+  .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 28px; }
+  .card { background: white; border-radius: 12px; padding: 20px; box-shadow: 0 1px 4px rgba(0,0,0,.08); }
+  .card .label { font-size: 0.78rem; color: #718096; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 6px; }
+  .card .value { font-size: 1.7rem; font-weight: 700; }
+  .card.aktiva .value { color: #276749; }
+  .card.passiva .value { color: #c53030; }
+  .card.netto .value { color: #1e3a5f; }
+
+  /* Chart */
+  .chart-box { background: white; border-radius: 12px; padding: 20px; box-shadow: 0 1px 4px rgba(0,0,0,.08); margin-bottom: 28px; }
+  .chart-box h2 { font-size: 0.95rem; font-weight: 600; color: #4a5568; margin-bottom: 16px; }
+  .chart-wrap { max-width: 320px; margin: 0 auto; }
+
+  /* Tabs */
+  .tabs { display: flex; gap: 8px; margin-bottom: 20px; }
+  .tab { padding: 8px 20px; border-radius: 8px; border: none; cursor: pointer; font-size: 0.9rem; font-weight: 600; background: white; color: #4a5568; box-shadow: 0 1px 3px rgba(0,0,0,.1); transition: all .15s; }
+  .tab.active { background: #1e3a5f; color: white; }
+
+  /* Liste */
+  .list-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+  .list-header h2 { font-size: 1rem; font-weight: 700; color: #2d3748; }
+  .btn-add { background: #1e3a5f; color: white; border: none; border-radius: 8px; padding: 8px 16px; font-size: 0.85rem; font-weight: 600; cursor: pointer; }
+  .btn-add:hover { background: #2a4f7f; }
+  .sort-select { padding: 7px 10px; border: 1.5px solid #e2e8f0; border-radius: 8px; font-size: 0.82rem; color: #4a5568; background: white; cursor: pointer; outline: none; }
+  .sort-select:focus { border-color: #1e3a5f; }
+  .filter-bar { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; align-items: center; }
+  .filter-btn { padding: 6px 14px; border-radius: 20px; border: 1.5px solid #e2e8f0; background: white; font-size: 0.82rem; font-weight: 600; color: #4a5568; cursor: pointer; transition: all .15s; }
+  .filter-btn.active { background: #1e3a5f; color: white; border-color: #1e3a5f; }
+  .person-badge { display: inline-block; background: #ebf4ff; color: #2b6cb0; border-radius: 10px; padding: 2px 8px; font-size: 0.72rem; font-weight: 600; margin-left: 6px; }
+  .btn-persons { background: none; border: 1.5px solid rgba(255,255,255,0.3); color: white; border-radius: 7px; padding: 6px 12px; font-size: 0.82rem; font-weight: 600; cursor: pointer; }
+  .btn-persons:hover { background: rgba(255,255,255,0.15); }
+  .person-list-item { display: flex; align-items: center; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #f0f4f8; }
+  .person-list-item span { font-size: 0.95rem; }
+  .btn-del-person { background: none; border: none; color: #cbd5e0; cursor: pointer; font-size: 1rem; }
+  .btn-del-person:hover { color: #e53e3e; }
+
+  .item { background: white; border-radius: 10px; padding: 14px 16px; margin-bottom: 10px; display: flex; align-items: center; gap: 12px; box-shadow: 0 1px 3px rgba(0,0,0,.07); }
+  .item-icon { font-size: 1.4rem; width: 36px; text-align: center; flex-shrink: 0; }
+  .item-info { flex: 1; min-width: 0; }
+  .item-name { font-weight: 600; font-size: 0.95rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .item-cat { font-size: 0.78rem; color: #718096; margin-top: 2px; }
+  .item-value { font-weight: 700; font-size: 1rem; margin-left: auto; flex-shrink: 0; }
+  .item-value.pos { color: #276749; }
+  .item-value.neg { color: #c53030; }
+  .btn-del { background: none; border: none; cursor: pointer; color: #cbd5e0; font-size: 1.1rem; padding: 4px; flex-shrink: 0; }
+  .btn-del:hover { color: #e53e3e; }
+
+  .empty { text-align: center; color: #a0aec0; padding: 40px 0; font-size: 0.9rem; }
+
+  /* Modal */
+  .overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.4); z-index: 100; align-items: center; justify-content: center; }
+  .overlay.open { display: flex; }
+  .modal { background: white; border-radius: 16px; padding: 28px; width: 100%; max-width: 420px; margin: 16px; box-shadow: 0 8px 32px rgba(0,0,0,.2); }
+  .modal h3 { font-size: 1.1rem; font-weight: 700; margin-bottom: 20px; color: #1a202c; }
+  .field { margin-bottom: 16px; }
+  .field label { display: block; font-size: 0.82rem; font-weight: 600; color: #4a5568; margin-bottom: 6px; }
+  .field input, .field select { width: 100%; padding: 10px 12px; border: 1.5px solid #e2e8f0; border-radius: 8px; font-size: 0.95rem; outline: none; }
+  .field input:focus, .field select:focus { border-color: #1e3a5f; }
+  .modal-actions { display: flex; gap: 10px; margin-top: 24px; }
+  .btn-save { flex: 1; background: #1e3a5f; color: white; border: none; border-radius: 8px; padding: 11px; font-size: 0.95rem; font-weight: 700; cursor: pointer; }
+  .btn-cancel { flex: 1; background: #edf2f7; color: #4a5568; border: none; border-radius: 8px; padding: 11px; font-size: 0.95rem; font-weight: 600; cursor: pointer; }
+
+  @media (max-width: 600px) {
+    .cards { grid-template-columns: 1fr; }
+    .card .value { font-size: 1.4rem; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Login Screen -->
+<div id="login-screen">
+  <div class="login-box">
+    <div class="lock">🔒</div>
+    <h2 id="login-title">Willkommen</h2>
+    <p id="login-subtitle">Bitte PIN eingeben</p>
+    <div class="pin-dots">
+      <div class="pin-dot" id="dot-0"></div>
+      <div class="pin-dot" id="dot-1"></div>
+      <div class="pin-dot" id="dot-2"></div>
+      <div class="pin-dot" id="dot-3"></div>
+    </div>
+    <div class="pin-grid">
+      <button class="pin-btn" onclick="pinInput('1')">1</button>
+      <button class="pin-btn" onclick="pinInput('2')">2</button>
+      <button class="pin-btn" onclick="pinInput('3')">3</button>
+      <button class="pin-btn" onclick="pinInput('4')">4</button>
+      <button class="pin-btn" onclick="pinInput('5')">5</button>
+      <button class="pin-btn" onclick="pinInput('6')">6</button>
+      <button class="pin-btn" onclick="pinInput('7')">7</button>
+      <button class="pin-btn" onclick="pinInput('8')">8</button>
+      <button class="pin-btn" onclick="pinInput('9')">9</button>
+      <div></div>
+      <button class="pin-btn" onclick="pinInput('0')">0</button>
+      <button class="pin-btn del" onclick="pinDelete()">⌫</button>
+    </div>
+    <div class="login-error" id="login-error"></div>
+    <button class="btn-change-pw" id="btn-change-pw" onclick="startChangePIN()" style="display:none">PIN ändern</button>
+  </div>
+</div>
+
+<header>
+  <h1>Vermögensverwaltung</h1>
+  <div style="display:flex;align-items:center;gap:16px;">
+    <span id="datum"></span>
+    <div class="export-btns">
+      <button class="btn-persons" onclick="openPersonsModal()">👤 Personen</button>
+      <button class="btn-export" onclick="exportCSV()">CSV</button>
+      <button class="btn-export" onclick="exportPDF()">PDF</button>
+      <button class="btn-export" onclick="saveToiCloud()">☁️ Speichern</button>
+      <button class="btn-export" onclick="document.getElementById('icloud-load').click()">☁️ Laden</button>
+      <input type="file" id="icloud-load" accept=".json" style="display:none" onchange="loadFromiCloud(event)">
+    </div>
+  </div>
+</header>
+
+<div class="container">
+
+  <!-- Kacheln -->
+  <div class="cards">
+    <div class="card aktiva">
+      <div class="label">Aktiva</div>
+      <div class="value" id="sum-aktiva">0 €</div>
+    </div>
+    <div class="card passiva">
+      <div class="label">Passiva</div>
+      <div class="value" id="sum-passiva">0 €</div>
+    </div>
+    <div class="card netto">
+      <div class="label">Nettovermögen</div>
+      <div class="value" id="sum-netto">0 €</div>
+    </div>
+  </div>
+
+  <!-- Gefilterte Kacheln -->
+  <div id="cards-filtered" style="display:none; margin-bottom:28px;">
+    <div style="font-size:0.78rem; font-weight:700; color:#718096; text-transform:uppercase; letter-spacing:0.8px; margin-bottom:10px;" id="cards-filtered-label"></div>
+    <div class="cards">
+      <div class="card aktiva">
+        <div class="label">Aktiva</div>
+        <div class="value" id="f-sum-aktiva">0 €</div>
+      </div>
+      <div class="card passiva">
+        <div class="label">Passiva</div>
+        <div class="value" id="f-sum-passiva">0 €</div>
+      </div>
+      <div class="card netto">
+        <div class="label">Nettovermögen</div>
+        <div class="value" id="f-sum-netto">0 €</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Charts nebeneinander -->
+  <div id="charts-row" style="display:none; gap:16px; margin-bottom:16px;">
+    <div class="chart-box" id="chart-box" style="margin-bottom:0; flex:1;">
+      <h2 id="chart-title">Aufteilung nach Kategorie</h2>
+      <div style="display:flex; gap:20px; align-items:center;">
+        <div style="flex:0 0 180px; max-width:180px;"><canvas id="myChart"></canvas></div>
+        <div id="cat-legend" style="flex:1; min-width:0;"></div>
+      </div>
+    </div>
+    <div class="chart-box" id="history-box" style="margin-bottom:0; flex:2; display:none;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+        <h2 style="margin-bottom:0;">Vermögensentwicklung</h2>
+        <button class="btn-add" style="font-size:0.8rem; padding:6px 12px;" onclick="addSnapshot()">+ Snapshot</button>
+      </div>
+      <canvas id="historyChart"></canvas>
+    </div>
+  </div>
+
+  <!-- Passiva-Chart -->
+  <div id="passiva-chart-row" style="display:none; margin-bottom:28px;">
+    <div class="chart-box" id="passiva-chart-box" style="margin-bottom:0;">
+      <h2 id="passiva-chart-title">Passiva – Aufteilung</h2>
+      <div style="display:flex; gap:20px; align-items:center;">
+        <div style="flex:0 0 180px; max-width:180px;"><canvas id="passivaChart"></canvas></div>
+        <div id="passiva-legend" style="flex:1; min-width:0;"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Personen-Filter -->
+  <div class="filter-bar" id="filter-bar"></div>
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('aktiva')">Aktiva</button>
+    <button class="tab" onclick="switchTab('passiva')">Passiva</button>
+  </div>
+
+  <!-- Liste -->
+  <div id="panel-aktiva">
+    <div class="list-header">
+      <h2>Meine Aktiva</h2>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <select class="sort-select" onchange="setSort('aktiva',this.value)">
+          <option value="none">Reihenfolge</option>
+          <option value="cat-asc">Kategorie A–Z</option>
+          <option value="value-desc">Wert ↓</option>
+          <option value="value-asc">Wert ↑</option>
+          <option value="date-desc">Datum neu → alt</option>
+          <option value="date-asc">Datum alt → neu</option>
+        </select>
+        <button class="btn-add" onclick="openModal('aktiva')">+ Hinzufügen</button>
+      </div>
+    </div>
+    <div id="list-aktiva"></div>
+  </div>
+
+  <div id="panel-passiva" style="display:none">
+    <div class="list-header">
+      <h2>Meine Passiva</h2>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <select class="sort-select" onchange="setSort('passiva',this.value)">
+          <option value="none">Reihenfolge</option>
+          <option value="cat-asc">Kategorie A–Z</option>
+          <option value="value-desc">Wert ↓</option>
+          <option value="value-asc">Wert ↑</option>
+          <option value="date-desc">Datum neu → alt</option>
+          <option value="date-asc">Datum alt → neu</option>
+        </select>
+        <button class="btn-add" onclick="openModal('passiva')">+ Hinzufügen</button>
+      </div>
+    </div>
+    <div id="list-passiva"></div>
+  </div>
+
+</div>
+
+<!-- Personen Modal -->
+<div class="overlay" id="overlay-persons">
+  <div class="modal">
+    <h3>Personen verwalten</h3>
+    <div id="persons-list" style="margin-bottom:16px; min-height:40px;"></div>
+    <div style="display:flex;gap:8px;">
+      <input type="text" id="p-new-name" placeholder="Name eingeben" style="flex:1;padding:9px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:0.95rem;outline:none;">
+      <button class="btn-save" style="flex:0 0 auto;padding:9px 16px;" onclick="addPerson()">+</button>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closePersonsModal()">Schließen</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal -->
+<div class="overlay" id="overlay">
+  <div class="modal">
+    <h3 id="modal-title">Eintrag hinzufügen</h3>
+    <div class="field">
+      <label>Bezeichnung</label>
+      <input type="text" id="m-name" placeholder="z. B. Girokonto DKB">
+    </div>
+    <div class="field">
+      <label>Kategorie</label>
+      <select id="m-cat"></select>
+    </div>
+    <div class="field">
+      <label>Wert (€)</label>
+      <input type="number" id="m-value" placeholder="0" min="0" step="0.01">
+    </div>
+    <div class="field">
+      <label>Datum</label>
+      <input type="date" id="m-date">
+    </div>
+    <div class="field" id="field-laufzeit" style="display:none">
+      <label>Laufzeitende</label>
+      <input type="date" id="m-laufzeit">
+    </div>
+    <div class="field" id="field-fremdw" style="display:none">
+      <label>Fremdwährung → EUR</label>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <select id="m-currency" style="width:84px;padding:10px 8px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:0.95rem;outline:none;">
+          <option>USD</option>
+          <option>GBP</option>
+          <option>CHF</option>
+          <option>JPY</option>
+          <option>CAD</option>
+          <option>AUD</option>
+          <option>SEK</option>
+          <option>NOK</option>
+          <option>DKK</option>
+          <option>CNY</option>
+          <option>HKD</option>
+          <option>SGD</option>
+          <option>TRY</option>
+          <option>PLN</option>
+          <option>CZK</option>
+        </select>
+        <input type="number" id="m-fw-amount" placeholder="Betrag in Fremdwährung" min="0" step="0.01" style="flex:1;padding:10px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:0.95rem;outline:none;">
+        <button type="button" onclick="fetchRate()" style="padding:10px 12px;background:#1e3a5f;color:white;border:none;border-radius:8px;font-size:0.82rem;font-weight:600;cursor:pointer;white-space:nowrap;">Kurs ↻</button>
+      </div>
+      <div id="fw-rate-info" style="font-size:0.78rem;color:#718096;margin-top:6px;min-height:16px;"></div>
+    </div>
+    <div class="field">
+      <label>Person</label>
+      <select id="m-person"></select>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal()">Abbrechen</button>
+      <button class="btn-save" onclick="saveItem()">Speichern</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── PIN Login ──────────────────────────────────────────
+let pinEntry = "";
+let pinMode = "login"; // "login" | "set-new" | "confirm-new"
+let pinNewTemp = "";
+
+async function hashPIN(pin) {
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(pin));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,"0")).join("");
+}
+
+function pinInput(digit) {
+  if (pinEntry.length >= 4) return;
+  pinEntry += digit;
+  updateDots();
+  if (pinEntry.length === 4) setTimeout(checkPIN, 120);
+}
+
+function pinDelete() {
+  pinEntry = pinEntry.slice(0, -1);
+  updateDots();
+}
+
+function updateDots(state) {
+  for (let i = 0; i < 4; i++) {
+    const d = document.getElementById("dot-" + i);
+    d.className = "pin-dot" + (i < pinEntry.length ? " filled" : "") + (state === "error" ? " error" : "");
+  }
+}
+
+async function checkPIN() {
+  const stored = localStorage.getItem("vm_pin");
+
+  if (pinMode === "set-new") {
+    pinNewTemp = pinEntry;
+    pinEntry = "";
+    pinMode = "confirm-new";
+    document.getElementById("login-title").textContent = "PIN bestätigen";
+    document.getElementById("login-subtitle").textContent = "PIN nochmals eingeben";
+    updateDots();
+    return;
+  }
+
+  if (pinMode === "confirm-new") {
+    if (pinEntry === pinNewTemp) {
+      const h = await hashPIN(pinEntry);
+      localStorage.setItem("vm_pin", h);
+      pinMode = "login";
+      pinEntry = "";
+      unlockApp();
+    } else {
+      showPINError("PINs stimmen nicht überein");
+    }
+    return;
+  }
+
+  // Normal login
+  if (!stored) {
+    // Kein PIN gesetzt → direkt rein und PIN setzen lassen
+    unlockApp();
+    return;
+  }
+  const h = await hashPIN(pinEntry);
+  if (h === stored) {
+    unlockApp();
+  } else {
+    showPINError("Falsche PIN");
+  }
+}
+
+function showPINError(msg) {
+  updateDots("error");
+  document.getElementById("login-error").textContent = msg;
+  setTimeout(() => {
+    pinEntry = "";
+    updateDots();
+    document.getElementById("login-error").textContent = "";
+  }, 900);
+}
+
+function unlockApp() {
+  document.getElementById("login-screen").classList.add("hidden");
+  document.getElementById("btn-change-pw").style.display = "";
+  render();
+}
+
+function startChangePIN() {
+  pinEntry = "";
+  pinMode = "set-new";
+  pinNewTemp = "";
+  document.getElementById("login-title").textContent = "Neue PIN";
+  document.getElementById("login-subtitle").textContent = "Neue 4-stellige PIN wählen";
+  document.getElementById("login-error").textContent = "";
+  document.getElementById("login-screen").classList.remove("hidden");
+  updateDots();
+}
+
+// Beim Start
+(async () => {
+  const stored = localStorage.getItem("vm_pin");
+  if (!stored) {
+    pinMode = "set-new";
+    document.getElementById("login-title").textContent = "PIN festlegen";
+    document.getElementById("login-subtitle").textContent = "Wähle eine 4-stellige PIN";
+  }
+})();
+// ───────────────────────────────────────────────────────
+
+const CATS_AKTIVA = [
+  { label: "Bankkonto / Bargeld", icon: "🏦" },
+  { label: "Aktien / ETFs", icon: "📈" },
+  { label: "Krypto", icon: "₿" },
+  { label: "Immobilien", icon: "🏠" },
+  { label: "Fahrzeuge", icon: "🚗" },
+  { label: "Rentenversicherung", icon: "🧓" },
+  { label: "Solarfonds", icon: "☀️", laufzeit: true },
+  { label: "Immobilienfonds", icon: "🏢", laufzeit: true },
+  { label: "Beteiligung", icon: "🤝" },
+  { label: "Fremdwährungskonto", icon: "💱" },
+  { label: "Gold", icon: "🥇" },
+  { label: "Silber", icon: "🥈" },
+  { label: "Briefmarken", icon: "✉️" },
+  { label: "Gemälde / Kunst", icon: "🖼️" },
+  { label: "Sonstiges", icon: "📦" },
+];
+const CATS_PASSIVA = [
+  { label: "Hypothek / Baudarlehen", icon: "🏗️" },
+  { label: "Kredit / Darlehen", icon: "💳" },
+  { label: "Darlehen", icon: "🏦" },
+  { label: "Privatkredit", icon: "🤝" },
+  { label: "Kreditkarte", icon: "💰" },
+  { label: "Sonstiges", icon: "📦" },
+];
+
+const COLORS = ["#3182ce","#38a169","#d69e2e","#e53e3e","#805ad5","#dd6b20","#319795","#d53f8c"];
+
+let data = JSON.parse(localStorage.getItem("vm_data") || '{"aktiva":[],"passiva":[],"snapshots":[],"persons":["Ich","Ehefrau","Kind 1","Kind 2","Kind 3","Gemeinsam"]}');
+if (!data.persons.includes("Gemeinsam")) { data.persons.push("Gemeinsam"); save(); }
+if (!data.snapshots) data.snapshots = [];
+if (!data.persons) data.persons = ["Ich","Ehefrau","Kind 1","Kind 2","Kind 3","Gemeinsam"];
+let currentType = "aktiva";
+let editIndex = -1;
+let filterPerson = "alle";
+const sortState = { aktiva: "none", passiva: "none" };
+
+// ── Personen ────────────────────────────────────────────
+function openPersonsModal() {
+  renderPersonsList();
+  document.getElementById("overlay-persons").classList.add("open");
+}
+function closePersonsModal() {
+  document.getElementById("overlay-persons").classList.remove("open");
+  render();
+}
+function renderPersonsList() {
+  const el = document.getElementById("persons-list");
+  if (!data.persons.length) { el.innerHTML = '<p style="color:#a0aec0;font-size:0.85rem;">Keine Personen</p>'; return; }
+  el.innerHTML = data.persons.map((p, i) => `
+    <div class="person-list-item">
+      <span>${p}</span>
+      <button class="btn-del-person" onclick="deletePerson(${i})">✕</button>
+    </div>`).join("");
+}
+function addPerson() {
+  const name = document.getElementById("p-new-name").value.trim();
+  if (!name) return;
+  data.persons.push(name);
+  save();
+  document.getElementById("p-new-name").value = "";
+  renderPersonsList();
+}
+function deletePerson(i) {
+  data.persons.splice(i, 1);
+  save();
+  renderPersonsList();
+}
+document.getElementById("overlay-persons").addEventListener("click", e => { if (e.target === e.currentTarget) closePersonsModal(); });
+document.getElementById("p-new-name").addEventListener("keydown", e => { if (e.key === "Enter") addPerson(); });
+
+function renderFilterBar() {
+  const bar = document.getElementById("filter-bar");
+  const all = ["alle", ...data.persons];
+  bar.innerHTML = all.map(p => `<button class="filter-btn ${filterPerson===p?'active':''}" onclick="setFilter('${p}')">${p === 'alle' ? 'Alle' : p}</button>`).join("");
+}
+function setFilter(p) {
+  filterPerson = p;
+  render();
+}
+// ────────────────────────────────────────────────────────
+
+function setSort(type, val) {
+  sortState[type] = val;
+  render();
+}
+
+function sortedItems(type) {
+  const items = data[type].map((item, i) => ({ ...item, _i: i }));
+  const s = sortState[type];
+  if (s === "cat-asc")    return [...items].sort((a, b) => a.cat.localeCompare(b.cat));
+  if (s === "value-desc") return [...items].sort((a, b) => b.value - a.value);
+  if (s === "value-asc")  return [...items].sort((a, b) => a.value - b.value);
+  if (s === "date-desc")  return [...items].sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+  if (s === "date-asc")   return [...items].sort((a, b) => (a.date || "").localeCompare(b.date || ""));
+  return items;
+}
+let chart = null;
+let passivaChart = null;
+let historyChart = null;
+
+function save() { localStorage.setItem("vm_data", JSON.stringify(data)); }
+
+function fmt(n) {
+  return new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(n);
+}
+
+function sum(arr) { return arr.reduce((s, x) => s + x.value, 0); }
+
+function catInfo(type, label) {
+  const arr = type === "aktiva" ? CATS_AKTIVA : CATS_PASSIVA;
+  return arr.find(c => c.label === label) || { icon: "📦" };
+}
+
+function render() {
+  renderFilterBar();
+
+  // Gesamtsummen (immer alle)
+  const a = sum(data.aktiva);
+  const p = sum(data.passiva);
+  const n = a - p;
+  document.getElementById("sum-aktiva").textContent = fmt(a);
+  document.getElementById("sum-passiva").textContent = fmt(p);
+  document.getElementById("sum-netto").textContent = fmt(n);
+
+  // Gefilterte Summen
+  const fc = document.getElementById("cards-filtered");
+  if (filterPerson !== "alle") {
+    const fa = sum(data.aktiva.filter(i => (i.person || "") === filterPerson));
+    const fp = sum(data.passiva.filter(i => (i.person || "") === filterPerson));
+    document.getElementById("f-sum-aktiva").textContent = fmt(fa);
+    document.getElementById("f-sum-passiva").textContent = fmt(fp);
+    document.getElementById("f-sum-netto").textContent = fmt(fa - fp);
+    document.getElementById("cards-filtered-label").textContent = filterPerson;
+    fc.style.display = "block";
+  } else {
+    fc.style.display = "none";
+  }
+
+  // Listen
+  ["aktiva","passiva"].forEach(type => {
+    const el = document.getElementById("list-" + type);
+    const filtered = sortedItems(type).filter(item => filterPerson === "alle" || (item.person || "") === filterPerson);
+    if (!filtered.length) { el.innerHTML = '<div class="empty">Keine Einträge</div>'; return; }
+    el.innerHTML = filtered.map(item => {
+      const i = item._i;
+      const ci = catInfo(type, item.cat);
+      return `<div class="item">
+        <div class="item-icon">${ci.icon}</div>
+        <div class="item-info">
+          <div class="item-name">${item.name}${item.person ? `<span class="person-badge">${item.person}</span>` : ""}</div>
+          <div class="item-cat">${item.cat}${item.fremdw ? ` · ${item.fremdw.amount.toLocaleString("de-DE")} ${item.fremdw.currency} (Kurs: ${item.fremdw.rate.toFixed(4)})` : ""}${item.date ? " · " + new Date(item.date).toLocaleDateString("de-DE") : ""}${item.laufzeit ? " · bis " + new Date(item.laufzeit).toLocaleDateString("de-DE") : ""}</div>
+        </div>
+        <div class="item-value ${type==='aktiva'?'pos':'neg'}">${fmt(item.value)}</div>
+        <button class="btn-del" style="color:#a0aec0; font-size:0.95rem;" onclick="openModal('${type}',${i})">✏️</button>
+        <button class="btn-del" onclick="deleteItem('${type}',${i})">✕</button>
+      </div>`;
+    }).join("");
+  });
+
+  renderChart();
+}
+
+function renderChart() {
+  const aktiva = filterPerson === "alle"
+    ? data.aktiva
+    : data.aktiva.filter(i => (i.person || "") === filterPerson);
+  const grouped = {};
+  aktiva.forEach(item => {
+    grouped[item.cat] = (grouped[item.cat] || 0) + item.value;
+  });
+  const labels = Object.keys(grouped);
+  const values = labels.map(l => grouped[l]);
+
+  const hasDonut = labels.length > 0;
+  const hasHistory = data.snapshots.length > 0;
+
+  document.getElementById("charts-row").style.display = (hasDonut || hasHistory) ? "flex" : "none";
+  document.getElementById("chart-box").style.display = hasDonut ? "" : "none";
+  document.getElementById("history-box").style.display = hasHistory ? "" : "none";
+
+  document.getElementById("chart-title").textContent =
+    "Aufteilung" + (filterPerson !== "alle" ? " – " + filterPerson : " – Gesamt");
+
+  // Kategorie-Legende als HTML
+  const legendEl = document.getElementById("cat-legend");
+  if (hasDonut) {
+    const total = values.reduce((s, v) => s + v, 0);
+    legendEl.innerHTML = labels.map((label, i) => `
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:5px 0;border-bottom:1px solid #f0f4f8;">
+        <div style="display:flex;align-items:center;gap:8px;min-width:0;">
+          <span style="width:11px;height:11px;border-radius:50%;background:${COLORS[i % COLORS.length]};flex-shrink:0;display:inline-block;"></span>
+          <span style="font-size:0.80rem;color:#4a5568;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${label}</span>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;flex-shrink:0;margin-left:10px;">
+          <span style="font-size:0.85rem;font-weight:700;color:#2d3748;">${fmt(values[i])}</span>
+          <span style="font-size:0.72rem;color:#a0aec0;">${((values[i]/total)*100).toFixed(1)} %</span>
+        </div>
+      </div>`).join("");
+  } else {
+    legendEl.innerHTML = "";
+  }
+
+  if (hasDonut) {
+    if (chart) chart.destroy();
+    chart = new Chart(document.getElementById("myChart"), {
+      type: "doughnut",
+      data: {
+        labels,
+        datasets: [{ data: values, backgroundColor: COLORS.slice(0, labels.length), borderWidth: 2 }]
+      },
+      options: {
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: ctx => ` ${fmt(ctx.raw)}`
+            }
+          }
+        }
+      }
+    });
+  }
+
+  // Passiva-Donut
+  const passivaItems = filterPerson === "alle"
+    ? data.passiva
+    : data.passiva.filter(i => (i.person || "") === filterPerson);
+  const pGrouped = {};
+  passivaItems.forEach(item => {
+    pGrouped[item.cat] = (pGrouped[item.cat] || 0) + item.value;
+  });
+  const pLabels = Object.keys(pGrouped);
+  const pValues = pLabels.map(l => pGrouped[l]);
+  const COLORS_P = ["#e53e3e","#dd6b20","#d69e2e","#805ad5","#d53f8c","#c53030"];
+  const hasPassivaDonut = pLabels.length > 0;
+
+  document.getElementById("passiva-chart-row").style.display = hasPassivaDonut ? "" : "none";
+  document.getElementById("passiva-chart-title").textContent =
+    "Passiva" + (filterPerson !== "alle" ? " – " + filterPerson : " – Gesamt");
+
+  const pLegendEl = document.getElementById("passiva-legend");
+  if (hasPassivaDonut) {
+    const pTotal = pValues.reduce((s, v) => s + v, 0);
+    pLegendEl.innerHTML = pLabels.map((label, i) => `
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:5px 0;border-bottom:1px solid #f0f4f8;">
+        <div style="display:flex;align-items:center;gap:8px;min-width:0;">
+          <span style="width:11px;height:11px;border-radius:50%;background:${COLORS_P[i % COLORS_P.length]};flex-shrink:0;display:inline-block;"></span>
+          <span style="font-size:0.80rem;color:#4a5568;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${label}</span>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;flex-shrink:0;margin-left:10px;">
+          <span style="font-size:0.85rem;font-weight:700;color:#c53030;">${fmt(pValues[i])}</span>
+          <span style="font-size:0.72rem;color:#a0aec0;">${((pValues[i]/pTotal)*100).toFixed(1)} %</span>
+        </div>
+      </div>`).join("");
+    if (passivaChart) passivaChart.destroy();
+    passivaChart = new Chart(document.getElementById("passivaChart"), {
+      type: "doughnut",
+      data: {
+        labels: pLabels,
+        datasets: [{ data: pValues, backgroundColor: COLORS_P.slice(0, pLabels.length), borderWidth: 2 }]
+      },
+      options: {
+        plugins: {
+          legend: { display: false },
+          tooltip: { callbacks: { label: ctx => ` ${fmt(ctx.raw)}` } }
+        }
+      }
+    });
+  } else {
+    pLegendEl.innerHTML = "";
+    if (passivaChart) { passivaChart.destroy(); passivaChart = null; }
+  }
+
+  if (hasHistory) {
+    const snaps = [...data.snapshots].sort((a, b) => a.date.localeCompare(b.date));
+    if (historyChart) historyChart.destroy();
+    historyChart = new Chart(document.getElementById("historyChart"), {
+      type: "bar",
+      data: {
+        labels: snaps.map(s => s.date),
+        datasets: [
+          {
+            label: "Nettovermögen",
+            data: snaps.map(s => s.netto),
+            backgroundColor: snaps.map(s => s.netto >= 0 ? "rgba(39,103,73,0.75)" : "rgba(197,48,48,0.75)"),
+            borderRadius: 6,
+            borderSkipped: false,
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: ctx => " " + fmt(ctx.raw)
+            }
+          }
+        },
+        scales: {
+          y: {
+            ticks: {
+              callback: v => new Intl.NumberFormat("de-DE", { notation: "compact", currency: "EUR" }).format(v) + " €"
+            },
+            grid: { color: "#f0f0f0" }
+          },
+          x: { grid: { display: false } }
+        }
+      }
+    });
+  }
+}
+
+function addSnapshot() {
+  const today = new Date().toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" });
+  const netto = sum(data.aktiva) - sum(data.passiva);
+  // Bestehenden Eintrag für heute überschreiben
+  const idx = data.snapshots.findIndex(s => s.date === today);
+  if (idx >= 0) data.snapshots[idx] = { date: today, netto };
+  else data.snapshots.push({ date: today, netto });
+  save();
+  render();
+}
+
+function switchTab(type) {
+  currentType = type;
+  document.querySelectorAll(".tab").forEach((t, i) => t.classList.toggle("active", ["aktiva","passiva"][i] === type));
+  document.getElementById("panel-aktiva").style.display = type === "aktiva" ? "" : "none";
+  document.getElementById("panel-passiva").style.display = type === "passiva" ? "" : "none";
+}
+
+function openModal(type, idx = -1) {
+  currentType = type;
+  editIndex = idx;
+  window._fwRate = null;
+  document.getElementById("m-fw-amount").value = "";
+  document.getElementById("fw-rate-info").textContent = "";
+  const isEdit = idx >= 0;
+  document.getElementById("modal-title").textContent = isEdit ? "Eintrag bearbeiten" : (type === "aktiva" ? "Aktiva hinzufügen" : "Passiva hinzufügen");
+  const sel = document.getElementById("m-cat");
+  const cats = type === "aktiva" ? CATS_AKTIVA : CATS_PASSIVA;
+  sel.innerHTML = cats.map(c => `<option>${c.label}</option>`).join("");
+  sel.onchange = () => toggleLaufzeit(type, sel.value);
+  const pSel = document.getElementById("m-person");
+  pSel.innerHTML = data.persons.map(p => `<option>${p}</option>`).join("");
+  if (isEdit) {
+    const item = data[type][idx];
+    document.getElementById("m-name").value = item.name;
+    document.getElementById("m-value").value = item.value;
+    document.getElementById("m-date").value = item.date || new Date().toISOString().slice(0, 10);
+    document.getElementById("m-laufzeit").value = item.laufzeit || "";
+    sel.value = item.cat;
+    pSel.value = item.person || data.persons[0] || "";
+    if (item.fremdw) {
+      document.getElementById("m-currency").value = item.fremdw.currency;
+      document.getElementById("m-fw-amount").value = item.fremdw.amount;
+      document.getElementById("fw-rate-info").textContent =
+        `1 ${item.fremdw.currency} = ${item.fremdw.rate.toFixed(4)} EUR (Stand: ${item.fremdw.rateDate})`;
+      window._fwRate = { ...item.fremdw };
+    }
+  } else {
+    document.getElementById("m-name").value = "";
+    document.getElementById("m-value").value = "";
+    document.getElementById("m-date").value = new Date().toISOString().slice(0, 10);
+    document.getElementById("m-laufzeit").value = "";
+    pSel.value = filterPerson !== "alle" ? filterPerson : (data.persons[0] || "");
+  }
+  toggleLaufzeit(type, sel.value);
+  document.getElementById("overlay").classList.add("open");
+  setTimeout(() => document.getElementById("m-name").focus(), 100);
+}
+
+function toggleLaufzeit(type, catLabel) {
+  const cats = type === "aktiva" ? CATS_AKTIVA : CATS_PASSIVA;
+  const cat = cats.find(c => c.label === catLabel);
+  document.getElementById("field-laufzeit").style.display = (cat && cat.laufzeit) ? "" : "none";
+  const isFremdw = catLabel === "Fremdwährungskonto";
+  document.getElementById("field-fremdw").style.display = isFremdw ? "" : "none";
+  if (!isFremdw) {
+    document.getElementById("fw-rate-info").textContent = "";
+    window._fwRate = null;
+  }
+}
+
+async function fetchRate() {
+  const currency = document.getElementById("m-currency").value;
+  const amount = parseFloat(document.getElementById("m-fw-amount").value) || 0;
+  const info = document.getElementById("fw-rate-info");
+  info.textContent = "Kurs wird abgerufen…";
+  try {
+    const res = await fetch(`https://api.frankfurter.app/latest?from=${currency}&to=EUR`);
+    const json = await res.json();
+    const rate = json.rates.EUR;
+    window._fwRate = { currency, amount, rate, rateDate: json.date };
+    if (amount > 0) document.getElementById("m-value").value = (amount * rate).toFixed(2);
+    info.textContent = `1 ${currency} = ${rate.toFixed(4)} EUR (Stand: ${json.date})`;
+  } catch {
+    info.textContent = "Fehler: Kurs konnte nicht abgerufen werden.";
+  }
+}
+
+function closeModal() {
+  document.getElementById("overlay").classList.remove("open");
+}
+
+function saveItem() {
+  const name = document.getElementById("m-name").value.trim();
+  const cat = document.getElementById("m-cat").value;
+  const value = parseFloat(document.getElementById("m-value").value);
+  const date = document.getElementById("m-date").value;
+  const person = document.getElementById("m-person").value;
+  const laufzeit = document.getElementById("m-laufzeit").value;
+  if (!name) { document.getElementById("m-name").focus(); return; }
+  if (!value || value <= 0) { document.getElementById("m-value").focus(); return; }
+  const fwAmount = parseFloat(document.getElementById("m-fw-amount").value) || 0;
+  const fremdw = (cat === "Fremdwährungskonto" && window._fwRate && fwAmount > 0)
+    ? { ...window._fwRate, amount: fwAmount }
+    : undefined;
+  const entry = { name, cat, value, date, person, ...(laufzeit ? { laufzeit } : {}), ...(fremdw ? { fremdw } : {}) };
+  if (editIndex >= 0) {
+    data[currentType][editIndex] = entry;
+  } else {
+    data[currentType].push(entry);
+  }
+  save();
+  render();
+  closeModal();
+}
+
+function deleteItem(type, i) {
+  if (!confirm(`"${data[type][i].name}" wirklich löschen?`)) return;
+  data[type].splice(i, 1);
+  save();
+  render();
+}
+
+function saveToiCloud() {
+  const json = JSON.stringify(data, null, 2);
+  const blob = new Blob([json], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = "vermoegen.json"; a.click();
+  URL.revokeObjectURL(url);
+}
+
+function loadFromiCloud(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const loaded = JSON.parse(e.target.result);
+      if (!loaded.aktiva || !loaded.passiva) throw new Error();
+      data = loaded;
+      save();
+      render();
+      alert("Daten erfolgreich geladen.");
+    } catch {
+      alert("Fehler: Ungültige Datei.");
+    }
+    event.target.value = "";
+  };
+  reader.readAsText(file);
+}
+
+function exportCSV() {
+  const rows = [["Typ","Kategorie","Bezeichnung","Wert (EUR)"]];
+  data.aktiva.forEach(i => rows.push(["Aktiva", i.cat, i.name, i.value.toFixed(2)]));
+  data.passiva.forEach(i => rows.push(["Passiva", i.cat, i.name, i.value.toFixed(2)]));
+  const a = sum(data.aktiva), p = sum(data.passiva);
+  rows.push([]);
+  rows.push(["","","Aktiva gesamt", a.toFixed(2)]);
+  rows.push(["","","Passiva gesamt", p.toFixed(2)]);
+  rows.push(["","","Nettovermögen", (a - p).toFixed(2)]);
+  const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g,'""')}"`).join(";")).join("\n");
+  const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a2 = document.createElement("a");
+  a2.href = url; a2.download = "vermoegen.csv"; a2.click();
+  URL.revokeObjectURL(url);
+}
+
+function exportPDF() {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit: "mm", format: "a4" });
+  const today = new Date().toLocaleDateString("de-DE", { day:"2-digit", month:"long", year:"numeric" });
+  const pageW = 210;
+
+  // Header
+  doc.setFillColor(30, 58, 95);
+  doc.rect(0, 0, pageW, 28, "F");
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(18); doc.setFont("helvetica","bold");
+  doc.text("Vermögensübersicht", 14, 13);
+  doc.setFontSize(9); doc.setFont("helvetica","normal");
+  doc.text(today, 14, 22);
+
+  // Zusammenfassung
+  const a = sum(data.aktiva), p = sum(data.passiva), n = a - p;
+  doc.setTextColor(30, 58, 95);
+  doc.setFontSize(10); doc.setFont("helvetica","bold");
+  doc.text("Aktiva:", 14, 40);   doc.setFont("helvetica","normal"); doc.setTextColor(39,103,73);  doc.text(fmt(a), 60, 40);
+  doc.setTextColor(30, 58, 95);  doc.setFont("helvetica","bold");
+  doc.text("Passiva:", 14, 48);  doc.setFont("helvetica","normal"); doc.setTextColor(197,48,48);  doc.text(fmt(p), 60, 48);
+  doc.setTextColor(30, 58, 95);  doc.setFont("helvetica","bold");
+  doc.text("Nettovermögen:", 14, 56); doc.text(fmt(n), 60, 56);
+  doc.setDrawColor(200,200,200); doc.line(14, 61, pageW - 14, 61);
+
+  let y = 70;
+  const addSection = (title, items, color) => {
+    if (!items.length) return;
+    doc.setFontSize(11); doc.setFont("helvetica","bold"); doc.setTextColor(30,58,95);
+    doc.text(title, 14, y); y += 7;
+    doc.setFontSize(9); doc.setFont("helvetica","normal");
+    items.forEach((item, idx) => {
+      if (y > 270) { doc.addPage(); y = 20; }
+      doc.setFillColor(idx % 2 === 0 ? 247 : 255, idx % 2 === 0 ? 250 : 255, idx % 2 === 0 ? 252 : 255);
+      doc.rect(14, y - 5, pageW - 28, 8, "F");
+      doc.setTextColor(50, 50, 50);
+      doc.text(item.name, 16, y);
+      doc.setTextColor(100, 100, 100);
+      doc.text(item.cat, 90, y);
+      doc.setTextColor(...color); doc.setFont("helvetica","bold");
+      doc.text(fmt(item.value), pageW - 14, y, { align: "right" });
+      doc.setFont("helvetica","normal");
+      y += 9;
+    });
+    y += 6;
+  };
+
+  addSection("Aktiva", data.aktiva, [39, 103, 73]);
+  addSection("Passiva", data.passiva, [197, 48, 48]);
+
+  // Footer
+  doc.setFontSize(8); doc.setTextColor(160,160,160);
+  doc.text("Erstellt am " + today, pageW / 2, 290, { align: "center" });
+
+  doc.save("vermoegen.pdf");
+}
+
+// Datum
+document.getElementById("datum").textContent = new Date().toLocaleDateString("de-DE", { day:"2-digit", month:"long", year:"numeric" });
+
+// Overlay schließen bei Klick außerhalb
+document.getElementById("overlay").addEventListener("click", e => { if (e.target === e.currentTarget) closeModal(); });
+
+// Fremdwährung: EUR-Wert live aktualisieren beim Eingeben des Betrags
+document.getElementById("m-fw-amount").addEventListener("input", () => {
+  if (window._fwRate) {
+    const amount = parseFloat(document.getElementById("m-fw-amount").value) || 0;
+    document.getElementById("m-value").value = (amount * window._fwRate.rate).toFixed(2);
+  }
+});
+
+// Keyboard support for PIN
+document.addEventListener("keydown", e => {
+  if (!document.getElementById("login-screen").classList.contains("hidden")) {
+    if (e.key >= "0" && e.key <= "9") pinInput(e.key);
+    if (e.key === "Backspace") pinDelete();
+  }
+});
+</script>
+</body>
+</html>

@@ -29,7 +29,6 @@
             overflow-x: hidden;
         }
 
-        /* ── Noise overlay ── */
         body::before {
             content: '';
             position: fixed;
@@ -43,15 +42,14 @@
         .wrap {
             position: relative;
             z-index: 1;
-            max-width: 860px;
+            max-width: 960px;
             margin: 0 auto;
             padding: 80px 24px 100px;
         }
 
-        /* ── Header ── */
         header {
             text-align: center;
-            margin-bottom: 72px;
+            margin-bottom: 60px;
             animation: fadeUp 0.7s ease both;
         }
 
@@ -88,10 +86,7 @@
             margin-bottom: 14px;
         }
 
-        h1 em {
-            font-style: italic;
-            color: var(--gold-light);
-        }
+        h1 em { font-style: italic; color: var(--gold-light); }
 
         .subtitle {
             font-size: 0.9rem;
@@ -101,12 +96,11 @@
             text-transform: uppercase;
         }
 
-        /* ── Divider ── */
         .divider {
             display: flex;
             align-items: center;
             gap: 16px;
-            margin: 0 auto 52px;
+            margin: 0 auto 20px;
             max-width: 320px;
         }
 
@@ -117,23 +111,49 @@
             background: linear-gradient(to right, transparent, var(--border));
         }
 
-        .divider::after {
-            background: linear-gradient(to left, transparent, var(--border));
-        }
+        .divider::after { background: linear-gradient(to left, transparent, var(--border)); }
 
         .divider-diamond {
-            width: 7px;
-            height: 7px;
+            width: 7px; height: 7px;
             background: var(--gold);
             transform: rotate(45deg);
             flex-shrink: 0;
         }
 
-        /* ── Grid ── */
+        /* ── Kategorien ── */
+        .category {
+            margin-bottom: 48px;
+            animation: fadeUp 0.7s ease both;
+        }
+
+        .category:nth-child(2) { animation-delay: 0.05s; }
+        .category:nth-child(3) { animation-delay: 0.10s; }
+        .category:nth-child(4) { animation-delay: 0.15s; }
+        .category:nth-child(5) { animation-delay: 0.20s; }
+
+        .category-label {
+            font-size: 0.72rem;
+            font-weight: 500;
+            letter-spacing: 0.18em;
+            text-transform: uppercase;
+            color: var(--gold);
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .category-label::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: var(--border);
+        }
+
         .grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
-            gap: 20px;
+            grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+            gap: 14px;
         }
 
         /* ── App Card ── */
@@ -141,115 +161,97 @@
             position: relative;
             background: var(--bg2);
             border: 1px solid var(--border);
-            border-radius: 16px;
-            padding: 32px 28px;
+            border-radius: 14px;
+            padding: 24px 22px;
             text-decoration: none;
             color: inherit;
-            display: block;
+            display: flex;
+            flex-direction: column;
             overflow: hidden;
-            transition: transform 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
-            animation: fadeUp 0.7s ease both;
-        }
-
-        .card:nth-child(2) { animation-delay: 0.1s; }
-        .card:nth-child(3) { animation-delay: 0.2s; }
-        .card:nth-child(4) { animation-delay: 0.3s; }
-
-        .card::before {
-            content: '';
-            position: absolute;
-            inset: 0;
-            background: linear-gradient(135deg, var(--card-color, transparent) 0%, transparent 60%);
-            opacity: 0;
-            transition: opacity 0.3s ease;
-            border-radius: inherit;
+            transition: transform 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
         }
 
         .card:hover {
-            transform: translateY(-4px);
+            transform: translateY(-3px);
             border-color: var(--gold);
-            box-shadow: 0 12px 40px rgba(200,149,42,0.12);
+            box-shadow: 0 10px 32px rgba(200,149,42,0.1);
         }
 
-        .card:hover::before { opacity: 0.05; }
-
         .card-icon {
-            font-size: 2rem;
-            margin-bottom: 18px;
-            display: block;
+            font-size: 1.6rem;
+            margin-bottom: 12px;
             line-height: 1;
         }
 
         .card-tag {
             display: inline-block;
-            font-size: 0.68rem;
+            font-size: 0.65rem;
             font-weight: 500;
-            letter-spacing: 0.14em;
+            letter-spacing: 0.12em;
             text-transform: uppercase;
             color: var(--gold);
             border: 1px solid var(--border);
             border-radius: 20px;
-            padding: 3px 10px;
-            margin-bottom: 12px;
+            padding: 2px 8px;
+            margin-bottom: 8px;
+            width: fit-content;
         }
 
         .card h2 {
             font-family: 'Cormorant Garant', serif;
-            font-size: 1.55rem;
+            font-size: 1.3rem;
             font-weight: 600;
             color: var(--cream);
-            margin-bottom: 8px;
+            margin-bottom: 6px;
             line-height: 1.2;
         }
 
         .card p {
-            font-size: 0.88rem;
+            font-size: 0.82rem;
             font-weight: 300;
             color: var(--muted);
-            line-height: 1.65;
-            margin-bottom: 24px;
+            line-height: 1.6;
+            flex: 1;
+            margin-bottom: 16px;
         }
 
         .card-arrow {
             display: inline-flex;
             align-items: center;
-            gap: 8px;
-            font-size: 0.8rem;
+            gap: 6px;
+            font-size: 0.75rem;
             font-weight: 500;
             color: var(--gold);
             letter-spacing: 0.06em;
             transition: gap 0.2s ease;
         }
 
-        .card:hover .card-arrow { gap: 12px; }
+        .card:hover .card-arrow { gap: 10px; }
+        .card-arrow::after { content: '→'; font-size: 0.9rem; }
 
-        .card-arrow::after {
-            content: '→';
-            font-size: 1rem;
-        }
-
-        /* ── Footer ── */
         footer {
             text-align: center;
-            margin-top: 80px;
+            margin-top: 60px;
             font-size: 0.78rem;
             color: var(--muted);
             letter-spacing: 0.08em;
-            animation: fadeUp 0.7s 0.4s ease both;
         }
 
-        /* ── Animations ── */
         @keyframes fadeUp {
             from { opacity: 0; transform: translateY(20px); }
             to   { opacity: 1; transform: translateY(0); }
         }
 
-        /* ── Mobile ── */
         @media (max-width: 480px) {
-            .wrap { padding: 52px 16px 72px; }
-            header { margin-bottom: 48px; }
-            .grid { grid-template-columns: 1fr; gap: 14px; }
-            .card { padding: 24px 20px; }
+            .wrap { padding: 48px 14px 64px; }
+            header { margin-bottom: 40px; }
+            .grid { grid-template-columns: 1fr 1fr; gap: 10px; }
+            .card { padding: 16px 14px; }
+            .card h2 { font-size: 1.1rem; }
+        }
+
+        @media (max-width: 360px) {
+            .grid { grid-template-columns: 1fr; }
         }
     </style>
 </head>
@@ -263,22 +265,151 @@
 
         <div class="divider"><div class="divider-diamond"></div></div>
 
-        <div class="grid">
-            <a class="card" href="https://wistefa.github.io/skat-strichliste" style="--card-color: #2d6a4f;">
-                <span class="card-icon">♠</span>
-                <span class="card-tag">Kartenspiel</span>
-                <h2>Skat Strichliste</h2>
-                <p>Digitale Strichliste für vier Spieler mit automatischer Geberrotation, Spielwert-Berechnung und Bockrunden.</p>
-                <span class="card-arrow">Zur App</span>
-            </a>
+        <!-- Spiele & Sport -->
+        <div class="category">
+            <div class="category-label">Spiele &amp; Sport</div>
+            <div class="grid">
+                <a class="card" href="https://wistefa.github.io/skat-strichliste">
+                    <span class="card-icon">♠</span>
+                    <span class="card-tag">Kartenspiel</span>
+                    <h2>Skat Strichliste</h2>
+                    <p>Strichliste für 4 Spieler mit Geberrotation, Spielwert-Berechnung und Bockrunden.</p>
+                    <span class="card-arrow">Öffnen</span>
+                </a>
+                <a class="card" href="storchencup/">
+                    <span class="card-icon">🏆</span>
+                    <span class="card-tag">Turnier</span>
+                    <h2>Storchencup</h2>
+                    <p>Turnierverwaltung für den Storchencup.</p>
+                    <span class="card-arrow">Öffnen</span>
+                </a>
+                <a class="card" href="fitness-app/">
+                    <span class="card-icon">💪</span>
+                    <span class="card-tag">Sport</span>
+                    <h2>Fitness App</h2>
+                    <p>Trainingsplanung und Fortschritts-Tracking.</p>
+                    <span class="card-arrow">Öffnen</span>
+                </a>
+                <a class="card" href="einmaleins/">
+                    <span class="card-icon">✖️</span>
+                    <span class="card-tag">Lernen</span>
+                    <h2>Einmaleins</h2>
+                    <p>Lernspiel für das kleine und große Einmaleins.</p>
+                    <span class="card-arrow">Öffnen</span>
+                </a>
+            </div>
+        </div>
 
-            <a class="card" href="https://wistefa.github.io/Reisetagebuch" style="--card-color: #1a4a7a;">
-                <span class="card-icon">✈︎</span>
-                <span class="card-tag">Reise</span>
-                <h2>Reisetagebuch</h2>
-                <p>Persönliches Reisetagebuch als Progressive Web App — Einträge, Fotos und PDF-Export direkt im Browser.</p>
-                <span class="card-arrow">Zur App</span>
-            </a>
+        <!-- Finanzen & Haushalt -->
+        <div class="category">
+            <div class="category-label">Finanzen &amp; Haushalt</div>
+            <div class="grid">
+                <a class="card" href="haushaltsbuch/">
+                    <span class="card-icon">🏠</span>
+                    <span class="card-tag">Finanzen</span>
+                    <h2>Haushaltsbuch</h2>
+                    <p>Einnahmen und Ausgaben im Überblick behalten.</p>
+                    <span class="card-arrow">Öffnen</span>
+                </a>
+                <a class="card" href="spesenabrechnung/">
+                    <span class="card-icon">🧾</span>
+                    <span class="card-tag">Finanzen</span>
+                    <h2>Spesenabrechnung</h2>
+                    <p>Reisekosten und Spesen einfach erfassen und abrechnen.</p>
+                    <span class="card-arrow">Öffnen</span>
+                </a>
+                <a class="card" href="vermoegen/">
+                    <span class="card-icon">📈</span>
+                    <span class="card-tag">Finanzen</span>
+                    <h2>Vermögensverwaltung</h2>
+                    <p>Vermögenswerte und Entwicklung im Überblick.</p>
+                    <span class="card-arrow">Öffnen</span>
+                </a>
+                <a class="card" href="versicherungen/">
+                    <span class="card-icon">🛡️</span>
+                    <span class="card-tag">Verwaltung</span>
+                    <h2>Versicherungen</h2>
+                    <p>Versicherungsübersicht und Verträge verwalten.</p>
+                    <span class="card-arrow">Öffnen</span>
+                </a>
+                <a class="card" href="muenzsammlung/">
+                    <span class="card-icon">🪙</span>
+                    <span class="card-tag">Sammlung</span>
+                    <h2>Münzsammlung</h2>
+                    <p>Münzsammlung erfassen, bewerten und verwalten.</p>
+                    <span class="card-arrow">Öffnen</span>
+                </a>
+                <a class="card" href="dashboard/">
+                    <span class="card-icon">📊</span>
+                    <span class="card-tag">Analyse</span>
+                    <h2>Options-Dashboard</h2>
+                    <p>Ticker-Aggregation, Call/Put-Analyse und Charts für Optionshändler.</p>
+                    <span class="card-arrow">Öffnen</span>
+                </a>
+            </div>
+        </div>
+
+        <!-- Reise & Alltag -->
+        <div class="category">
+            <div class="category-label">Reise &amp; Alltag</div>
+            <div class="grid">
+                <a class="card" href="https://wistefa.github.io/Reisetagebuch">
+                    <span class="card-icon">✈︎</span>
+                    <span class="card-tag">Reise</span>
+                    <h2>Reisetagebuch</h2>
+                    <p>Reiseerlebnisse festhalten, Fotos hinzufügen und als PDF exportieren.</p>
+                    <span class="card-arrow">Öffnen</span>
+                </a>
+                <a class="card" href="reiseplaner/">
+                    <span class="card-icon">🗺️</span>
+                    <span class="card-tag">Reise</span>
+                    <h2>Reiseplaner</h2>
+                    <p>Reisen planen, Routen erstellen und Aktivitäten organisieren.</p>
+                    <span class="card-arrow">Öffnen</span>
+                </a>
+                <a class="card" href="rezepte/">
+                    <span class="card-icon">🍳</span>
+                    <span class="card-tag">Alltag</span>
+                    <h2>Rezepte</h2>
+                    <p>Rezepte sammeln, verwalten und für die Einkaufsliste nutzen.</p>
+                    <span class="card-arrow">Öffnen</span>
+                </a>
+            </div>
+        </div>
+
+        <!-- Tools & Kreatives -->
+        <div class="category">
+            <div class="category-label">Tools &amp; Kreatives</div>
+            <div class="grid">
+                <a class="card" href="drohnenshow/">
+                    <span class="card-icon">🚁</span>
+                    <span class="card-tag">Simulator</span>
+                    <h2>Drohnenshow</h2>
+                    <p>3D-Simulator für Drohnenshow-Choreografien mit Formation-Editor.</p>
+                    <span class="card-arrow">Öffnen</span>
+                </a>
+                <a class="card" href="freelancer-crm/">
+                    <span class="card-icon">💼</span>
+                    <span class="card-tag">Business</span>
+                    <h2>Freelancer CRM</h2>
+                    <p>Kundenverwaltung, Projekte und Angebote für Freelancer.</p>
+                    <span class="card-arrow">Öffnen</span>
+                </a>
+                <a class="card" href="app-galerie/">
+                    <span class="card-icon">🖼️</span>
+                    <span class="card-tag">Galerie</span>
+                    <h2>App Galerie</h2>
+                    <p>Übersicht und Präsentation aller App-Projekte.</p>
+                    <span class="card-arrow">Öffnen</span>
+                </a>
+                <a class="card" href="video/">
+                    <span class="card-icon">🎬</span>
+                    <span class="card-tag">Video</span>
+                    <h2>Video Tool</h2>
+                    <p>Videoschnitt und -bearbeitung direkt im Browser.</p>
+                    <span class="card-arrow">Öffnen</span>
+                </a>
+            </div>
         </div>
 
         <footer>

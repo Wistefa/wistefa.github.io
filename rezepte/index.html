@@ -1,0 +1,1342 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Meine Rezepte</title>
+  <link rel="manifest" href="manifest.json" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="Meine Rezepte" />
+  <meta name="theme-color" content="#FDFAF5" />
+  <link rel="apple-touch-icon" href="icon-192.png" />
+
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,800;1,700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; background: #FDFAF5; }
+    body { font-family: 'DM Sans', sans-serif;
+      padding-top: env(safe-area-inset-top);
+      padding-bottom: env(safe-area-inset-bottom); }
+    textarea { resize: none; }
+    input, textarea, button, select { -webkit-appearance: none; appearance: none; }
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.15); border-radius: 4px; }
+  </style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+  const { useState, useEffect, useRef, useCallback } = React;
+
+  // ─────────────────────────────────────────────────────
+  //  KONSTANTEN
+  // ─────────────────────────────────────────────────────
+  const DB_NAME  = 'rezepte_db';
+  const DB_VER   = 1;
+  const DB_STORE = 'files';
+  const KEY_RECIPES = 'rezepte_recipes_v1';
+  const KEY_MENUS   = 'rezepte_menus_v1';
+  const KEY_CATS    = 'rezepte_cats_v1';
+  const DEFAULT_CATS = { labels:['Kategorie 1','Kategorie 2','Kategorie 3'], values:[[],[],[]] };
+
+  // ─────────────────────────────────────────────────────
+  //  INDEXEDDB
+  // ─────────────────────────────────────────────────────
+  function openDB() {
+    return new Promise((res,rej) => {
+      const r = indexedDB.open(DB_NAME, DB_VER);
+      r.onupgradeneeded = e => e.target.result.createObjectStore(DB_STORE,{keyPath:'id'});
+      r.onsuccess = e => res(e.target.result);
+      r.onerror   = () => rej(r.error);
+    });
+  }
+  async function dbSave(id, data, meta={}) {
+    const db = await openDB();
+    return new Promise((res,rej) => {
+      const tx = db.transaction(DB_STORE,'readwrite');
+      tx.objectStore(DB_STORE).put({id, data, ...meta});
+      tx.oncomplete = res; tx.onerror = () => rej(tx.error);
+    });
+  }
+  async function dbGet(id) {
+    const db = await openDB();
+    return new Promise((res,rej) => {
+      const r = db.transaction(DB_STORE,'readonly').objectStore(DB_STORE).get(id);
+      r.onsuccess = () => res(r.result || null); r.onerror = () => rej(r.error);
+    });
+  }
+  async function dbGetMany(ids) {
+    if (!ids.length) return {};
+    const db = await openDB();
+    return new Promise((res,rej) => {
+      const store = db.transaction(DB_STORE,'readonly').objectStore(DB_STORE);
+      const result = {}; let pending = ids.length;
+      ids.forEach(id => {
+        const r = store.get(id);
+        r.onsuccess = () => { if(r.result) result[id]=r.result; if(!--pending) res(result); };
+        r.onerror   = () => { if(!--pending) res(result); };
+      });
+    });
+  }
+  async function dbDelete(id) {
+    const db = await openDB();
+    return new Promise((res,rej) => {
+      const tx = db.transaction(DB_STORE,'readwrite');
+      tx.objectStore(DB_STORE).delete(id);
+      tx.oncomplete = res; tx.onerror = () => rej(tx.error);
+    });
+  }
+  async function dbGetAll() {
+    const db = await openDB();
+    return new Promise((res,rej) => {
+      const r = db.transaction(DB_STORE,'readonly').objectStore(DB_STORE).getAll();
+      r.onsuccess = () => res(r.result||[]); r.onerror = () => rej(r.error);
+    });
+  }
+  async function dbClear() {
+    const db = await openDB();
+    return new Promise((res,rej) => {
+      const tx = db.transaction(DB_STORE,'readwrite');
+      tx.objectStore(DB_STORE).clear();
+      tx.oncomplete = res; tx.onerror = () => rej(tx.error);
+    });
+  }
+
+  // ─────────────────────────────────────────────────────
+  //  LOCALSTORAGE HOOK
+  // ─────────────────────────────────────────────────────
+  function useLS(key, init) {
+    const [s, set] = useState(() => {
+      try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : init; }
+      catch { return init; }
+    });
+    const upd = v => set(prev => {
+      const next = typeof v==='function' ? v(prev) : v;
+      try { localStorage.setItem(key, JSON.stringify(next)); } catch {}
+      return next;
+    });
+    return [s, upd];
+  }
+
+  // ─────────────────────────────────────────────────────
+  //  HILFSFUNKTIONEN
+  // ─────────────────────────────────────────────────────
+  const uid = () => Math.random().toString(36).slice(2) + Date.now().toString(36);
+  const readFile = file => new Promise(res => {
+    const r = new FileReader(); r.onload = e => res(e.target.result); r.readAsDataURL(file);
+  });
+  const readFileAsBuffer = file => new Promise(res => {
+    const r = new FileReader(); r.onload = e => res(e.target.result); r.readAsArrayBuffer(file);
+  });
+
+  function parseIngredients(text) {
+    return text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+  }
+
+  // ─────────────────────────────────────────────────────
+  //  DESIGN
+  // ─────────────────────────────────────────────────────
+  const C = {
+    bg:'#FDFAF5', card:'#FFFFFF', accent:'#B5451B', accentBg:'#FEF2EE',
+    text:'#1E1711', textSec:'#8C7E77', border:'#EDE7DF',
+    green:'#4A7C4E', greenBg:'#EEF5EF',
+  };
+  const CAT_COLORS = ['#B5451B','#2E6DA4','#4A7C4E','#7B5EA7','#B5831B','#2A8C8C'];
+
+  // ─────────────────────────────────────────────────────
+  //  UI BAUSTEINE
+  // ─────────────────────────────────────────────────────
+  function Btn({ children, onClick, full, variant='primary', small, disabled }) {
+    const bg  = variant==='danger'?'#C0392B': variant==='ghost'?'#F0EAE4': variant==='green'?C.green: C.accent;
+    const col = variant==='ghost' ? C.text : '#fff';
+    return (
+      <button onClick={onClick} disabled={disabled} style={{
+        background:bg, color:col, border:'none', borderRadius:12,
+        padding: small?'7px 14px':'12px 18px',
+        fontSize: small?13:15, fontWeight:600, fontFamily:'inherit',
+        cursor: disabled?'default':'pointer', width: full?'100%':'auto',
+        opacity: disabled?0.5:1, transition:'opacity .15s',
+        WebkitTapHighlightColor:'transparent'
+      }}>{children}</button>
+    );
+  }
+
+  function Field({ label, children, row }) {
+    return (
+      <div style={{ marginBottom:14 }}>
+        {label && <div style={{ fontSize:11, fontWeight:700, color:C.textSec,
+          letterSpacing:0.7, marginBottom:5, textTransform:'uppercase' }}>{label}</div>}
+        {row ? <div style={{display:'flex',gap:8}}>{children}</div> : children}
+      </div>
+    );
+  }
+
+  function Input({ value, onChange, placeholder, type='text', onKeyDown, style:st }) {
+    return (
+      <input type={type} value={value} onChange={e=>onChange(e.target.value)}
+        placeholder={placeholder} onKeyDown={onKeyDown}
+        style={{ width:'100%', background:'#F9F5F0', border:`1px solid ${C.border}`,
+          borderRadius:11, padding:'10px 13px', fontSize:15, color:C.text,
+          outline:'none', fontFamily:'inherit', ...st }} />
+    );
+  }
+
+  function Textarea({ value, onChange, placeholder, rows=5 }) {
+    return (
+      <textarea value={value} onChange={e=>onChange(e.target.value)}
+        placeholder={placeholder} rows={rows}
+        style={{ width:'100%', background:'#F9F5F0', border:`1px solid ${C.border}`,
+          borderRadius:11, padding:'10px 13px', fontSize:15, color:C.text,
+          outline:'none', fontFamily:'inherit', lineHeight:1.7 }} />
+    );
+  }
+
+  function Sheet({ title, onClose, children, wide }) {
+    return (
+      <div onClick={e=>e.target===e.currentTarget&&onClose()}
+        style={{ position:'fixed', inset:0, background:'rgba(30,23,17,0.45)',
+          zIndex:200, display:'flex', alignItems:'flex-end', justifyContent:'center' }}>
+        <div style={{ background:C.card, borderRadius:'22px 22px 0 0',
+          width:'100%', maxWidth: wide?700:600,
+          padding:'22px 20px', paddingBottom:'calc(24px + env(safe-area-inset-bottom))',
+          maxHeight:'94vh', overflowY:'auto' }}>
+          <div style={{ display:'flex', justifyContent:'space-between',
+            alignItems:'center', marginBottom:18 }}>
+            <div style={{ fontFamily:"'Playfair Display',serif", fontSize:20,
+              fontWeight:700, color:C.text }}>{title}</div>
+            <button onClick={onClose} style={{ background:'#F0EAE4', border:'none',
+              borderRadius:'50%', width:30, height:30, cursor:'pointer',
+              fontSize:14, color:C.textSec, display:'flex', alignItems:'center',
+              justifyContent:'center' }}>✕</button>
+          </div>
+          {children}
+        </div>
+      </div>
+    );
+  }
+
+  function Badge({ text, color }) {
+    return (
+      <span style={{ background: color+'22', color, borderRadius:20,
+        padding:'3px 10px', fontSize:12, fontWeight:600, display:'inline-block' }}>
+        {text}
+      </span>
+    );
+  }
+
+  // ─────────────────────────────────────────────────────
+  //  KATEGORIE-SELEKTOR (Combobox mit Neu-Anlage)
+  // ─────────────────────────────────────────────────────
+  function CatInput({ label, value, onChange, options, onAddOption, color }) {
+    const [open, setOpen] = useState(false);
+    const [input, setInput] = useState(value||'');
+    const ref = useRef(null);
+
+    useEffect(() => { setInput(value||''); }, [value]);
+    useEffect(() => {
+      const h = e => { if(ref.current && !ref.current.contains(e.target)) setOpen(false); };
+      document.addEventListener('mousedown', h); return () => document.removeEventListener('mousedown',h);
+    }, []);
+
+    const filtered = options.filter(o => o.toLowerCase().includes(input.toLowerCase()));
+    const isNew    = input.trim() && !options.includes(input.trim());
+
+    const pick = val => { setInput(val); onChange(val); setOpen(false); };
+    const addNew = () => {
+      if (!input.trim()) return;
+      onAddOption(input.trim()); onChange(input.trim()); setOpen(false);
+    };
+
+    return (
+      <div ref={ref} style={{ marginBottom:14 }}>
+        <div style={{ fontSize:11, fontWeight:700, color:C.textSec,
+          letterSpacing:0.7, marginBottom:5, textTransform:'uppercase' }}>{label}</div>
+        <div style={{ position:'relative' }}>
+          <input value={input}
+            onChange={e => { setInput(e.target.value); onChange(e.target.value); setOpen(true); }}
+            onFocus={() => setOpen(true)}
+            onKeyDown={e => { if(e.key==='Enter'){ e.preventDefault(); isNew ? addNew() : (filtered[0] && pick(filtered[0])); } }}
+            placeholder="Tippen oder neu anlegen…"
+            style={{ width:'100%', background:'#F9F5F0', border:`1px solid ${C.border}`,
+              borderRadius:11, padding:'10px 13px', fontSize:15, color:C.text,
+              outline:'none', fontFamily:'inherit' }} />
+          {open && (filtered.length>0 || isNew) && (
+            <div style={{ position:'absolute', top:'calc(100% + 4px)', left:0, right:0,
+              background:C.card, border:`1px solid ${C.border}`, borderRadius:12,
+              boxShadow:'0 4px 20px rgba(0,0,0,0.1)', zIndex:300, maxHeight:180, overflowY:'auto' }}>
+              {filtered.map(o => (
+                <div key={o} onClick={() => pick(o)}
+                  style={{ padding:'10px 14px', cursor:'pointer', fontSize:14,
+                    color:C.text, borderBottom:`1px solid ${C.border}` }}
+                  onMouseEnter={e=>e.target.style.background='#F9F5F0'}
+                  onMouseLeave={e=>e.target.style.background='transparent'}>{o}</div>
+              ))}
+              {isNew && (
+                <div onClick={addNew}
+                  style={{ padding:'10px 14px', cursor:'pointer', fontSize:14,
+                    color: color||C.accent, fontWeight:600 }}>
+                  ➕ „{input.trim()}" neu anlegen
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // ─────────────────────────────────────────────────────
+  //  EINKAUFSLISTE
+  // ─────────────────────────────────────────────────────
+  function ShoppingList({ recipe, onClose }) {
+    const lines = parseIngredients(recipe.ingredients||'');
+    const [checked, setChecked] = useState({});
+    const toggle = i => setChecked(p => ({...p,[i]:!p[i]}));
+
+    const printPDF = () => {
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF({unit:'mm',format:'a4'});
+      const ML=18, CW=174;
+      let y=20;
+      doc.setFillColor(181,69,27); doc.rect(0,0,210,4,'F');
+      doc.setFontSize(9); doc.setFont('helvetica','normal'); doc.setTextColor(140,126,119);
+      doc.text('EINKAUFSLISTE', ML, 14);
+      doc.setFontSize(22); doc.setFont('helvetica','bold'); doc.setTextColor(30,23,17);
+      doc.text(recipe.title, ML, 26); y=36;
+      doc.setFontSize(11); doc.setFont('helvetica','normal');
+      lines.forEach(l => {
+        if(y>270){doc.addPage();y=20;}
+        doc.setTextColor(181,69,27); doc.text('□', ML, y);
+        doc.setTextColor(30,23,17); doc.text(l, ML+7, y); y+=8;
+      });
+      doc.save(`Einkaufsliste_${recipe.title.replace(/[^a-zA-Z0-9]/g,'_')}.pdf`);
+    };
+
+    return (
+      <Sheet title="🛒 Einkaufsliste" onClose={onClose}>
+        <div style={{ fontSize:13, color:C.textSec, marginBottom:14 }}>{recipe.title}</div>
+        {lines.length===0 ? (
+          <div style={{ color:C.textSec, fontSize:14, textAlign:'center', padding:'20px 0' }}>
+            Keine Zutaten im Rezept eingetragen.
+          </div>
+        ) : (
+          <div style={{ marginBottom:16 }}>
+            {lines.map((l,i) => (
+              <div key={i} onClick={() => toggle(i)}
+                style={{ display:'flex', alignItems:'center', gap:12, padding:'10px 0',
+                  borderBottom:`1px solid ${C.border}`, cursor:'pointer' }}>
+                <div style={{ width:22, height:22, borderRadius:6, flexShrink:0,
+                  border:`2px solid ${checked[i]?C.accent:C.border}`,
+                  background: checked[i]?C.accent:'transparent',
+                  display:'flex', alignItems:'center', justifyContent:'center' }}>
+                  {checked[i] && <span style={{color:'#fff',fontSize:13}}>✓</span>}
+                </div>
+                <span style={{ fontSize:15, color:checked[i]?C.textSec:C.text,
+                  textDecoration:checked[i]?'line-through':'none', flex:1 }}>{l}</span>
+              </div>
+            ))}
+          </div>
+        )}
+        <div style={{ display:'flex', gap:10 }}>
+          <Btn onClick={() => setChecked({})} full variant='ghost' small>Zurücksetzen</Btn>
+          <Btn onClick={printPDF} full small disabled={lines.length===0}>Als PDF speichern</Btn>
+        </div>
+      </Sheet>
+    );
+  }
+
+  // ─────────────────────────────────────────────────────
+  //  REZEPT-KARTE
+  // ─────────────────────────────────────────────────────
+  function RecipeCard({ recipe, cats, onClick }) {
+    const [cover, setCover] = useState(null);
+    useEffect(() => {
+      if(recipe.photoIds?.length) dbGet(recipe.photoIds[0].id).then(r=>r&&setCover(r.data));
+    }, [recipe]);
+
+    return (
+      <div onClick={onClick} style={{ background:C.card, borderRadius:18,
+        marginBottom:12, overflow:'hidden', cursor:'pointer',
+        boxShadow:'0 2px 14px rgba(30,23,17,0.08)', border:`1px solid ${C.border}` }}>
+        {cover && (
+          <img src={cover} alt={recipe.title}
+            style={{ width:'100%', height:160, objectFit:'cover', display:'block' }} />
+        )}
+        {!cover && (
+          <div style={{ height:80, background:`linear-gradient(135deg,${C.accentBg},#FFF8F3)`,
+            display:'flex', alignItems:'center', justifyContent:'center', fontSize:32 }}>🍽️</div>
+        )}
+        <div style={{ padding:'12px 14px' }}>
+          <div style={{ fontFamily:"'Playfair Display',serif", fontSize:18,
+            fontWeight:700, color:C.text, marginBottom:6 }}>{recipe.title}</div>
+          <div style={{ display:'flex', flexWrap:'wrap', gap:6, marginBottom:6 }}>
+            {recipe.cat?.map((v,i) => v && (
+              <Badge key={i} text={v} color={CAT_COLORS[i%CAT_COLORS.length]} />
+            ))}
+          </div>
+          <div style={{ display:'flex', gap:14, fontSize:12, color:C.textSec }}>
+            {recipe.prepTime && <span>⏱ {recipe.prepTime}</span>}
+            {recipe.servings  && <span>👥 {recipe.servings}</span>}
+            {recipe.sourceType==='import' && <span>📄 Importiert</span>}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ─────────────────────────────────────────────────────
+  //  REZEPT DETAIL
+  // ─────────────────────────────────────────────────────
+  function RecipeDetail({ recipe, cats, onEdit, onDelete, onBack }) {
+    const [photoData, setPhotoData] = useState({});
+    const [pdfUrl,    setPdfUrl]    = useState(null);
+    const [showShop,  setShowShop]  = useState(false);
+    const [pdfBusy,   setPdfBusy]   = useState(false);
+
+    useEffect(() => {
+      const ids = (recipe.photoIds||[]).map(p=>p.id);
+      if(ids.length) dbGetMany(ids).then(r => {
+        const d={}; Object.entries(r).forEach(([k,v])=>d[k]=v.data); setPhotoData(d);
+      });
+      if(recipe.pdfId) dbGet(recipe.pdfId).then(r => {
+        if(r){const b=new Blob([Uint8Array.from(atob(r.data.split(',')[1]),c=>c.charCodeAt(0))],{type:'application/pdf'});
+          setPdfUrl(URL.createObjectURL(b));}
+      });
+    },[recipe]);
+
+    const exportPDF = async () => {
+      setPdfBusy(true);
+      try {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF({unit:'mm',format:'a4'});
+        const PW=210,PH=297,ML=18,CW=174,MB=16;
+        let y=10;
+        const np = h => { if(y+h>PH-MB){doc.addPage();y=16;} };
+        const sf = (sz,st='normal',col=[30,23,17]) => {
+          doc.setFontSize(sz); doc.setFont('helvetica',st); doc.setTextColor(...col);
+        };
+
+        doc.setFillColor(181,69,27); doc.rect(0,0,PW,4,'F');
+        y=16; sf(9,'normal',[140,126,119]); doc.text('REZEPT',ML,y); y+=8;
+        sf(26,'bold',[30,23,17]);
+        const tl=doc.splitTextToSize(recipe.title,CW);
+        tl.forEach(l=>{doc.text(l,ML,y);y+=10;}); y+=2;
+
+        // Badges
+        sf(9,'normal',[140,126,119]);
+        let bx=ML;
+        (recipe.cat||[]).forEach((v,i)=>{ if(v){doc.text(v,bx,y); bx+=doc.getTextWidth(v)+10;} });
+        if(recipe.prepTime){ doc.text('⏱ '+recipe.prepTime, bx, y); bx+=doc.getTextWidth('⏱ '+recipe.prepTime)+10; }
+        if(recipe.servings){ doc.text('👥 '+recipe.servings, bx, y); }
+        y+=8;
+
+        // Cover photo
+        if(recipe.photoIds?.length) {
+          const first = Object.values(photoData)[0];
+          if(first){
+            const dims = await new Promise(res=>{const i=new Image();i.onload=()=>res({w:i.naturalWidth,h:i.naturalHeight});i.src=first;});
+            let iw=CW,ih=(dims.h/dims.w)*iw; if(ih>100){ih=100;iw=(dims.w/dims.h)*ih;}
+            np(ih+4); doc.addImage(first,'JPEG',ML+(CW-iw)/2,y,iw,ih,undefined,'MEDIUM'); y+=ih+8;
+          }
+        }
+
+        // Divider
+        doc.setDrawColor(237,231,223); doc.setLineWidth(0.4); doc.line(ML,y,ML+CW,y); y+=8;
+
+        // Zutaten
+        if(recipe.ingredients){
+          sf(13,'bold',[30,23,17]); np(8); doc.text('Zutaten',ML,y); y+=7;
+          sf(10,'normal',[30,23,17]);
+          parseIngredients(recipe.ingredients).forEach(l=>{
+            np(6); doc.text('• '+l,ML+3,y); y+=6;
+          }); y+=4;
+        }
+
+        // Zubereitung
+        if(recipe.instructions){
+          doc.setDrawColor(237,231,223); doc.setLineWidth(0.3); np(4); doc.line(ML,y,ML+CW,y); y+=7;
+          sf(13,'bold',[30,23,17]); np(8); doc.text('Zubereitung',ML,y); y+=7;
+          sf(10,'normal',[30,23,17]); doc.setLineHeightFactor(1.6);
+          const ilines=doc.splitTextToSize(recipe.instructions,CW);
+          ilines.forEach(l=>{np(6.5);doc.text(l,ML,y);y+=6.5;}); y+=4;
+        }
+
+        // Notizen
+        if(recipe.notes){
+          doc.setDrawColor(237,231,223); doc.setLineWidth(0.3); np(4); doc.line(ML,y,ML+CW,y); y+=7;
+          sf(11,'bold',[30,23,17]); np(8); doc.text('Notizen',ML,y); y+=6;
+          sf(10,'italic',[140,126,119]);
+          doc.splitTextToSize(recipe.notes,CW).forEach(l=>{np(5.5);doc.text(l,ML,y);y+=5.5;});
+        }
+
+        // Footer
+        const tot=doc.internal.getNumberOfPages();
+        for(let i=1;i<=tot;i++){
+          doc.setPage(i);
+          sf(7.5,'normal',[180,174,168]);
+          doc.text(recipe.title,ML,PH-9);
+          if(tot>1) doc.text(`${i}/${tot}`,PW/2,PH-9,{align:'center'});
+          doc.setDrawColor(237,231,223);doc.setLineWidth(0.3);doc.line(ML,PH-13,ML+CW,PH-13);
+        }
+        doc.save(`Rezept_${recipe.title.replace(/[^a-zA-Z0-9äöüÄÖÜß]/g,'_')}.pdf`);
+      } finally { setPdfBusy(false); }
+    };
+
+    return (
+      <div style={{ background:C.bg, minHeight:'100vh' }}>
+        {/* Header */}
+        <div style={{ background:C.card, borderBottom:`1px solid ${C.border}`,
+          padding:'0 20px', paddingTop:'env(safe-area-inset-top)' }}>
+          <div style={{ height:54, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+            <button onClick={onBack} style={{ background:'none', border:'none', color:C.accent,
+              fontSize:15, fontFamily:'inherit', fontWeight:600, cursor:'pointer' }}>← Rezepte</button>
+            <div style={{ display:'flex', gap:10, alignItems:'center' }}>
+              <button onClick={() => setShowShop(true)} title="Einkaufsliste"
+                style={{ background:C.greenBg, border:`1px solid ${C.green}`, borderRadius:10,
+                  padding:'5px 11px', cursor:'pointer', fontSize:12, fontWeight:700,
+                  color:C.green, fontFamily:'inherit' }}>🛒 Liste</button>
+              <button onClick={exportPDF} disabled={pdfBusy}
+                style={{ background:C.accentBg, border:`1px solid ${C.accent}`, borderRadius:10,
+                  padding:'5px 11px', cursor:'pointer', fontSize:12, fontWeight:700,
+                  color:C.accent, fontFamily:'inherit', opacity:pdfBusy?0.6:1 }}>
+                {pdfBusy?'…':'📄 PDF'}</button>
+              <button onClick={onEdit}
+                style={{ background:'none', border:'none', fontSize:20, cursor:'pointer' }}>✏️</button>
+              <button onClick={onDelete}
+                style={{ background:'none', border:'none', fontSize:20, cursor:'pointer' }}>🗑️</button>
+            </div>
+          </div>
+        </div>
+
+        <div style={{ maxWidth:640, margin:'0 auto', padding:'24px 20px 48px' }}>
+          {/* Cover */}
+          {recipe.photoIds?.length>0 && photoData[recipe.photoIds[0].id] && (
+            <img src={photoData[recipe.photoIds[0].id]} alt={recipe.title}
+              style={{ width:'100%', borderRadius:18, maxHeight:320, objectFit:'cover',
+                display:'block', marginBottom:20 }} />
+          )}
+
+          {/* Titel */}
+          <div style={{ fontFamily:"'Playfair Display',serif", fontSize:30,
+            fontWeight:800, color:C.text, marginBottom:10, lineHeight:1.15 }}>{recipe.title}</div>
+
+          {/* Badges */}
+          <div style={{ display:'flex', flexWrap:'wrap', gap:6, marginBottom:14 }}>
+            {(recipe.cat||[]).map((v,i) => v && (
+              <Badge key={i} text={v} color={CAT_COLORS[i%CAT_COLORS.length]} />
+            ))}
+          </div>
+
+          {/* Meta */}
+          <div style={{ display:'flex', gap:20, fontSize:13, color:C.textSec,
+            marginBottom:16, flexWrap:'wrap' }}>
+            {recipe.prepTime  && <span>⏱ Vorbereitung: <b>{recipe.prepTime}</b></span>}
+            {recipe.cookTime  && <span>🔥 Kochen: <b>{recipe.cookTime}</b></span>}
+            {recipe.servings  && <span>👥 Portionen: <b>{recipe.servings}</b></span>}
+          </div>
+
+          {recipe.description && (
+            <div style={{ fontSize:15, color:C.textSec, lineHeight:1.7,
+              marginBottom:20, fontStyle:'italic' }}>{recipe.description}</div>
+          )}
+
+          {/* Zutaten */}
+          {recipe.ingredients && (
+            <div style={{ background:'#FEF8F4', borderRadius:16, padding:16,
+              marginBottom:16, border:`1px solid ${C.border}` }}>
+              <div style={{ fontFamily:"'Playfair Display',serif", fontSize:18,
+                fontWeight:700, color:C.text, marginBottom:12 }}>Zutaten</div>
+              {parseIngredients(recipe.ingredients).map((l,i) => (
+                <div key={i} style={{ display:'flex', gap:10, padding:'5px 0',
+                  borderBottom:`1px solid ${C.border}`, fontSize:14, color:C.text }}>
+                  <span style={{ color:C.accent, fontWeight:700 }}>•</span>{l}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Zubereitung */}
+          {recipe.instructions && (
+            <div style={{ marginBottom:16 }}>
+              <div style={{ fontFamily:"'Playfair Display',serif", fontSize:18,
+                fontWeight:700, color:C.text, marginBottom:12 }}>Zubereitung</div>
+              <div style={{ fontSize:15, color:C.text, lineHeight:1.8, whiteSpace:'pre-wrap' }}>
+                {recipe.instructions}
+              </div>
+            </div>
+          )}
+
+          {/* Weitere Fotos */}
+          {recipe.photoIds?.length>1 && (
+            <div style={{ marginTop:20 }}>
+              <div style={{ fontFamily:"'Playfair Display',serif", fontSize:16,
+                fontWeight:700, color:C.text, marginBottom:10 }}>Fotos</div>
+              {recipe.photoIds.slice(1).map(p => photoData[p.id] && (
+                <div key={p.id} style={{ marginBottom:12 }}>
+                  <img src={photoData[p.id]} alt={p.caption||''}
+                    style={{ width:'100%', borderRadius:14, maxHeight:300,
+                      objectFit:'cover', display:'block' }} />
+                  {p.caption && (
+                    <div style={{ fontSize:12, color:C.textSec, marginTop:5,
+                      textAlign:'center', fontStyle:'italic' }}>{p.caption}</div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Importiertes PDF */}
+          {pdfUrl && (
+            <div style={{ marginTop:20 }}>
+              <div style={{ fontFamily:"'Playfair Display',serif", fontSize:16,
+                fontWeight:700, color:C.text, marginBottom:10 }}>Originaldokument (PDF)</div>
+              <iframe src={pdfUrl} style={{ width:'100%', height:500, borderRadius:14,
+                border:`1px solid ${C.border}` }} title="Rezept PDF" />
+            </div>
+          )}
+
+          {/* Notizen */}
+          {recipe.notes && (
+            <div style={{ background:'#F9F5F0', borderRadius:14, padding:14,
+              marginTop:16, border:`1px solid ${C.border}` }}>
+              <div style={{ fontSize:11, fontWeight:700, color:C.textSec,
+                letterSpacing:0.7, marginBottom:6 }}>NOTIZEN</div>
+              <div style={{ fontSize:14, color:C.text, lineHeight:1.7,
+                whiteSpace:'pre-wrap' }}>{recipe.notes}</div>
+            </div>
+          )}
+
+          {/* Aktionsleiste unten */}
+          <div style={{ marginTop:28, display:'flex', flexDirection:'column', gap:10 }}>
+            <button onClick={exportPDF} disabled={pdfBusy} style={{
+              width:'100%', padding:'15px 20px', borderRadius:14, border:'none',
+              background: pdfBusy ? '#ccc' : C.accent, color:'#fff',
+              fontSize:16, fontWeight:700, fontFamily:'inherit', cursor: pdfBusy?'default':'pointer',
+              display:'flex', alignItems:'center', justifyContent:'center', gap:10,
+              boxShadow:`0 4px 16px rgba(181,69,27,0.3)`
+            }}>
+              📄 {pdfBusy ? 'PDF wird erstellt…' : 'Rezept als PDF drucken'}
+            </button>
+            <button onClick={() => setShowShop(true)} style={{
+              width:'100%', padding:'14px 20px', borderRadius:14,
+              border:`2px solid ${C.green}`, background:C.greenBg, color:C.green,
+              fontSize:15, fontWeight:700, fontFamily:'inherit', cursor:'pointer',
+              display:'flex', alignItems:'center', justifyContent:'center', gap:10
+            }}>
+              🛒 Einkaufsliste anzeigen
+            </button>
+          </div>
+        </div>
+
+        {showShop && <ShoppingList recipe={recipe} onClose={()=>setShowShop(false)} />}
+      </div>
+    );
+  }
+
+  // ─────────────────────────────────────────────────────
+  //  REZEPT BEARBEITEN / ANLEGEN
+  // ─────────────────────────────────────────────────────
+  function RecipeEdit({ recipe, cats, onSave, onAddCatValue, onClose }) {
+    const [title,    setTitle]    = useState(recipe?.title||'');
+    const [cat,      setCat]      = useState(recipe?.cat||['','','']);
+    const [desc,     setDesc]     = useState(recipe?.description||'');
+    const [ingr,     setIngr]     = useState(recipe?.ingredients||'');
+    const [instr,    setInstr]    = useState(recipe?.instructions||'');
+    const [prep,     setPrep]     = useState(recipe?.prepTime||'');
+    const [cook,     setCook]     = useState(recipe?.cookTime||'');
+    const [serv,     setServ]     = useState(recipe?.servings||'');
+    const [notes,    setNotes]    = useState(recipe?.notes||'');
+    const [photoIds, setPhotoIds] = useState(recipe?.photoIds||[]);
+    const [photoData,setPhotoData]= useState({});
+    const [pdfId,    setPdfId]    = useState(recipe?.pdfId||null);
+    const [pdfName,  setPdfName]  = useState(recipe?.pdfName||'');
+    const [extracting,setExtracting]=useState(false);
+    const photoRef = useRef(null);
+    const pdfRef   = useRef(null);
+
+    useEffect(() => {
+      if(photoIds.length) dbGetMany(photoIds.map(p=>p.id)).then(r=>{
+        const d={}; Object.entries(r).forEach(([k,v])=>d[k]=v.data); setPhotoData(d);
+      });
+    },[]);
+
+    const addPhotos = async e => {
+      for(const f of Array.from(e.target.files)){
+        const id=uid(), data=await readFile(f);
+        await dbSave(id, data, {type:'photo'});
+        setPhotoIds(p=>[...p,{id,caption:''}]);
+        setPhotoData(p=>({...p,[id]:data}));
+      }
+      e.target.value='';
+    };
+
+    const delPhoto = async id => {
+      await dbDelete(id);
+      setPhotoIds(p=>p.filter(x=>x.id!==id));
+      setPhotoData(p=>{const n={...p};delete n[id];return n;});
+    };
+
+    const updCaption = (id,cap) => setPhotoIds(p=>p.map(x=>x.id===id?{...x,caption:cap}:x));
+
+    const importPDF = async e => {
+      const f = e.target.files[0]; if(!f) return;
+      const id = uid();
+      const data = await readFile(f);
+      await dbSave(id, data, {type:'pdf'});
+      if(pdfId) await dbDelete(pdfId);
+      setPdfId(id); setPdfName(f.name);
+      // PDF.js Text-Extraktion für Zutaten
+      try {
+        setExtracting(true);
+        const pdfjsLib = window['pdfjs-dist/build/pdf'];
+        pdfjsLib.GlobalWorkerOptions.workerSrc =
+          'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+        const buf = await readFileAsBuffer(f);
+        const pdf = await pdfjsLib.getDocument({data:buf}).promise;
+        let text='';
+        for(let i=1;i<=Math.min(pdf.numPages,6);i++){
+          const page=await pdf.getPage(i);
+          const tc=await page.getTextContent();
+          text+=tc.items.map(it=>it.str).join('\n')+'\n';
+        }
+        if(text.trim() && !ingr){
+          const lower=text.toLowerCase();
+          const idx=lower.indexOf('zutaten');
+          if(idx>-1){
+            const after=text.slice(idx+7,idx+1200);
+            const end=after.toLowerCase().search(/zubereitung|anleitung|so wird/);
+            setIngr((end>-1?after.slice(0,end):after.slice(0,600)).trim());
+          } else {
+            setIngr(text.slice(0,600).trim());
+          }
+        }
+      } catch(err){console.warn('PDF.js extraction failed',err);}
+      finally{setExtracting(false);}
+      e.target.value='';
+    };
+
+    const setCatVal = (i,v) => setCat(prev=>{const n=[...prev];n[i]=v;return n;});
+
+    const save = () => {
+      if(!title.trim()) return;
+      onSave({
+        id: recipe?.id||uid(), title:title.trim(), cat, description:desc,
+        ingredients:ingr, instructions:instr, prepTime:prep, cookTime:cook,
+        servings:serv, notes, photoIds, pdfId, pdfName,
+        sourceType: pdfId?'import':'manual',
+        createdAt: recipe?.createdAt||Date.now(), updatedAt: Date.now()
+      });
+      onClose();
+    };
+
+    return (
+      <Sheet title={recipe?'Rezept bearbeiten':'Neues Rezept'} onClose={onClose} wide>
+        <Field label="Titel">
+          <Input value={title} onChange={setTitle} placeholder="Rezeptname…" />
+        </Field>
+
+        {/* 3 Kategorien */}
+        <div style={{ background:'#F9F5F0', borderRadius:14, padding:'14px 14px 4px',
+          marginBottom:14, border:`1px solid ${C.border}` }}>
+          <div style={{ fontSize:11, fontWeight:700, color:C.textSec,
+            letterSpacing:0.7, marginBottom:10 }}>KATEGORIEN</div>
+          {[0,1,2].map(i => (
+            <CatInput key={i} label={cats.labels[i]||`Kategorie ${i+1}`}
+              value={cat[i]} onChange={v=>setCatVal(i,v)}
+              options={cats.values[i]||[]}
+              onAddOption={v=>onAddCatValue(i,v)}
+              color={CAT_COLORS[i]} />
+          ))}
+        </div>
+
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:10, marginBottom:14 }}>
+          <Field label="Vorbereitung"><Input value={prep} onChange={setPrep} placeholder="z.B. 20 Min" /></Field>
+          <Field label="Kochzeit">    <Input value={cook} onChange={setCook} placeholder="z.B. 45 Min" /></Field>
+          <Field label="Portionen">   <Input value={serv} onChange={setServ} placeholder="z.B. 4"      /></Field>
+        </div>
+
+        <Field label="Kurzbeschreibung">
+          <Textarea value={desc} onChange={setDesc} placeholder="Kurze Beschreibung des Gerichts…" rows={2} />
+        </Field>
+
+        <Field label="Zutaten (eine Zutat pro Zeile)">
+          {extracting && <div style={{fontSize:12,color:C.accent,marginBottom:6}}>⏳ Extrahiere Zutaten aus PDF…</div>}
+          <Textarea value={ingr} onChange={setIngr}
+            placeholder={"200g Mehl\n3 Eier\n100ml Milch\n…"} rows={7} />
+        </Field>
+
+        <Field label="Zubereitung">
+          <Textarea value={instr} onChange={setInstr}
+            placeholder="Schritt für Schritt…" rows={8} />
+        </Field>
+
+        <Field label="Fotos">
+          <input ref={photoRef} type="file" accept="image/*,image/jpeg"
+            multiple onChange={addPhotos} style={{display:'none'}} />
+          <div style={{ display:'flex', flexWrap:'wrap', gap:8, marginBottom:8 }}>
+            {photoIds.map(p => photoData[p.id] && (
+              <div key={p.id} style={{ position:'relative', width:80, height:80 }}>
+                <img src={photoData[p.id]} alt="" style={{ width:80, height:80,
+                  borderRadius:10, objectFit:'cover' }} />
+                <button onClick={()=>delPhoto(p.id)} style={{
+                  position:'absolute', top:3, right:3, background:'rgba(0,0,0,0.5)',
+                  border:'none', borderRadius:'50%', width:20, height:20,
+                  color:'#fff', cursor:'pointer', fontSize:11,
+                  display:'flex', alignItems:'center', justifyContent:'center' }}>✕</button>
+              </div>
+            ))}
+          </div>
+          <button onClick={()=>photoRef.current.click()} style={{ width:'100%',
+            padding:12, borderRadius:12, border:`2px dashed ${C.border}`,
+            background:'transparent', color:C.textSec, cursor:'pointer',
+            fontSize:13, fontFamily:'inherit', display:'flex',
+            alignItems:'center', justifyContent:'center', gap:8 }}>
+            📷 Fotos aus Mediathek / JPEG importieren
+          </button>
+        </Field>
+
+        <Field label="PDF importieren (Rezept als Datei)">
+          <input ref={pdfRef} type="file" accept="application/pdf"
+            onChange={importPDF} style={{display:'none'}} />
+          {pdfName && (
+            <div style={{ display:'flex', alignItems:'center', gap:8,
+              background:'#F9F5F0', borderRadius:10, padding:'8px 12px', marginBottom:8 }}>
+              <span style={{ fontSize:13, color:C.text, flex:1 }}>📄 {pdfName}</span>
+              <button onClick={()=>{setPdfId(null);setPdfName('');}} style={{
+                background:'none', border:'none', color:C.textSec, cursor:'pointer', fontSize:14 }}>✕</button>
+            </div>
+          )}
+          <button onClick={()=>pdfRef.current.click()} style={{ width:'100%',
+            padding:12, borderRadius:12, border:`2px dashed ${C.border}`,
+            background:'transparent', color:C.textSec, cursor:'pointer',
+            fontSize:13, fontFamily:'inherit', display:'flex',
+            alignItems:'center', justifyContent:'center', gap:8 }}>
+            📎 PDF-Rezept importieren {pdfName?'(ersetzen)':''}
+          </button>
+          {pdfName && (
+            <div style={{ fontSize:11, color:C.textSec, marginTop:5 }}>
+              Zutaten wurden automatisch extrahiert (falls erkennbar). Bitte prüfen und anpassen.
+            </div>
+          )}
+        </Field>
+
+        <Field label="Notizen">
+          <Textarea value={notes} onChange={setNotes} placeholder="Variationen, Tipps, Quelle…" rows={3} />
+        </Field>
+
+        <Btn onClick={save} full disabled={!title.trim()}>Rezept speichern</Btn>
+      </Sheet>
+    );
+  }
+
+  // ─────────────────────────────────────────────────────
+  //  MENÜ-PLANER
+  // ─────────────────────────────────────────────────────
+  function MenuEdit({ menu, recipes, onSave, onClose }) {
+    const [name,    setName]    = useState(menu?.name||'');
+    const [date,    setDate]    = useState(menu?.date||'');
+    const [courses, setCourses] = useState(menu?.courses||[{gang:'',recipeId:''}]);
+    const [notes,   setNotes]   = useState(menu?.notes||'');
+
+    const addCourse   = () => setCourses(p=>[...p,{gang:'',recipeId:''}]);
+    const delCourse   = i => setCourses(p=>p.filter((_,j)=>j!==i));
+    const updCourse   = (i,k,v) => setCourses(p=>p.map((c,j)=>j===i?{...c,[k]:v}:c));
+
+    const save = () => {
+      if(!name.trim()) return;
+      onSave({ id:menu?.id||uid(), name, date, courses, notes, createdAt:menu?.createdAt||Date.now() });
+      onClose();
+    };
+
+    return (
+      <Sheet title={menu?'Menü bearbeiten':'Neues Menü'} onClose={onClose} wide>
+        <Field label="Menüname">
+          <Input value={name} onChange={setName} placeholder="z.B. Weihnachtsdinner 2025" />
+        </Field>
+        <Field label="Datum">
+          <Input type="date" value={date} onChange={setDate} />
+        </Field>
+        <div style={{ marginBottom:14 }}>
+          <div style={{ fontSize:11, fontWeight:700, color:C.textSec,
+            letterSpacing:0.7, marginBottom:8 }}>GÄNGE</div>
+          {courses.map((c,i) => (
+            <div key={i} style={{ display:'grid', gridTemplateColumns:'1fr 2fr 36px',
+              gap:8, marginBottom:8, alignItems:'center' }}>
+              <input value={c.gang} onChange={e=>updCourse(i,'gang',e.target.value)}
+                placeholder="z.B. Vorspeise"
+                style={{ background:'#F9F5F0', border:`1px solid ${C.border}`, borderRadius:10,
+                  padding:'9px 12px', fontSize:14, color:C.text, outline:'none', fontFamily:'inherit' }} />
+              <select value={c.recipeId} onChange={e=>updCourse(i,'recipeId',e.target.value)}
+                style={{ background:'#F9F5F0', border:`1px solid ${C.border}`, borderRadius:10,
+                  padding:'9px 12px', fontSize:14, color:C.text, outline:'none', fontFamily:'inherit',
+                  width:'100%' }}>
+                <option value="">– Rezept wählen –</option>
+                {recipes.map(r=><option key={r.id} value={r.id}>{r.title}</option>)}
+              </select>
+              <button onClick={()=>delCourse(i)} style={{ background:'none', border:'none',
+                color:C.textSec, cursor:'pointer', fontSize:18 }}>✕</button>
+            </div>
+          ))}
+          <button onClick={addCourse} style={{ background:'none', border:`1px dashed ${C.border}`,
+            borderRadius:10, padding:'8px 14px', cursor:'pointer', fontSize:13,
+            color:C.accent, fontFamily:'inherit', fontWeight:600 }}>+ Gang hinzufügen</button>
+        </div>
+        <Field label="Notizen">
+          <Textarea value={notes} onChange={setNotes} placeholder="Besondere Hinweise…" rows={3} />
+        </Field>
+        <Btn onClick={save} full disabled={!name.trim()}>Menü speichern</Btn>
+      </Sheet>
+    );
+  }
+
+  function MenuCard({ menu, recipes, onClick }) {
+    const courseRecipes = (menu.courses||[]).map(c => recipes.find(r=>r.id===c.recipeId)).filter(Boolean);
+    return (
+      <div onClick={onClick} style={{ background:C.card, borderRadius:18, marginBottom:12,
+        padding:16, cursor:'pointer', boxShadow:'0 2px 14px rgba(30,23,17,0.07)',
+        border:`1px solid ${C.border}` }}>
+        <div style={{ fontFamily:"'Playfair Display',serif", fontSize:19,
+          fontWeight:700, color:C.text, marginBottom:4 }}>{menu.name}</div>
+        {menu.date && <div style={{ fontSize:12, color:C.textSec, marginBottom:8 }}>
+          📅 {new Date(menu.date+'T12:00:00').toLocaleDateString('de-DE',{day:'numeric',month:'long',year:'numeric'})}</div>}
+        <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
+          {(menu.courses||[]).map((c,i) => (
+            <span key={i} style={{ fontSize:12, color:C.textSec }}>
+              {c.gang && <b>{c.gang}: </b>}
+              {recipes.find(r=>r.id===c.recipeId)?.title||'–'}
+              {i<menu.courses.length-1&&'  ·  '}
+            </span>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // ─────────────────────────────────────────────────────
+  //  KATEGORIEN EINSTELLUNGEN
+  // ─────────────────────────────────────────────────────
+  function CatSettings({ cats, onChange, onClose }) {
+    const [labels, setLabels] = useState([...cats.labels]);
+    const [values, setValues] = useState(cats.values.map(v=>[...v]));
+
+    const save = () => { onChange({labels, values}); onClose(); };
+    const delVal = (ci,vi) => setValues(p=>p.map((arr,i)=>i===ci?arr.filter((_,j)=>j!==vi):arr));
+
+    return (
+      <Sheet title="⚙️ Kategorien verwalten" onClose={onClose}>
+        {[0,1,2].map(i => (
+          <div key={i} style={{ marginBottom:18 }}>
+            <div style={{ fontSize:11, fontWeight:700, color:C.textSec,
+              letterSpacing:0.7, marginBottom:6 }}>KATEGORIE {i+1} – NAME</div>
+            <input value={labels[i]} onChange={e=>{const l=[...labels];l[i]=e.target.value;setLabels(l);}}
+              style={{ width:'100%', background:'#F9F5F0', border:`1px solid ${C.border}`,
+                borderRadius:11, padding:'10px 13px', fontSize:15, color:C.text,
+                outline:'none', fontFamily:'inherit', marginBottom:8 }} />
+            <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
+              {values[i].map((v,j) => (
+                <span key={j} style={{ background:CAT_COLORS[i]+'20', color:CAT_COLORS[i],
+                  borderRadius:20, padding:'4px 10px', fontSize:12, fontWeight:600,
+                  display:'flex', alignItems:'center', gap:6 }}>
+                  {v}
+                  <button onClick={()=>delVal(i,j)} style={{ background:'none', border:'none',
+                    color:CAT_COLORS[i], cursor:'pointer', fontSize:12, lineHeight:1 }}>✕</button>
+                </span>
+              ))}
+              {values[i].length===0 && <span style={{fontSize:12,color:C.textSec}}>Noch keine Werte – werden beim Anlegen von Rezepten erstellt.</span>}
+            </div>
+          </div>
+        ))}
+        <Btn onClick={save} full>Speichern</Btn>
+      </Sheet>
+    );
+  }
+
+  // ─────────────────────────────────────────────────────
+  //  HOME
+  // ─────────────────────────────────────────────────────
+  function Home({ recipes, menus, cats, onSelectRecipe, onNewRecipe,
+      onSelectMenu, onNewMenu, onExport, onImport, onCatsChange }) {
+    const [tab,      setTab]      = useState('rezepte');
+    const [search,   setSearch]   = useState('');
+    const [filters,  setFilters]  = useState(['','','']);
+    const [showCats, setShowCats] = useState(false);
+    const [selMenu,  setSelMenu]  = useState(null);
+    const [showMenuEdit, setShowMenuEdit] = useState(false);
+    const importRef = useRef(null);
+
+    const setFilter = (i,v) => setFilters(p=>{const n=[...p];n[i]=v===n[i]?'':v;return n;});
+
+    const filtered = recipes.filter(r => {
+      const q = search.toLowerCase();
+      if(q && !r.title.toLowerCase().includes(q) &&
+         !(r.cat||[]).some(c=>c.toLowerCase().includes(q))) return false;
+      return filters.every((f,i) => !f || (r.cat||[])[i]===f);
+    });
+
+    const tabStyle = active => ({
+      flex:1, padding:'12px 0', background:'none', border:'none',
+      borderBottom:`2px solid ${active?C.accent:'transparent'}`,
+      color: active?C.accent:C.textSec, fontSize:14, fontWeight:active?700:500,
+      fontFamily:'inherit', cursor:'pointer', transition:'all .15s'
+    });
+
+    return (
+      <div style={{ background:C.bg, minHeight:'100vh', paddingBottom:40 }}>
+        {/* Header */}
+        <div style={{ background:C.card, borderBottom:`1px solid ${C.border}`,
+          paddingTop:'env(safe-area-inset-top)' }}>
+          <div style={{ padding:'16px 20px 0', display:'flex',
+            justifyContent:'space-between', alignItems:'flex-start' }}>
+            <div>
+              <div style={{ fontFamily:"'Playfair Display',serif", fontSize:28,
+                fontWeight:800, color:C.text }}>Meine Rezepte</div>
+              <div style={{ fontSize:12, color:C.textSec, marginTop:2 }}>
+                {recipes.length} {recipes.length===1?'Rezept':'Rezepte'}
+              </div>
+            </div>
+            <div style={{ display:'flex', gap:8, alignItems:'center' }}>
+              <button onClick={()=>setShowCats(true)} title="Kategorien"
+                style={{ background:'#F0EAE4', border:'none', borderRadius:'50%',
+                  width:36, height:36, cursor:'pointer', fontSize:16,
+                  display:'flex', alignItems:'center', justifyContent:'center' }}>⚙️</button>
+              <button onClick={()=>importRef.current.click()}
+                style={{ background:'#F0EAE4', border:'none', borderRadius:'50%',
+                  width:36, height:36, cursor:'pointer', fontSize:16,
+                  display:'flex', alignItems:'center', justifyContent:'center' }}>📥</button>
+              <button onClick={onExport}
+                style={{ background:'#F0EAE4', border:'none', borderRadius:'50%',
+                  width:36, height:36, cursor:'pointer', fontSize:16,
+                  display:'flex', alignItems:'center', justifyContent:'center' }}>📤</button>
+              <button onClick={tab==='rezepte'?onNewRecipe:onNewMenu}
+                style={{ background:C.accent, border:'none', color:'#fff',
+                  width:40, height:40, borderRadius:'50%', cursor:'pointer',
+                  fontSize:20, fontWeight:700, display:'flex', alignItems:'center',
+                  justifyContent:'center', boxShadow:'0 4px 14px rgba(181,69,27,.35)' }}>+</button>
+            </div>
+          </div>
+
+          {/* Tabs */}
+          <div style={{ display:'flex', padding:'0 20px', marginTop:8 }}>
+            <button style={tabStyle(tab==='rezepte')} onClick={()=>setTab('rezepte')}>Rezepte</button>
+            <button style={tabStyle(tab==='az')}      onClick={()=>setTab('az')}>A – Z</button>
+            <button style={tabStyle(tab==='menues')}  onClick={()=>setTab('menues')}>Menüs</button>
+          </div>
+        </div>
+
+        {tab==='rezepte' && (
+          <div style={{ padding:'16px 20px 0', maxWidth:640, margin:'0 auto' }}>
+            {/* Suche */}
+            <div style={{ position:'relative', marginBottom:12 }}>
+              <span style={{ position:'absolute', left:12, top:'50%', transform:'translateY(-50%)',
+                color:C.textSec, fontSize:15 }}>🔍</span>
+              <input value={search} onChange={e=>setSearch(e.target.value)}
+                placeholder="Rezept suchen…"
+                style={{ width:'100%', background:C.card, border:`1px solid ${C.border}`,
+                  borderRadius:12, padding:'10px 14px 10px 36px', fontSize:15,
+                  color:C.text, outline:'none', fontFamily:'inherit' }} />
+            </div>
+
+            {/* Filter Chips */}
+            {cats.values.some(v=>v.length>0) && (
+              <div style={{ marginBottom:14 }}>
+                {cats.values.map((vals,i) => vals.length>0 && (
+                  <div key={i} style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom:6 }}>
+                    <span style={{ fontSize:11, fontWeight:700, color:C.textSec,
+                      alignSelf:'center' }}>{cats.labels[i]}:</span>
+                    {vals.map(v => (
+                      <button key={v} onClick={()=>setFilter(i,v)} style={{
+                        background: filters[i]===v ? CAT_COLORS[i] : CAT_COLORS[i]+'20',
+                        color: filters[i]===v ? '#fff' : CAT_COLORS[i],
+                        border:'none', borderRadius:20, padding:'4px 11px',
+                        fontSize:12, fontWeight:600, cursor:'pointer', fontFamily:'inherit'
+                      }}>{v}</button>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Liste */}
+            {recipes.length===0 ? (
+              <div style={{ textAlign:'center', padding:'64px 0', color:C.textSec }}>
+                <div style={{ fontSize:56, marginBottom:14 }}>🍽️</div>
+                <div style={{ fontFamily:"'Playfair Display',serif", fontSize:22,
+                  color:C.text, marginBottom:8 }}>Noch keine Rezepte</div>
+                <div style={{ fontSize:14, marginBottom:24, lineHeight:1.6 }}>
+                  Lege dein erstes Rezept an oder<br/>importiere ein PDF oder JPEG.
+                </div>
+                <Btn onClick={onNewRecipe}>Erstes Rezept anlegen</Btn>
+              </div>
+            ) : filtered.length===0 ? (
+              <div style={{ textAlign:'center', padding:'40px 0', color:C.textSec }}>
+                <div style={{ fontSize:32 }}>🔍</div>
+                <div style={{ marginTop:10 }}>Keine Rezepte gefunden</div>
+              </div>
+            ) : filtered.map(r => (
+              <RecipeCard key={r.id} recipe={r} cats={cats} onClick={()=>onSelectRecipe(r.id)} />
+            ))}
+          </div>
+        )}
+
+        {tab==='az' && (
+          <div style={{ padding:'16px 20px 0', maxWidth:640, margin:'0 auto' }}>
+            {recipes.length===0 ? (
+              <div style={{ textAlign:'center', padding:'64px 0', color:C.textSec }}>
+                <div style={{ fontSize:48, marginBottom:12 }}>📖</div>
+                <div style={{ fontSize:15 }}>Noch keine Rezepte vorhanden.</div>
+              </div>
+            ) : (() => {
+              // Buchstaben-Schnellnavigation + gruppierte Liste
+              const sorted = [...recipes].sort((a,b)=>a.title.localeCompare(b.title,'de'));
+              const groups = {};
+              sorted.forEach(r => {
+                const letter = r.title[0].toUpperCase();
+                const key = /[A-ZÄÖÜ]/.test(letter) ? letter : '#';
+                if(!groups[key]) groups[key]=[];
+                groups[key].push(r);
+              });
+              const letters = Object.keys(groups).sort((a,b)=>a.localeCompare(b,'de'));
+
+              return (
+                <>
+                  {/* Buchstaben-Schnellsprung */}
+                  <div style={{ display:'flex', flexWrap:'wrap', gap:6, marginBottom:20 }}>
+                    {letters.map(l => (
+                      <a key={l} href={`#az-${l}`}
+                        style={{ background:C.accentBg, color:C.accent, borderRadius:8,
+                          width:34, height:34, display:'flex', alignItems:'center',
+                          justifyContent:'center', fontWeight:700, fontSize:14,
+                          textDecoration:'none', border:`1px solid ${C.accent}44` }}>
+                        {l}
+                      </a>
+                    ))}
+                  </div>
+
+                  {/* Gruppen */}
+                  {letters.map(l => (
+                    <div key={l} id={`az-${l}`} style={{ marginBottom:24 }}>
+                      {/* Buchstaben-Header */}
+                      <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:10 }}>
+                        <div style={{ width:40, height:40, borderRadius:12,
+                          background:C.accent, color:'#fff',
+                          display:'flex', alignItems:'center', justifyContent:'center',
+                          fontFamily:"'Playfair Display',serif", fontSize:20, fontWeight:800,
+                          flexShrink:0 }}>{l}</div>
+                        <div style={{ flex:1, height:1, background:C.border }} />
+                      </div>
+
+                      {/* Rezept-Zeilen */}
+                      {groups[l].map(r => (
+                        <div key={r.id} onClick={()=>onSelectRecipe(r.id)}
+                          style={{ display:'flex', alignItems:'center', gap:12,
+                            padding:'11px 0', borderBottom:`1px solid ${C.border}`,
+                            cursor:'pointer' }}>
+                          <div style={{ flex:1 }}>
+                            <div style={{ fontSize:15, fontWeight:600, color:C.text }}>
+                              {r.title}
+                            </div>
+                            <div style={{ display:'flex', gap:6, marginTop:4, flexWrap:'wrap' }}>
+                              {(r.cat||[]).map((v,i) => v && (
+                                <Badge key={i} text={v} color={CAT_COLORS[i%CAT_COLORS.length]} />
+                              ))}
+                              {r.prepTime && (
+                                <span style={{ fontSize:11, color:C.textSec }}>⏱ {r.prepTime}</span>
+                              )}
+                            </div>
+                          </div>
+                          <span style={{ color:C.textSec, fontSize:18 }}>›</span>
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                </>
+              );
+            })()}
+          </div>
+        )}
+
+        {tab==='menues' && (
+          <div style={{ padding:'16px 20px 0', maxWidth:640, margin:'0 auto' }}>
+            {menus.length===0 ? (
+              <div style={{ textAlign:'center', padding:'64px 0', color:C.textSec }}>
+                <div style={{ fontSize:56, marginBottom:14 }}>🥂</div>
+                <div style={{ fontFamily:"'Playfair Display',serif", fontSize:22,
+                  color:C.text, marginBottom:8 }}>Noch keine Menüs</div>
+                <div style={{ fontSize:14, marginBottom:24, lineHeight:1.6 }}>
+                  Stelle Rezepte zu einem Menü zusammen.
+                </div>
+                <Btn onClick={onNewMenu}>Erstes Menü erstellen</Btn>
+              </div>
+            ) : menus.map(m => (
+              <MenuCard key={m.id} menu={m} recipes={recipes} onClick={()=>setSelMenu(m.id)} />
+            ))}
+          </div>
+        )}
+
+        <input ref={importRef} type="file" accept=".json" onChange={onImport} style={{display:'none'}} />
+
+        {showCats && (
+          <CatSettings cats={cats} onChange={onCatsChange} onClose={()=>setShowCats(false)} />
+        )}
+
+        {selMenu && (() => {
+          const m = menus.find(x=>x.id===selMenu);
+          if(!m) return null;
+          return (
+            <Sheet title={m.name} onClose={()=>setSelMenu(null)}>
+              {m.date && <div style={{ fontSize:13, color:C.textSec, marginBottom:12 }}>
+                📅 {new Date(m.date+'T12:00:00').toLocaleDateString('de-DE',{weekday:'long',day:'numeric',month:'long',year:'numeric'})}</div>}
+              {(m.courses||[]).map((c,i) => {
+                const r=recipes.find(x=>x.id===c.recipeId);
+                return (
+                  <div key={i} style={{ display:'flex', gap:12, padding:'10px 0',
+                    borderBottom:`1px solid ${C.border}`, alignItems:'center' }}>
+                    <span style={{ fontSize:13, fontWeight:700, color:C.accent,
+                      minWidth:90 }}>{c.gang||`Gang ${i+1}`}</span>
+                    <span style={{ fontSize:14, color:C.text }}>{r?.title||'–'}</span>
+                  </div>
+                );
+              })}
+              {m.notes && <div style={{ fontSize:13, color:C.textSec, marginTop:12,
+                fontStyle:'italic' }}>{m.notes}</div>}
+              <div style={{ display:'flex', gap:10, marginTop:16 }}>
+                <Btn onClick={()=>{setShowMenuEdit(true);}} full variant='ghost'>Bearbeiten</Btn>
+              </div>
+            </Sheet>
+          );
+        })()}
+      </div>
+    );
+  }
+
+  // ─────────────────────────────────────────────────────
+  //  ROOT APP
+  // ─────────────────────────────────────────────────────
+  function App() {
+    const [recipes,  setRecipes]  = useLS(KEY_RECIPES, []);
+    const [menus,    setMenus]    = useLS(KEY_MENUS,   []);
+    const [cats,     setCats]     = useLS(KEY_CATS, DEFAULT_CATS);
+    const [selId,    setSelId]    = useState(null);
+    const [showEdit, setShowEdit] = useState(false);
+    const [editRec,  setEditRec]  = useState(null);
+    const [showMenuForm, setShowMenuForm] = useState(false);
+
+    const saveRecipe = r => setRecipes(p=>{
+      const i=p.findIndex(x=>x.id===r.id);
+      return i>=0 ? p.map(x=>x.id===r.id?r:x) : [...p,r];
+    });
+
+    const deleteRecipe = async id => {
+      const r = recipes.find(x=>x.id===id);
+      for(const p of (r?.photoIds||[])) await dbDelete(p.id);
+      if(r?.pdfId) await dbDelete(r.pdfId);
+      setRecipes(p=>p.filter(x=>x.id!==id));
+      setSelId(null);
+    };
+
+    const saveMenu = m => setMenus(p=>{
+      const i=p.findIndex(x=>x.id===m.id);
+      return i>=0 ? p.map(x=>x.id===m.id?m:x) : [...p,m];
+    });
+
+    const addCatValue = (catIdx, val) => {
+      setCats(prev => {
+        const newVals = prev.values.map((arr,i) =>
+          i===catIdx && !arr.includes(val) ? [...arr,val] : arr
+        );
+        return {...prev, values:newVals};
+      });
+    };
+
+    // Export (alle Daten + Dateien)
+    const exportData = async () => {
+      const files = await dbGetAll();
+      const datum = new Date().toISOString().split('T')[0];
+      const blob  = new Blob([JSON.stringify({recipes,menus,cats,files,exportedAt:new Date().toISOString()})],
+        {type:'application/json'});
+      const url=URL.createObjectURL(blob), a=document.createElement('a');
+      a.href=url; a.download=`rezepte_backup_${datum}.json`; a.click();
+      URL.revokeObjectURL(url);
+    };
+
+    // Import
+    const importData = async e => {
+      const f=e.target.files[0]; if(!f) return;
+      const reader=new FileReader();
+      reader.onload=async ev=>{
+        try {
+          const d=JSON.parse(ev.target.result);
+          if(!d.recipes){alert('Ungültige Datei.');return;}
+          if(!window.confirm(`${d.recipes.length} Rezepte importieren? Aktuelle Daten werden ersetzt.`)) return;
+          await dbClear();
+          for(const file of (d.files||[])) await dbSave(file.id, file.data, file);
+          setRecipes(d.recipes||[]);
+          setMenus(d.menus||[]);
+          if(d.cats) setCats(d.cats);
+        } catch{alert('Fehler beim Importieren.');}
+        e.target.value='';
+      };
+      reader.readAsText(f);
+    };
+
+    const selRecipe = recipes.find(r=>r.id===selId);
+
+    return (
+      <div style={{ maxWidth:640, margin:'0 auto', minHeight:'100vh', background:C.bg }}>
+        {selRecipe ? (
+          <RecipeDetail
+            recipe={selRecipe} cats={cats}
+            onBack={() => setSelId(null)}
+            onEdit={() => { setEditRec(selRecipe); setShowEdit(true); }}
+            onDelete={() => {
+              if(window.confirm(`„${selRecipe.title}" wirklich löschen?`)) deleteRecipe(selRecipe.id);
+            }}
+          />
+        ) : (
+          <Home
+            recipes={recipes} menus={menus} cats={cats}
+            onSelectRecipe={setSelId}
+            onNewRecipe={() => { setEditRec(null); setShowEdit(true); }}
+            onSelectMenu={()=>{}}
+            onNewMenu={() => setShowMenuForm(true)}
+            onExport={exportData}
+            onImport={importData}
+            onCatsChange={setCats}
+          />
+        )}
+
+        {showEdit && (
+          <RecipeEdit
+            recipe={editRec} cats={cats}
+            onSave={r => { saveRecipe(r); if(editRec) setSelId(r.id); }}
+            onAddCatValue={addCatValue}
+            onClose={() => { setShowEdit(false); setEditRec(null); }}
+          />
+        )}
+
+        {showMenuForm && (
+          <MenuEdit
+            menu={null} recipes={recipes}
+            onSave={saveMenu}
+            onClose={() => setShowMenuForm(false)}
+          />
+        )}
+      </div>
+    );
+  }
+
+  ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+<script>
+  if('serviceWorker' in navigator)
+    window.addEventListener('load', ()=>navigator.serviceWorker.register('./sw.js'));
+</script>
+</body>
+</html>

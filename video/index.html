@@ -1,0 +1,675 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<title>SmartCut – Mockup</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: #1c1c1e;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro", sans-serif;
+  display: flex; flex-direction: column; align-items: center;
+  padding-top: 50px; min-height: 100vh;
+}
+
+/* ── Nav ── */
+.nav {
+  position: fixed; top: 0; left: 0; width: 100%; height: 40px;
+  background: #111; display: flex; align-items: center;
+  justify-content: center; gap: 4px; z-index: 100;
+}
+.nav-btn {
+  padding: 5px 14px; border-radius: 5px; border: 1px solid #444;
+  background: transparent; color: #888; font-size: 12px; cursor: pointer; transition: all .15s;
+}
+.nav-btn.active { background: #2f80ed; color: #fff; border-color: #2f80ed; }
+.nav-btn:hover:not(.active) { background: #2a2a2c; color: #ccc; }
+
+/* ── Window ── */
+.mac-window {
+  width: 1200px; height: 720px; background: #2c2c2e; border-radius: 12px;
+  overflow: hidden; box-shadow: 0 25px 60px rgba(0,0,0,.5);
+  display: flex; flex-direction: column;
+}
+.titlebar {
+  height: 32px; background: #3a3a3c; display: flex; align-items: center;
+  gap: 8px; padding: 0 12px; border-bottom: 1px solid #555; flex-shrink: 0;
+}
+.dot { width: 12px; height: 12px; border-radius: 50%; }
+.red{background:#ff5f57;} .yellow{background:#ffbd2e;} .green{background:#28c840;}
+.win-title { flex:1; text-align:center; color:#d1d1d1; font-size:13px; margin-right:70px; }
+
+/* ── Toolbar ── */
+.toolbar {
+  height: 52px; background: #2f2f31; border-bottom: 1px solid #444;
+  display: flex; align-items: center; padding: 0 20px; gap: 10px; flex-shrink: 0;
+}
+.tool-btn {
+  background: #3a3a3c; color: #e2e2e2; padding: 6px 12px;
+  border-radius: 6px; border: 1px solid #505052; cursor: pointer; font-size: 12px;
+}
+.tool-btn:hover { background: #4a4a4c; }
+.tool-btn.export-btn { background: #27ae60; border-color: #2ecc71; color: #fff; }
+.spacer { flex: 1; }
+.status-pill { padding: 4px 12px; border-radius: 12px; font-size: 11px; font-weight: 600; }
+.pill-idle   { background: #3a3a3c; color: #888; }
+.pill-rec    { background: #c0392b; color: #fff; animation: pulse 1s infinite; }
+.pill-ready  { background: #27ae60; color: #fff; }
+.pill-export { background: #2f80ed; color: #fff; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.5} }
+
+/* ── Layout ── */
+.main { display: flex; flex: 1; overflow: hidden; }
+.content { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+.screen { display: none; flex: 1; flex-direction: column; overflow: hidden; }
+.screen.visible { display: flex; }
+
+/* ── Sidebar ── */
+.sidebar {
+  width: 200px; background: #1f1f20; border-right: 1px solid #3b3b3d;
+  padding: 10px; color: #d6d6d6; flex-shrink: 0; overflow-y: auto;
+}
+.sidebar-section { margin-bottom: 14px; }
+.sidebar-title { font-size: 11px; font-weight: 700; color: #555; text-transform: uppercase; letter-spacing: .06em; margin-bottom: 5px; padding-left: 4px; }
+.sidebar-item {
+  padding: 5px 8px; font-size: 12px; border-radius: 5px; cursor: pointer;
+  display: flex; align-items: center; gap: 7px;
+}
+.sidebar-item:hover { background: #2a2a2c; }
+.sidebar-item.sel { background: #2f4f7f; color: #fff; }
+
+/* ════════════════════════════════════
+   SCREEN 1 — Mediathek + Bereit
+   ════════════════════════════════════ */
+.s1-top {
+  height: 80px; background: #111; border-bottom: 1px solid #2a2a2c;
+  display: flex; align-items: center; justify-content: center; gap: 20px; flex-shrink: 0;
+}
+.detect-pill {
+  display: flex; gap: 8px; align-items: center;
+  background: #1a1a1c; border: 1px solid #333; border-radius: 8px;
+  padding: 8px 18px; font-size: 12px; color: #888;
+}
+.dot-blink { width: 8px; height: 8px; border-radius: 50%; background: #555; animation: blink 2s infinite; }
+@keyframes blink { 0%,100%{background:#555} 50%{background:#27ae60} }
+
+/* Media Browser Grid */
+.media-browser {
+  flex: 1; padding: 16px; overflow-y: auto;
+  background: #1a1a1c;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 12px;
+  align-content: start;
+}
+.media-thumb {
+  border-radius: 8px; overflow: hidden; cursor: pointer;
+  border: 2px solid transparent; transition: border-color .15s;
+  position: relative;
+}
+.media-thumb:hover { border-color: #2f80ed; }
+.media-thumb.sel-thumb { border-color: #a78bfa; }
+.thumb-img {
+  width: 100%; aspect-ratio: 16/9;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 28px; position: relative;
+}
+.thumb-dur {
+  position: absolute; bottom: 4px; right: 6px;
+  background: rgba(0,0,0,.7); color: #fff; font-size: 10px;
+  padding: 1px 5px; border-radius: 3px;
+}
+.thumb-scrub-bar {
+  position: absolute; bottom: 0; left: 0; height: 3px;
+  background: #2f80ed; width: 0%; transition: width .05s;
+}
+.thumb-label { padding: 5px 8px; font-size: 11px; color: #ccc; background: #222; }
+.thumb-sub   { padding: 0 8px 6px; font-size: 10px; color: #555; background: #222; }
+
+/* ════════════════════════════════════
+   SCREEN 2 — Aufnahme
+   ════════════════════════════════════ */
+.rec-monitor {
+  flex: 1; background: #000; position: relative;
+  display: flex; align-items: center; justify-content: center;
+}
+.rec-screen-content {
+  width: 85%; height: 85%;
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+  border-radius: 4px; display: flex; align-items: center; justify-content: center;
+  color: #aaa; font-size: 14px; position: relative;
+}
+.rec-overlay {
+  position: absolute; top: 12px; right: 12px;
+  background: rgba(0,0,0,.7); border-radius: 6px; padding: 6px 12px;
+  display: flex; align-items: center; gap: 8px; font-size: 12px; color: #fff;
+}
+.rec-dot { width: 8px; height: 8px; border-radius: 50%; background: #e74c3c; animation: pulse 1s infinite; }
+.rec-bar {
+  height: 60px; background: #111; border-top: 1px solid #333;
+  display: flex; align-items: center; padding: 0 16px; gap: 16px; flex-shrink: 0;
+}
+.waveform {
+  flex: 1; height: 36px; background: #1a1a1c; border-radius: 4px;
+  display: flex; align-items: center; padding: 0 8px; gap: 2px; overflow: hidden;
+}
+.wave-bar { width: 3px; background: #27ae60; border-radius: 2px; animation: wave var(--d,.8s) infinite alternate; }
+@keyframes wave { from{height:4px} to{height:var(--h,20px)} }
+.rec-stats { color: #888; font-size: 11px; text-align: right; line-height: 1.6; }
+
+/* ════════════════════════════════════
+   SCREEN 3 — Bearbeiten
+   ════════════════════════════════════ */
+.edit-top { display: flex; flex: 1; overflow: hidden; min-height: 0; }
+
+.preview-pane {
+  flex: 1; background: #000;
+  display: flex; align-items: center; justify-content: center; position: relative;
+}
+.preview-frame {
+  width: 80%; aspect-ratio: 16/9;
+  background: linear-gradient(135deg, #1a1a2e, #0f3460);
+  border-radius: 6px; display: flex; align-items: center; justify-content: center;
+  color: #ccc; font-size: 13px; flex-direction: column; gap: 6px;
+}
+.preview-timecode { font-size: 11px; color: #555; font-family: monospace; }
+.preview-controls {
+  position: absolute; bottom: 12px;
+  display: flex; gap: 10px; align-items: center;
+}
+.ctrl-btn {
+  background: rgba(255,255,255,.1); border: none; color: #fff;
+  width: 30px; height: 30px; border-radius: 50%; cursor: pointer;
+  font-size: 13px; display: flex; align-items: center; justify-content: center;
+}
+.ctrl-btn.play { width: 38px; height: 38px; font-size: 16px; background: rgba(255,255,255,.2); }
+
+/* Inspector */
+.inspector {
+  width: 220px; background: #1c1c1e; border-left: 1px solid #333;
+  color: #aaa; font-size: 11px; overflow-y: auto; flex-shrink: 0;
+}
+.insp-section { padding: 10px 12px; border-bottom: 1px solid #2a2a2c; }
+.insp-section h4 { color: #666; font-size: 10px; text-transform: uppercase; letter-spacing: .06em; margin-bottom: 8px; }
+.insp-row { display: flex; justify-content: space-between; align-items: center; padding: 3px 0; }
+.insp-val { color: #e2e2e2; }
+.insp-slider { width: 80px; accent-color: #a78bfa; }
+.tag { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 10px; margin: 2px 2px 2px 0; cursor: pointer; }
+.tag-green  { background: #064e3b; color: #34d399; }
+.tag-red    { background: #450a0a; color: #f87171; }
+.tag-purple { background: #3b0764; color: #c4b5fd; }
+.ki-item { padding: 4px 0; border-bottom: 1px solid #222; font-size: 10px; color: #888; line-height: 1.5; }
+.ki-item strong { color: #c4b5fd; }
+
+/* Timeline */
+.timeline-area {
+  height: 195px; background: #141416; border-top: 2px solid #2a2a2c;
+  flex-shrink: 0; display: flex; flex-direction: column;
+}
+.timeline-header {
+  height: 28px; background: #1a1a1c; border-bottom: 1px solid #2a2a2c;
+  display: flex; align-items: center; padding: 0 8px; gap: 6px; font-size: 11px; color: #666;
+}
+.tl-tool {
+  background: #2a2a2c; border: 1px solid #3a3a3c; color: #aaa;
+  padding: 2px 8px; border-radius: 4px; font-size: 10px; cursor: pointer;
+}
+.tl-tool:hover { background: #363638; }
+.timeline-tracks { flex: 1; padding: 6px 8px; display: flex; flex-direction: column; gap: 5px; overflow: hidden; }
+.track { display: flex; align-items: center; gap: 6px; }
+.track-label { width: 52px; font-size: 10px; color: #555; text-align: right; flex-shrink: 0; }
+.track-lane {
+  flex: 1; height: 34px; background: #1e1e20; border-radius: 6px;
+  display: flex; gap: 2px; padding: 3px; overflow: hidden; position: relative;
+}
+
+/* Clips — iMovie gerundete Kanten */
+.clip {
+  height: 100%; border-radius: 6px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 9px; color: rgba(255,255,255,.75);
+  position: relative; cursor: pointer; transition: filter .1s;
+  overflow: hidden;
+}
+.clip:hover { filter: brightness(1.2); }
+.clip::before { /* Glanzeffekt oben */
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0; height: 40%;
+  background: linear-gradient(to bottom, rgba(255,255,255,.12), transparent);
+  pointer-events: none;
+}
+.clip-normal    { background: #2d5a8e; }
+.clip-trash     { background: #6b1f1f; border: 1px dashed #e74c3c; opacity: .55; }
+.clip-highlight { background: #1a4731; border: 1px solid #34d399; }
+.clip-audio     { background: #3d2b6b; }
+
+/* Hover-Scrubbing Tooltip */
+.scrub-tooltip {
+  position: fixed; background: rgba(0,0,0,.85); color: #fff;
+  font-size: 10px; padding: 3px 8px; border-radius: 4px; pointer-events: none;
+  z-index: 999; display: none;
+}
+
+/* Lila Auswahlbereich */
+.selection-overlay {
+  position: absolute; top: 0; bottom: 0;
+  background: rgba(167,139,250,.18);
+  border-left: 2px solid #a78bfa;
+  border-right: 2px solid #a78bfa;
+  cursor: col-resize;
+  pointer-events: all;
+}
+.sel-handle {
+  position: absolute; top: 0; bottom: 0; width: 6px;
+  background: #a78bfa; opacity: .8; cursor: col-resize;
+}
+.sel-handle.left  { left: -3px; }
+.sel-handle.right { right: -3px; }
+
+/* Playhead */
+.playhead {
+  position: absolute; top: -4px; bottom: 0; width: 2px;
+  background: #fff; pointer-events: none; z-index: 10;
+}
+.playhead::before {
+  content: '▼';
+  position: absolute; top: -2px; left: -4px;
+  font-size: 8px; color: #fff;
+}
+
+/* Zeitlineal */
+.time-ruler {
+  height: 18px; background: #111; display: flex; align-items: center;
+  padding: 0 8px 0 66px; gap: 0; overflow: hidden; border-bottom: 1px solid #222;
+}
+.ruler-tick { flex: 1; font-size: 9px; color: #444; border-left: 1px solid #2a2a2c; padding-left: 3px; }
+
+/* ════════════════════════════════════
+   SCREEN 4 — Export
+   ════════════════════════════════════ */
+.export-area {
+  flex: 1; display: flex; align-items: center; justify-content: center; background: #1a1a1c;
+}
+.export-card {
+  background: #2c2c2e; border: 1px solid #3b3b3d; border-radius: 12px;
+  padding: 28px 36px; width: 480px; color: #d6d6d6;
+}
+.export-card h2 { font-size: 17px; margin-bottom: 18px; color: #fff; }
+.export-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 9px 0; border-bottom: 1px solid #3b3b3d; font-size: 12px;
+}
+.export-label { color: #888; }
+.export-val   { color: #e2e2e2; }
+.export-select {
+  background: #3a3a3c; border: 1px solid #505052; color: #e2e2e2;
+  border-radius: 5px; padding: 3px 8px; font-size: 11px;
+}
+.progress-wrap { margin: 18px 0 6px; }
+.progress-label { display: flex; justify-content: space-between; font-size: 11px; color: #888; margin-bottom: 5px; }
+.progress-bar { height: 7px; background: #3a3a3c; border-radius: 4px; overflow: hidden; }
+.progress-fill { height: 100%; background: linear-gradient(90deg, #2f80ed, #27ae60); border-radius: 4px; width: 72%; }
+.export-actions { display: flex; gap: 10px; margin-top: 18px; }
+.btn-primary { flex:1; padding:10px; border-radius:8px; background:#27ae60; border:none; color:#fff; font-size:13px; font-weight:600; cursor:pointer; }
+.btn-secondary { padding:10px 16px; border-radius:8px; background:#3a3a3c; border:1px solid #505052; color:#aaa; font-size:13px; cursor:pointer; }
+.export-path { margin-top:10px; font-size:10px; color:#555; background:#1a1a1c; border-radius:5px; padding:5px 10px; font-family:monospace; }
+</style>
+</head>
+<body>
+
+<div class="scrub-tooltip" id="scrubTip"></div>
+
+<div class="nav">
+  <button class="nav-btn active" onclick="showScreen(0,this)">1 · Mediathek</button>
+  <button class="nav-btn"        onclick="showScreen(1,this)">2 · Aufnahme</button>
+  <button class="nav-btn"        onclick="showScreen(2,this)">3 · Bearbeiten</button>
+  <button class="nav-btn"        onclick="showScreen(3,this)">4 · Export</button>
+</div>
+
+<div class="mac-window">
+  <div class="titlebar">
+    <div class="dot red"></div><div class="dot yellow"></div><div class="dot green"></div>
+    <div class="win-title" id="win-title">SmartCut – Mediathek</div>
+  </div>
+
+  <div class="toolbar">
+    <button class="tool-btn">🎥 Import</button>
+    <button class="tool-btn">⏺ Aufnahme</button>
+    <button class="tool-btn">✂️ Schneiden</button>
+    <button class="tool-btn">⭐ Highlight</button>
+    <button class="tool-btn">🎼 Audio</button>
+    <button class="tool-btn export-btn">📤 Export</button>
+    <div class="spacer"></div>
+    <span class="status-pill pill-idle" id="status-pill">● Bereit</span>
+  </div>
+
+  <div class="main">
+    <div class="sidebar">
+      <div class="sidebar-section">
+        <div class="sidebar-title">Mediathek</div>
+        <div class="sidebar-item sel">🎬 Alle Medien</div>
+        <div class="sidebar-item">📹 Aufnahmen</div>
+        <div class="sidebar-item">⭐ Highlights</div>
+        <div class="sidebar-item">🎵 Audio</div>
+      </div>
+      <div class="sidebar-section">
+        <div class="sidebar-title">Projekte</div>
+        <div class="sidebar-item sel">📁 Stammtisch 01</div>
+        <div class="sidebar-item">📁 Stammtisch 02</div>
+        <div class="sidebar-item">📁 Stammtisch 03</div>
+        <div class="sidebar-item">＋ Neu</div>
+      </div>
+      <div class="sidebar-section">
+        <div class="sidebar-title">Einstellungen</div>
+        <div class="sidebar-item">⚙️ Aufnahme</div>
+        <div class="sidebar-item">📂 Speicherort</div>
+        <div class="sidebar-item">🤖 KI-Schnitt</div>
+      </div>
+    </div>
+
+    <div class="content">
+
+      <!-- ── SCREEN 1: Mediathek ── -->
+      <div class="screen visible" id="screen-0">
+        <div class="s1-top">
+          <div class="detect-pill">
+            <div class="dot-blink"></div>
+            Bildschirm wird überwacht · Kein Video erkannt
+          </div>
+          <div style="font-size:12px;color:#555;">Hover über ein Clip = Vorschau</div>
+        </div>
+        <div class="media-browser" id="mediaBrowser"></div>
+      </div>
+
+      <!-- ── SCREEN 2: Aufnahme ── -->
+      <div class="screen" id="screen-1">
+        <div class="rec-monitor">
+          <div class="rec-screen-content">
+            🎬 Stammtisch-Video läuft …
+            <div class="rec-overlay"><div class="rec-dot"></div> REC &nbsp; 00:24:13</div>
+          </div>
+        </div>
+        <div class="rec-bar">
+          <span style="font-size:11px;color:#666;">Audio</span>
+          <div class="waveform" id="waveform"></div>
+          <div class="rec-stats">Größe: 1.2 GB<br>~/tmp/smartcut_raw.mp4</div>
+        </div>
+      </div>
+
+      <!-- ── SCREEN 3: Bearbeiten ── -->
+      <div class="screen" id="screen-2">
+        <div class="edit-top">
+          <div class="preview-pane">
+            <div class="preview-frame" id="previewFrame">
+              <span id="previewLabel">▶ Stammtisch 01</span>
+              <span class="preview-timecode" id="previewTC">00:12:44</span>
+            </div>
+            <div class="preview-controls">
+              <button class="ctrl-btn">⏮</button>
+              <button class="ctrl-btn">⏪</button>
+              <button class="ctrl-btn play">▶</button>
+              <button class="ctrl-btn">⏩</button>
+              <button class="ctrl-btn">⏭</button>
+            </div>
+          </div>
+
+          <!-- Inspector Panel -->
+          <div class="inspector">
+            <div class="insp-section">
+              <h4>Clip-Info</h4>
+              <div class="insp-row"><span>Start</span><span class="insp-val">00:12:30</span></div>
+              <div class="insp-row"><span>Ende</span><span class="insp-val">00:15:10</span></div>
+              <div class="insp-row"><span>Dauer</span><span class="insp-val">02:40</span></div>
+              <div class="insp-row"><span>Auflösung</span><span class="insp-val">1920×1080</span></div>
+              <div class="insp-row"><span>FPS</span><span class="insp-val">30</span></div>
+            </div>
+            <div class="insp-section">
+              <h4>Markierungen</h4>
+              <span class="tag tag-green">⭐ Highlight</span>
+              <span class="tag tag-red">🗑 Löschen</span>
+              <span class="tag tag-purple">◼ Auswahl</span>
+            </div>
+            <div class="insp-section">
+              <h4>Audio</h4>
+              <div class="insp-row"><span>Lautstärke</span><input type="range" class="insp-slider" value="80"></div>
+              <div class="insp-row"><span>Pegel</span><span class="insp-val">-6 dB</span></div>
+            </div>
+            <div class="insp-section">
+              <h4>Farbe</h4>
+              <div class="insp-row"><span>Helligkeit</span><input type="range" class="insp-slider" value="50"></div>
+              <div class="insp-row"><span>Kontrast</span><input type="range" class="insp-slider" value="55"></div>
+              <div class="insp-row"><span>Sättigung</span><input type="range" class="insp-slider" value="48"></div>
+            </div>
+            <div class="insp-section">
+              <h4>KI-Vorschläge</h4>
+              <div class="ki-item"><strong>00:14:20–00:14:55</strong><br>Stille erkannt → Kürzen</div>
+              <div class="ki-item"><strong>00:22:10–00:26:40</strong><br>Hohe Aktivität → Highlight</div>
+              <div class="ki-item"><strong>00:58:00–01:02:00</strong><br>Bewegungsarm → Kürzen</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Timeline -->
+        <div class="timeline-area">
+          <div class="timeline-header">
+            <button class="tl-tool">✂️ Schnitt</button>
+            <button class="tl-tool">⭐ Highlight</button>
+            <button class="tl-tool">🗑 Löschen</button>
+            <button class="tl-tool">◼ Auswahl</button>
+            <button class="tl-tool">↩ Rückgängig</button>
+            <div style="flex:1"></div>
+            <span style="font-size:10px;">Gesamt: 01:24:33 &nbsp;|&nbsp; Schnitt: 01:08:14</span>
+          </div>
+          <div class="time-ruler" id="timeRuler"></div>
+          <div class="timeline-tracks">
+            <div class="track">
+              <div class="track-label">Video</div>
+              <div class="track-lane" id="videoTrack">
+                <div class="clip clip-normal"    style="flex:2" data-label="Intro"     data-time="00:00:00">Intro</div>
+                <div class="clip clip-trash"     style="flex:1" data-label="Pause"     data-time="00:18:30">Pause</div>
+                <div class="clip clip-highlight" style="flex:3" data-label="⭐ Highlight" data-time="00:24:10">⭐ Highlight</div>
+                <div class="clip clip-normal"    style="flex:2" data-label="Diskussion" data-time="00:48:00">Talk</div>
+                <div class="clip clip-trash"     style="flex:1" data-label="Stille"    data-time="01:04:10">Stille</div>
+                <div class="clip clip-normal"    style="flex:2" data-label="Abschluss" data-time="01:10:00">Ende</div>
+                <!-- Lila Auswahlbereich -->
+                <div class="selection-overlay" id="selOverlay" style="left:36%;width:28%;">
+                  <div class="sel-handle left"></div>
+                  <div class="sel-handle right"></div>
+                </div>
+                <div class="playhead" style="left:30%"></div>
+              </div>
+            </div>
+            <div class="track">
+              <div class="track-label">Audio</div>
+              <div class="track-lane">
+                <div class="clip clip-audio" style="flex:2"></div>
+                <div class="clip clip-trash" style="flex:1;opacity:.25"></div>
+                <div class="clip clip-audio" style="flex:3"></div>
+                <div class="clip clip-audio" style="flex:2"></div>
+                <div class="clip clip-trash" style="flex:1;opacity:.25"></div>
+                <div class="clip clip-audio" style="flex:2"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── SCREEN 4: Export ── -->
+      <div class="screen" id="screen-3">
+        <div class="export-area">
+          <div class="export-card">
+            <h2>📤 Video exportieren</h2>
+            <div class="export-row"><span class="export-label">Projekt</span><span class="export-val">Stammtisch 01</span></div>
+            <div class="export-row">
+              <span class="export-label">Format</span>
+              <select class="export-select"><option>MP4 (H.264)</option><option>MP4 (H.265)</option><option>MOV</option></select>
+            </div>
+            <div class="export-row">
+              <span class="export-label">Qualität</span>
+              <select class="export-select"><option>1080p – Hoch</option><option>720p – Mittel</option><option>4K – Maximum</option></select>
+            </div>
+            <div class="export-row"><span class="export-label">Dauer (Schnitt)</span><span class="export-val">01:08:14 <span style="color:#666">(war 01:24:33)</span></span></div>
+            <div class="export-row"><span class="export-label">Geschätzte Größe</span><span class="export-val">~2.1 GB</span></div>
+            <div class="progress-wrap">
+              <div class="progress-label"><span>Exportiere …</span><span>72%</span></div>
+              <div class="progress-bar"><div class="progress-fill"></div></div>
+            </div>
+            <div class="export-actions">
+              <button class="btn-primary">✅ Export starten</button>
+              <button class="btn-secondary">Abbrechen</button>
+            </div>
+            <div class="export-path">~/Videos/Stammtisch-Bearbeitet/Stammtisch_01_final.mp4</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+/* ── Screen-Switching ── */
+const titles = ['SmartCut – Mediathek','SmartCut – Aufnahme','SmartCut – Bearbeiten','SmartCut – Export'];
+const pills  = [
+  {cls:'pill-idle',  text:'● Bereit'},
+  {cls:'pill-rec',   text:'⏺ REC'},
+  {cls:'pill-ready', text:'✓ Bereit zum Export'},
+  {cls:'pill-export',text:'📤 Exportiere …'},
+];
+function showScreen(idx, btn) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('visible'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('screen-'+idx).classList.add('visible');
+  btn.classList.add('active');
+  document.getElementById('win-title').textContent = titles[idx];
+  const p = document.getElementById('status-pill');
+  p.className = 'status-pill '+pills[idx].cls;
+  p.textContent = pills[idx].text;
+}
+
+/* ── Waveform ── */
+const wf = document.getElementById('waveform');
+for (let i=0;i<80;i++){
+  const b=document.createElement('div'); b.className='wave-bar';
+  const h=6+Math.random()*24;
+  b.style.setProperty('--h',h+'px'); b.style.setProperty('--d',(0.4+Math.random()*0.8)+'s');
+  b.style.animationDelay=(Math.random()*0.5)+'s'; wf.appendChild(b);
+}
+
+/* ── Media Browser Grid (Screen 1) ── */
+const clips = [
+  {emoji:'🎬',label:'Stammtisch 01',sub:'01:24:33 · 2.1 GB',color:'#1a2a4a'},
+  {emoji:'🎥',label:'Stammtisch 02',sub:'58:12 · 1.6 GB',color:'#1a3a2a'},
+  {emoji:'📹',label:'Stammtisch 03',sub:'01:12:08 · 1.9 GB',color:'#2a1a3a'},
+  {emoji:'🎞',label:'Aufnahme 04',sub:'45:30 · 1.1 GB',color:'#3a2a1a'},
+  {emoji:'🎬',label:'Aufnahme 05',sub:'01:05:44 · 1.7 GB',color:'#1a3a3a'},
+  {emoji:'🎥',label:'Aufnahme 06',sub:'32:20 · 0.8 GB',color:'#2a1a1a'},
+  {emoji:'⭐',label:'Highlights Reel',sub:'08:14 · 0.2 GB',color:'#1a4731'},
+  {emoji:'🎵',label:'Audio-Mix',sub:'01:24:33 · 48 MB',color:'#3d2b6b'},
+];
+const mb = document.getElementById('mediaBrowser');
+clips.forEach((c,i) => {
+  const d = document.createElement('div');
+  d.className = 'media-thumb' + (i===0?' sel-thumb':'');
+  d.innerHTML = `
+    <div class="thumb-img" style="background:${c.color}">
+      <span style="font-size:32px">${c.emoji}</span>
+      <div class="thumb-dur">${c.sub.split(' · ')[0]}</div>
+      <div class="thumb-scrub-bar" id="scrubBar${i}"></div>
+    </div>
+    <div class="thumb-label">${c.label}</div>
+    <div class="thumb-sub">${c.sub}</div>`;
+
+  // Hover-Scrubbing
+  d.addEventListener('mousemove', e => {
+    const rect = d.querySelector('.thumb-img').getBoundingClientRect();
+    const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    document.getElementById('scrubBar'+i).style.width = (pct*100)+'%';
+    const total = 84 * 60; // ~1:24
+    const sec = Math.round(pct * total);
+    const mm = String(Math.floor(sec/60)).padStart(2,'0');
+    const ss = String(sec%60).padStart(2,'0');
+    const tip = document.getElementById('scrubTip');
+    tip.textContent = `${mm}:${ss}`;
+    tip.style.display = 'block';
+    tip.style.left = (e.clientX+10)+'px';
+    tip.style.top  = (e.clientY-24)+'px';
+  });
+  d.addEventListener('mouseleave', () => {
+    document.getElementById('scrubBar'+i).style.width='0%';
+    document.getElementById('scrubTip').style.display='none';
+  });
+  mb.appendChild(d);
+});
+
+/* ── Timeline Clip Hover-Scrubbing (Screen 3) ── */
+const tip = document.getElementById('scrubTip');
+document.querySelectorAll('.clip').forEach(clip => {
+  clip.addEventListener('mousemove', e => {
+    const rect = clip.getBoundingClientRect();
+    const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    const label = clip.dataset.label || 'Clip';
+    const baseTime = clip.dataset.time || '00:00:00';
+    const [h,m,s] = baseTime.split(':').map(Number);
+    const baseS = h*3600+m*60+s;
+    const durS  = 600 + Math.round(pct * 800);
+    const totalS = baseS + Math.round(pct * durS);
+    const th = String(Math.floor(totalS/3600)).padStart(2,'0');
+    const tm = String(Math.floor((totalS%3600)/60)).padStart(2,'0');
+    const ts = String(totalS%60).padStart(2,'0');
+    tip.textContent = `${label} · ${th}:${tm}:${ts}`;
+    tip.style.display = 'block';
+    tip.style.left = (e.clientX+10)+'px';
+    tip.style.top  = (e.clientY-28)+'px';
+    // Preview aktualisieren
+    document.getElementById('previewLabel').textContent = `▶ ${label}`;
+    document.getElementById('previewTC').textContent = `${th}:${tm}:${ts}`;
+  });
+  clip.addEventListener('mouseleave', () => {
+    tip.style.display = 'none';
+    document.getElementById('previewLabel').textContent = '▶ Stammtisch 01';
+    document.getElementById('previewTC').textContent = '00:12:44';
+  });
+});
+
+/* ── Zeitlineal ── */
+const ruler = document.getElementById('timeRuler');
+const marks = ['00:00','10:00','20:00','30:00','40:00','50:00','01:00:00','01:10:00','01:20:00'];
+marks.forEach(m => {
+  const t = document.createElement('div'); t.className='ruler-tick'; t.textContent=m; ruler.appendChild(t);
+});
+
+/* ── Lila Auswahlbereich Drag ── */
+const sel = document.getElementById('selOverlay');
+const lane = document.getElementById('videoTrack');
+let dragging = null, startX = 0, startLeft = 0, startWidth = 0;
+
+sel.addEventListener('mousedown', e => {
+  if (e.target.classList.contains('sel-handle')) {
+    dragging = e.target.classList.contains('left') ? 'left' : 'right';
+  } else {
+    dragging = 'move';
+  }
+  startX = e.clientX;
+  startLeft  = parseFloat(sel.style.left);
+  startWidth = parseFloat(sel.style.width);
+  e.preventDefault();
+});
+document.addEventListener('mousemove', e => {
+  if (!dragging) return;
+  const laneW = lane.getBoundingClientRect().width;
+  const dx = (e.clientX - startX) / laneW * 100;
+  if (dragging === 'move') {
+    sel.style.left = Math.max(0, Math.min(100-startWidth, startLeft+dx))+'%';
+  } else if (dragging === 'left') {
+    const newL = Math.max(0, Math.min(startLeft+startWidth-5, startLeft+dx));
+    const newW = startLeft+startWidth - newL;
+    sel.style.left = newL+'%'; sel.style.width = newW+'%';
+  } else {
+    sel.style.width = Math.max(5, Math.min(100-startLeft, startWidth+dx))+'%';
+  }
+});
+document.addEventListener('mouseup', () => { dragging = null; });
+</script>
+</body>
+</html>

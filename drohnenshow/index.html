@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Droneshow Mockup Tool – mit Übergängen</title>
+<script src="https://cdn.jsdelivr.net/npm/three@0.158.0/build/three.min.js"></script>
+<style>
+  :root {
+    --bg-main:#1e1f24;--bg-panel:#25262a;--fg:#eee;--accent:#00bfa5;
+  }
+  [data-theme="light"] {
+    --bg-main:#f4f4f6;--bg-panel:#ffffff;--fg:#222;--accent:#00796b;
+  }
+  body{margin:0;font-family:Segoe UI,Arial,sans-serif;background:var(--bg-main);
+       color:var(--fg);overflow:hidden;}
+  header{height:48px;background:var(--bg-panel);display:flex;align-items:center;
+         padding:0 10px;border-bottom:1px solid #444;}
+  header button{margin-right:10px;background:#3a3b41;border:none;color:#fff;
+                padding:6px 12px;border-radius:4px;cursor:pointer;}
+  header button.theme-toggle{margin-left:auto;background:var(--accent);}
+  main{display:grid;grid-template-columns:260px 1fr 300px;
+       grid-template-rows:1fr 140px;
+       grid-template-areas:"sidebar viewer inspector"
+                           "timeline timeline timeline";
+       height:calc(100vh - 48px);}
+  aside#sidebar{grid-area:sidebar;background:var(--bg-panel);}
+  section#viewer{grid-area:viewer;position:relative;background:#000;}
+  aside#inspector{grid-area:inspector;background:var(--bg-panel);
+                  padding:10px;}
+  footer#timeline{grid-area:timeline;background:var(--bg-panel);
+                  padding:10px;border-top:1px solid #444;}
+  select,input{width:100%;margin-bottom:6px;}
+  .viewer-overlay{position:absolute;top:10px;left:10px;background:rgba(0,0,0,0.5);
+    padding:4px 8px;border-radius:4px;font-size:12px;color:#fff;}
+</style>
+</head>
+<body data-theme="dark">
+
+<header>
+  <button>Neu</button><button>Speichern</button>
+  <button class="theme-toggle">🌘 Light/Dark</button>
+</header>
+
+<main>
+  <aside id="sidebar">
+    <h3>Motive</h3>
+    <div>🦋 Schmetterling</div><div>🐘 Elefant</div>
+    <div>🦅 Adler</div><div>🐬 Delfin</div>
+    <div>🐎 Pferd</div>
+  </aside>
+
+  <section id="viewer">
+    <canvas id="canvas3d"></canvas>
+    <div class="viewer-overlay" id="overlayText">Formation: Zufällig</div>
+  </section>
+
+  <aside id="inspector">
+    <h3>Eigenschaften</h3>
+    <label>Formation</label>
+    <select id="formationSelect">
+      <option value="random">Zufällig</option>
+      <option value="butterfly">🦋 Schmetterling</option>
+      <option value="elephant">🐘 Elefant</option>
+      <option value="eagle">🦅 Adler</option>
+      <option value="dolphin">🐬 Delfin</option>
+      <option value="horse">🐎 Pferd</option>
+    </select>
+    <label>Farbe</label>
+    <input type="color" id="colorPicker" value="#00ffff" />
+  </aside>
+
+  <footer id="timeline"><h3>Timeline (Simulation)</h3></footer>
+</main>
+
+<script>
+const canvas=document.getElementById("canvas3d");
+const scene=new THREE.Scene();
+const camera=new THREE.PerspectiveCamera(60,window.innerWidth/(window.innerHeight-140),0.1,1000);
+const renderer=new THREE.WebGLRenderer({canvas,antialias:true});
+renderer.setSize(window.innerWidth-560,window.innerHeight-188);
+renderer.setClearColor(0x000000);
+camera.position.set(0,8,18);
+scene.add(new THREE.AmbientLight(0xffffff,1));
+
+const geo=new THREE.SphereGeometry(0.12,8,8);
+const drones=[]; let targets=[];
+
+// Tierformationen
+const forms={
+butterfly:[{x:-4,y:1,z:0},{x:-3,y:2,z:0},{x:-2,y:3,z:0},{x:-1,y:3.5,z:0},
+ {x:1,y:3.5,z:0},{x:2,y:3,z:0},{x:3,y:2,z:0},{x:4,y:1,z:0},
+ {x:-3,y:-1,z:0},{x:-2,y:-2,z:0},{x:-1,y:-3,z:0},
+ {x:1,y:-3,z:0},{x:2,y:-2,z:0},{x:3,y:-1,z:0},{x:0,y:0,z:0}],
+elephant:[{x:-4,y:1,z:0},{x:-3,y:2,z:0},{x:-2,y:3,z:0},{x:-1,y:3,z:0},
+ {x:1,y:3,z:0},{x:2,y:2,z:0},{x:3,y:1,z:0},{x:-4,y:-1,z:0},{x:-3,y:-2,z:0},
+ {x:-2,y:-2,z:0},{x:-1,y:-1,z:0},{x:0,y:-2,z:0},{x:1,y:-1,z:0},
+ {x:3,y:-3,z:0},{x:4,y:-2,z:0},{x:4,y:-1,z:0}],
+eagle:[{x:-5,y:1,z:0},{x:-4,y:2,z:0},{x:-3,y:3,z:0},{x:-2,y:2.5,z:0},
+ {x:-1,y:2,z:0},{x:0,y:1.5,z:0},{x:1,y:2,z:0},{x:2,y:2.5,z:0},
+ {x:3,y:3,z:0},{x:4,y:2,z:0},{x:5,y:1,z:0},{x:0,y:0,z:0},{x:0,y:-1,z:0}],
+dolphin:[{x:-4,y:0,z:0},{x:-3,y:1,z:0},{x:-2,y:1.5,z:0},{x:-1,y:1.8,z:0},
+ {x:0,y:2,z:0},{x:1,y:1.5,z:0},{x:2,y:0.5,z:0},{x:3,y:-0.5,z:0},
+ {x:4,y:-1,z:0},{x:-1,y:-1,z:0},{x:0,y:-1.5,z:0},{x:1,y:-1,z:0}],
+horse:[{x:-3,y:2,z:0},{x:-2,y:3,z:0},{x:-1,y:3.2,z:0},{x:0,y:3,z:0},
+ {x:1,y:2.5,z:0},{x:-3,y:1,z:0},{x:-2,y:0,z:0},{x:-1,y:-1,z:0},
+ {x:0,y:-1,z:0},{x:1,y:0,z:0},{x:2,y:1,z:0},{x:3,y:1.5,z:0}]
+};
+
+// Setup Start (100 zufällige Drohnen)
+for(let i=0;i<100;i++){
+  const m=new THREE.MeshBasicMaterial({color:0x00ffff});
+  const d=new THREE.Mesh(geo,m);
+  d.position.set((Math.random()-0.5)*20,Math.random()*10,(Math.random()-0.5)*20);
+  drones.push(d);
+  scene.add(d);
+}
+
+// --- Transition Manager ---
+let transition=null;
+function setTargets(arr){
+  const needed=arr.length;
+  targets=[];
+  for(let i=0;i<drones.length;i++){
+    const t=arr[i%needed];
+    targets.push({x:t.x,y:t.y,z:t.z});
+  }
+}
+function startTransition(arr){
+  setTargets(arr);
+  const startPos=drones.map(d=>d.position.clone());
+  const endPos=targets.map(t=>new THREE.Vector3(t.x,t.y,t.z));
+  transition={t:0,startPos,endPos,dur:2}; // 2sec
+}
+
+// --- Auswahl-Events ---
+const formation=document.getElementById("formationSelect");
+const overlay=document.getElementById("overlayText");
+formation.onchange=e=>{
+  const val=e.target.value;
+  overlay.innerText="Formation: "+val;
+  if(val==="random"){
+    const arr=Array.from({length:100},()=>({x:(Math.random()-0.5)*20,
+              y:Math.random()*10,z:(Math.random()-0.5)*20}));
+    startTransition(arr);
+  }else{
+    startTransition(forms[val]);
+  }
+};
+document.getElementById("colorPicker").oninput=e=>{
+  drones.forEach(d=>d.material.color.set(e.target.value));
+};
+
+// --- Animation Loop ---
+let t=0;
+function animate(){
+  requestAnimationFrame(animate);
+  t+=0.016;
+  if(transition){
+    transition.t+=0.016;
+    const k=Math.min(transition.t/transition.dur,1);
+    for(let i=0;i<drones.length;i++){
+      drones[i].position.lerpVectors(
+        transition.startPos[i],
+        transition.endPos[i],
+        k
+      );
+    }
+    if(k>=1) transition=null;
+  }
+  drones.forEach((d,i)=>{d.scale.setScalar(1+Math.sin(t*2+i*0.3)*0.1);});
+  renderer.render(scene,camera);
+}
+animate();
+formation.dispatchEvent(new Event("change"));
+</script>
+</body>
+</html>

@@ -1,0 +1,13 @@
+{
+  "name": "Meine Rezepte",
+  "short_name": "Rezepte",
+  "description": "Digitaler Rezept-Sammelordner mit Kategorien, Fotos und PDF-Export",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#FDFAF5",
+  "theme_color": "#FDFAF5",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

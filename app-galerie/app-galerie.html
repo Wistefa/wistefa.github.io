@@ -1,0 +1,691 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Meine Apps – Wilfried's Werkzeugkiste</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Serif+Display:ital@0;1&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:#f2f2f7; --surface:#fff; --border:rgba(0,0,0,0.08);
+    --text:#1c1c1e; --text2:#6e6e73; --text3:#aeaeb2;
+    --accent:#0071e3; --accent-h:#0077ed;
+    --green:#34c759; --orange:#ff9500; --pink:#ff2d55; --purple:#af52de; --teal:#5ac8fa; --red:#ff3b30;
+    --radius:18px;
+    --sh:0 2px 20px rgba(0,0,0,0.07),0 1px 4px rgba(0,0,0,0.05);
+    --sh-lg:0 8px 40px rgba(0,0,0,0.12),0 2px 8px rgba(0,0,0,0.06);
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{font-family:'DM Sans',-apple-system,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;-webkit-font-smoothing:antialiased;}
+
+  /* HEADER */
+  header{background:rgba(242,242,247,.88);backdrop-filter:saturate(180%) blur(20px);-webkit-backdrop-filter:saturate(180%) blur(20px);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:100;padding:0 24px;}
+  .hi{max-width:1100px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;height:60px;gap:16px;}
+  .brand{display:flex;align-items:center;gap:10px;cursor:pointer;}
+  .logo{width:32px;height:32px;background:linear-gradient(135deg,#0071e3,#5ac8fa);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:17px;}
+  .brand-name{font-size:17px;font-weight:600;letter-spacing:-.3px;}
+  .brand-sub{font-size:12px;color:var(--text2);}
+  .search{flex:1;max-width:280px;position:relative;}
+  .search input{width:100%;background:rgba(0,0,0,.06);border:none;border-radius:12px;padding:8px 14px 8px 34px;font-size:14px;font-family:inherit;color:var(--text);outline:none;transition:background .2s;}
+  .search input:focus{background:rgba(0,0,0,.09);}
+  .search input::placeholder{color:var(--text3);}
+  .si{position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--text3);font-size:13px;pointer-events:none;}
+  .btn-add{display:inline-flex;align-items:center;gap:5px;padding:7px 14px;border-radius:20px;font-size:13px;font-weight:600;border:none;cursor:pointer;font-family:inherit;background:rgba(0,0,0,.06);color:var(--text);transition:all .2s;}
+  .btn-add:hover{background:rgba(0,0,0,.1);}
+
+  /* iCLOUD BAR */
+  .ibar{background:var(--surface);border-bottom:1px solid var(--border);padding:9px 24px;}
+  .ibar-in{max-width:1100px;margin:0 auto;display:flex;align-items:center;gap:9px;flex-wrap:wrap;}
+  .ilabel{font-size:13px;color:var(--text2);font-weight:500;display:flex;align-items:center;gap:5px;}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--green);display:inline-block;flex-shrink:0;}
+  .dot.unsaved{background:var(--orange);}
+  .ibtn{display:inline-flex;align-items:center;gap:5px;padding:6px 13px;border-radius:20px;font-size:12px;font-weight:600;border:none;cursor:pointer;font-family:inherit;transition:all .2s;}
+  .ibtn.save{background:rgba(0,113,227,.1);color:var(--accent);}
+  .ibtn.save:hover{background:rgba(0,113,227,.18);}
+  .ibtn.load{background:rgba(52,199,89,.1);color:var(--green);}
+  .ibtn.load:hover{background:rgba(52,199,89,.18);}
+  .ihint{font-size:11px;color:var(--text3);margin-left:auto;}
+  #fi{display:none;}
+
+  /* HERO */
+  .hero{max-width:1100px;margin:0 auto;padding:32px 24px 20px;}
+  .hf{background:linear-gradient(135deg,#1a1a2e 0%,#16213e 50%,#0f3460 100%);border-radius:24px;padding:44px 48px;display:flex;align-items:center;justify-content:space-between;gap:32px;overflow:hidden;position:relative;box-shadow:var(--sh-lg);cursor:pointer;transition:transform .3s,box-shadow .3s;}
+  .hf:hover{transform:translateY(-2px);box-shadow:0 16px 60px rgba(0,0,0,.2);}
+  .hf::before{content:'';position:absolute;top:-60px;right:-60px;width:300px;height:300px;background:radial-gradient(circle,rgba(0,113,227,.35) 0%,transparent 70%);pointer-events:none;}
+  .hf::after{content:'';position:absolute;bottom:-80px;left:100px;width:250px;height:250px;background:radial-gradient(circle,rgba(90,200,250,.2) 0%,transparent 70%);pointer-events:none;}
+  .ht{position:relative;z-index:1;}
+  .heyebrow{font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--teal);margin-bottom:10px;}
+  .hname{font-family:'DM Serif Display',serif;font-size:34px;line-height:1.1;color:#fff;margin-bottom:11px;letter-spacing:-.5px;}
+  .hname em{font-style:italic;color:var(--teal);}
+  .hdesc{font-size:14px;line-height:1.6;color:rgba(255,255,255,.65);max-width:380px;margin-bottom:22px;}
+  .btn-p{display:inline-flex;align-items:center;gap:6px;background:var(--accent);color:#fff;padding:10px 20px;border-radius:30px;font-size:13px;font-weight:600;text-decoration:none;border:none;cursor:pointer;transition:background .2s,transform .15s;font-family:inherit;}
+  .btn-p:hover{background:var(--accent-h);transform:scale(1.02);}
+  .hmock{position:relative;z-index:1;flex-shrink:0;}
+  .hicon{width:108px;height:108px;border-radius:26px;display:flex;align-items:center;justify-content:center;font-size:50px;box-shadow:0 20px 60px rgba(0,113,227,.5);}
+
+  /* TABS */
+  .tabs-wrap{max-width:1100px;margin:0 auto;padding:28px 24px 0;}
+  .tabs{display:flex;gap:4px;border-bottom:1px solid var(--border);}
+  .tab{padding:10px 18px;font-size:14px;font-weight:500;color:var(--text2);cursor:pointer;border:none;background:none;font-family:inherit;border-bottom:2px solid transparent;margin-bottom:-1px;transition:color .2s;}
+  .tab:hover{color:var(--text);}
+  .tab.active{color:var(--accent);border-bottom-color:var(--accent);font-weight:600;}
+
+  /* SECTION */
+  .sec{max-width:1100px;margin:0 auto;padding:28px 24px;}
+  .sec-h{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:18px;}
+  .sec-t{font-size:21px;font-weight:700;letter-spacing:-.3px;}
+  .tc{display:none;}
+  .tc.active{display:block;}
+
+  /* CATS */
+  .cats{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;margin-bottom:20px;scrollbar-width:none;}
+  .cats::-webkit-scrollbar{display:none;}
+  .cp{background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:6px 14px;font-size:13px;font-weight:500;color:var(--text2);cursor:pointer;white-space:nowrap;transition:all .2s;box-shadow:0 1px 4px rgba(0,0,0,.05);}
+  .cp:hover,.cp.active{background:var(--accent);color:#fff;border-color:var(--accent);}
+
+  /* APP GRID */
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;}
+  .card{background:var(--surface);border-radius:var(--radius);padding:18px;box-shadow:var(--sh);border:1px solid var(--border);transition:transform .25s,box-shadow .25s;position:relative;animation:fu .35s ease both;}
+  .card:nth-child(2){animation-delay:.05s}.card:nth-child(3){animation-delay:.1s}.card:nth-child(4){animation-delay:.15s}.card:nth-child(5){animation-delay:.2s}
+  .card:hover{transform:translateY(-3px);box-shadow:var(--sh-lg);}
+  .card-hdr{display:flex;align-items:flex-start;gap:12px;margin-bottom:12px;}
+  .aicon{width:58px;height:58px;border-radius:13px;display:flex;align-items:center;justify-content:center;font-size:27px;flex-shrink:0;box-shadow:0 4px 12px rgba(0,0,0,.1);}
+  .ameta{flex:1;min-width:0;}
+  .aname{font-size:15px;font-weight:700;letter-spacing:-.2px;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .acat{font-size:12px;color:var(--text2);font-weight:500;margin-bottom:5px;}
+  .stars{display:flex;align-items:center;gap:3px;font-size:11px;color:var(--orange);}
+  .stars span{color:var(--text2);margin-left:3px;}
+  .adesc{font-size:13px;line-height:1.55;color:var(--text2);margin-bottom:14px;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;}
+  .afooter{display:flex;align-items:center;justify-content:space-between;padding-top:12px;border-top:1px solid var(--border);}
+  .tags{display:flex;gap:5px;flex-wrap:wrap;}
+  .tag{font-size:11px;font-weight:600;padding:3px 8px;border-radius:20px;background:var(--bg);color:var(--text2);}
+  .btn-get{background:var(--bg);color:var(--accent);border:none;border-radius:20px;padding:6px 16px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;transition:background .2s;flex-shrink:0;}
+  .btn-get:hover{background:rgba(0,113,227,.1);}
+  .card-url{display:block;font-size:11px;color:var(--text3);text-decoration:none;margin-top:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transition:color .2s;}
+  .card-url:hover{color:var(--accent);}
+  .ca{position:absolute;top:11px;right:11px;display:none;gap:5px;}
+  .card:hover .ca{display:flex;}
+  .cb{width:26px;height:26px;border-radius:7px;border:none;cursor:pointer;font-size:12px;display:flex;align-items:center;justify-content:center;}
+  .cb.e{background:rgba(0,113,227,.12);color:var(--accent);}
+  .cb.d{background:rgba(255,59,48,.1);color:var(--red);}
+
+  /* UPDATES */
+  .ul-wrap{background:var(--surface);border-radius:var(--radius);padding:4px 20px;box-shadow:var(--sh);border:1px solid var(--border);}
+  .ul-item{display:flex;align-items:center;gap:14px;padding:14px 0;border-bottom:1px solid var(--border);}
+  .ul-item:last-child{border-bottom:none;}
+  .ul-icon{width:50px;height:50px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0;}
+  .ul-meta{flex:1;min-width:0;}
+  .ul-name{font-size:14px;font-weight:600;}
+  .ul-ver{font-size:12px;color:var(--text2);margin-top:2px;}
+  .ul-date{font-size:11px;color:var(--text3);}
+  .btn-upd{background:var(--bg);color:var(--accent);border:none;border-radius:20px;padding:5px 13px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;margin-top:4px;}
+
+  /* MODALS */
+  .mo{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);backdrop-filter:blur(10px);z-index:999;align-items:center;justify-content:center;padding:20px;}
+  .mo.open{display:flex;}
+  .mb{background:var(--surface);border-radius:24px;padding:32px 28px;max-width:480px;width:100%;box-shadow:0 30px 80px rgba(0,0,0,.3);max-height:90vh;overflow-y:auto;}
+  .mt{font-size:19px;font-weight:700;margin-bottom:18px;letter-spacing:-.3px;}
+
+  /* FORM */
+  .fr{margin-bottom:14px;}
+  .fl{font-size:11px;font-weight:700;color:var(--text2);margin-bottom:5px;display:block;text-transform:uppercase;letter-spacing:.5px;}
+  .fi,.fta,.fsel{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:11px;padding:9px 13px;font-size:14px;font-family:inherit;color:var(--text);outline:none;transition:border .2s;}
+  .fi:focus,.fta:focus,.fsel:focus{border-color:var(--accent);background:#fff;}
+  .fta{min-height:76px;resize:vertical;}
+  .fsel{cursor:pointer;}
+  .fr2{display:grid;grid-template-columns:1fr 1fr;gap:11px;margin-bottom:14px;}
+  .factions{display:flex;gap:9px;justify-content:flex-end;padding-top:6px;}
+  .btn-cancel{background:var(--bg);border:none;border-radius:20px;padding:10px 18px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;color:var(--text);}
+  .btn-sf{background:var(--accent);color:#fff;border:none;border-radius:20px;padding:10px 20px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;transition:background .2s;}
+  .btn-sf:hover{background:var(--accent-h);}
+
+  /* COLOR SWATCHES */
+  .swatches{display:flex;gap:8px;flex-wrap:wrap;margin-top:2px;}
+  .sw{width:28px;height:28px;border-radius:8px;cursor:pointer;border:2px solid transparent;transition:transform .2s,border .2s;flex-shrink:0;}
+  .sw.sel{border-color:var(--accent);transform:scale(1.2);}
+
+  /* HOWTO */
+  .hs{background:var(--bg);border-radius:13px;padding:14px;margin-bottom:11px;}
+  .hn{font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px;}
+  .ht2{font-size:14px;line-height:1.5;}
+  .ht2 code{background:rgba(0,113,227,.1);color:var(--accent);padding:1px 5px;border-radius:5px;font-size:13px;}
+
+  /* TOAST */
+  #toast{position:fixed;bottom:32px;left:50%;transform:translateX(-50%) translateY(16px);background:#1c1c1e;color:#fff;padding:11px 20px;border-radius:30px;font-size:14px;font-weight:500;opacity:0;transition:all .3s;z-index:9999;pointer-events:none;white-space:nowrap;}
+  #toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+
+  /* EMPTY */
+  .empty{text-align:center;padding:60px 20px;color:var(--text2);}
+  .empty .e{font-size:44px;margin-bottom:10px;}
+
+  footer{text-align:center;padding:32px 24px;color:var(--text3);font-size:13px;border-top:1px solid var(--border);margin-top:8px;}
+  footer a{color:var(--accent);text-decoration:none;}
+
+  @keyframes fu{from{opacity:0;transform:translateY(13px);}to{opacity:1;transform:translateY(0);}}
+  @media(max-width:700px){.hf{flex-direction:column;padding:28px 22px;}.hmock{display:none;}.hname{font-size:26px;}.grid{grid-template-columns:1fr;}.ihint{display:none;}.fr2{grid-template-columns:1fr;}}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="hi">
+    <div class="brand" onclick="switchTab('entdecken',document.querySelector('.tab'))">
+      <div class="logo">🛠️</div>
+      <div><div class="brand-name">Wilfried's Apps</div><div class="brand-sub">Persönliche App-Galerie</div></div>
+    </div>
+    <div class="search"><span class="si">🔍</span><input type="text" placeholder="Suchen…" oninput="filterApps(this.value)"></div>
+    <button class="btn-add" onclick="openEditor(null)">＋ App</button>
+  </div>
+</header>
+
+<div class="ibar">
+  <div class="ibar-in">
+    <span class="ilabel"><span class="dot unsaved" id="sdot"></span>☁️ iCloud</span>
+    <button class="ibtn save" onclick="doExport()">⬆ In iCloud sichern</button>
+    <button class="ibtn load" onclick="document.getElementById('fi').click()">⬇ Aus iCloud laden</button>
+    <input type="file" id="fi" accept=".json" onchange="doImport(event)">
+    <span class="ihint" id="shint">Noch nicht gespeichert</span>
+  </div>
+</div>
+
+<div class="hero">
+  <div class="hf" id="hf">
+    <div class="ht">
+      <div class="heyebrow">⭐ App des Tages</div>
+      <div class="hname" id="hname">Willkommen bei <em>deinen Apps</em></div>
+      <div class="hdesc" id="hdesc">Füge Apps hinzu oder lade deine iCloud-Sicherung – dann erscheinen sie hier automatisch.</div>
+      <button class="btn-p" onclick="openEditor(null)">＋ Erste App hinzufügen</button>
+    </div>
+    <div class="hmock"><div class="hicon" id="hicon" style="background:linear-gradient(135deg,#0071e3,#5ac8fa)">🛠️</div></div>
+  </div>
+</div>
+
+<div class="tabs-wrap">
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('entdecken',this)">Entdecken</button>
+    <button class="tab" onclick="switchTab('verein',this)">Vereins-Apps</button>
+    <button class="tab" onclick="switchTab('privat',this)">Privat</button>
+    <button class="tab" onclick="switchTab('updates',this)">Updates</button>
+  </div>
+</div>
+
+<div id="tab-entdecken" class="tc active">
+  <div class="sec">
+    <div class="cats" role="group" aria-label="Kategorien filtern">
+      <button class="cp active" onclick="filterCat('alle',this)">Alle</button>
+      <button class="cp" onclick="filterCat('verein',this)">⚽ Verein</button>
+      <button class="cp" onclick="filterCat('finanzen',this)">💰 Finanzen</button>
+      <button class="cp" onclick="filterCat('reise',this)">✈️ Reise</button>
+      <button class="cp" onclick="filterCat('hobby',this)">🎯 Hobby</button>
+      <button class="cp" onclick="filterCat('tools',this)">🔧 Tools</button>
+    </div>
+    <div class="sec-h">
+      <div class="sec-t">Alle Apps</div>
+      <span style="font-size:13px;color:var(--text2)" id="acount"></span>
+    </div>
+    <div class="grid" id="grid-all"></div>
+  </div>
+</div>
+
+<div id="tab-verein" class="tc">
+  <div class="sec">
+    <div class="sec-h"><div class="sec-t">⚽ Vereins-Apps</div></div>
+    <div class="grid" id="grid-verein"></div>
+  </div>
+</div>
+
+<div id="tab-privat" class="tc">
+  <div class="sec">
+    <div class="sec-h"><div class="sec-t">🔒 Private Apps</div></div>
+    <div class="grid" id="grid-privat"></div>
+  </div>
+</div>
+
+<div id="tab-updates" class="tc">
+  <div class="sec">
+    <div class="sec-h"><div class="sec-t">Updates</div></div>
+    <div class="ul-wrap"><div id="ulist"></div></div>
+  </div>
+</div>
+
+<footer>Gemacht mit ❤️ von Wilfried &nbsp;·&nbsp; <a href="#" onclick="openHowto();return false">☁️ iCloud-Anleitung</a></footer>
+
+<!-- EDITOR MODAL -->
+<div class="mo" id="modal-ed" role="dialog" aria-modal="true" aria-labelledby="ed-title">
+  <div class="mb">
+    <div class="mt" id="ed-title">Neue App</div>
+    <input type="hidden" id="eid">
+    <div class="fr"><label class="fl">App-Name *</label><input class="fi" id="fn" placeholder="z.B. Gastessen-Abrechnung"></div>
+    <div class="fr2">
+      <div><label class="fl">Emoji-Icon</label><input class="fi" id="fic" placeholder="🎾" maxlength="4"></div>
+      <div><label class="fl">Kategorie</label>
+        <select class="fsel" id="fcat">
+          <option value="verein">⚽ Verein</option>
+          <option value="finanzen">💰 Finanzen</option>
+          <option value="reise">✈️ Reise</option>
+          <option value="hobby">🎯 Hobby</option>
+          <option value="tools">🔧 Tools</option>
+        </select>
+      </div>
+    </div>
+    <div class="fr">
+      <label class="fl">Icon-Farbe</label>
+      <div class="swatches" id="swatches"></div>
+      <input type="hidden" id="fcol">
+    </div>
+    <div class="fr"><label class="fl">Beschreibung</label><textarea class="fta" id="fdesc" placeholder="Was macht die App?"></textarea></div>
+    <div class="fr2">
+      <div><label class="fl">Version</label><input class="fi" id="fver" placeholder="1.0.0"></div>
+      <div><label class="fl">Bewertung (1–5)</label><input class="fi" id="frat" type="number" min="1" max="5" step="0.5" placeholder="5"></div>
+    </div>
+    <div class="fr"><label class="fl">Tags (kommagetrennt)</label><input class="fi" id="ftags" placeholder="React, iPad, PDF"></div>
+    <div class="fr"><label class="fl">Download-Link</label><input class="fi" id="furl" type="url" placeholder="https://…"></div>
+    <div class="fr"><label class="fl">Änderungshinweis</label><input class="fi" id="flog" placeholder="z.B. Bug-Fixes, neues Design"></div>
+    <div class="fr"><label class="fl">Sichtbarkeit</label>
+      <select class="fsel" id="fvis">
+        <option value="alle">🌐 Öffentlich</option>
+        <option value="privat">🔒 Nur privat</option>
+      </select>
+    </div>
+    <div class="factions">
+      <button class="btn-cancel" onclick="closeEd()">Abbrechen</button>
+      <button class="btn-sf" onclick="saveApp()">💾 Speichern</button>
+    </div>
+  </div>
+</div>
+
+<!-- DOWNLOAD MODAL -->
+<div class="mo" id="modal-dl" role="dialog" aria-modal="true" aria-labelledby="dl-nm">
+  <div class="mb" style="text-align:center;">
+    <div style="font-size:52px;margin-bottom:11px" id="dl-ic"></div>
+    <div style="font-size:19px;font-weight:700;margin-bottom:4px" id="dl-nm"></div>
+    <div style="font-size:12px;color:var(--text2);margin-bottom:6px" id="dl-vr"></div>
+    <div style="font-size:13px;color:var(--text2);margin-bottom:26px;line-height:1.5" id="dl-ds"></div>
+    <div style="display:flex;gap:9px;justify-content:center;flex-wrap:wrap">
+      <a id="dl-lk" href="#" class="btn-p" target="_blank">⬇ App öffnen</a>
+      <button onclick="closeDl()" style="background:var(--bg);border:none;padding:10px 18px;border-radius:30px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;">Schließen</button>
+    </div>
+  </div>
+</div>
+
+<!-- HOWTO MODAL -->
+<div class="mo" id="modal-hw" role="dialog" aria-modal="true" aria-label="iCloud-Synchronisation">
+  <div class="mb">
+    <div style="font-size:48px;text-align:center;margin-bottom:10px">☁️</div>
+    <div class="mt" style="text-align:center">iCloud-Synchronisation</div>
+    <div class="hs"><div class="hn">Schritt 1 – Speichern</div><div class="ht2">Klicke auf <strong>„⬆ In iCloud sichern"</strong>. Die Datei <code>meine-apps.json</code> wird heruntergeladen.</div></div>
+    <div class="hs"><div class="hn">Schritt 2 – In iCloud ablegen</div><div class="ht2">Mac: Datei in <code>iCloud Drive → Dokumente</code> verschieben.<br>iPhone/iPad: In der <strong>Dateien-App</strong> → iCloud Drive ablegen.</div></div>
+    <div class="hs"><div class="hn">Schritt 3 – Auf anderem Gerät laden</div><div class="ht2">Klicke auf <strong>„⬇ Aus iCloud laden"</strong> und wähle <code>meine-apps.json</code> aus iCloud Drive.</div></div>
+    <div class="hs"><div class="hn">Tipp – HTML ebenfalls sichern</div><div class="ht2">Speichere diese HTML-Datei ebenfalls in iCloud Drive – so ist die gesamte Galerie auf allen Geräten verfügbar.</div></div>
+    <div style="display:flex;justify-content:center;margin-top:16px"><button class="btn-cancel" onclick="closeHw()">Schließen</button></div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ── UTILS ─────────────────────────────
+function esc(s) {
+  return String(s)
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;')
+    .replace(/'/g,'&#39;');
+}
+
+function safeUrl(u) {
+  return /^https?:\/\//i.test(u) ? u : '#';
+}
+
+// ── DATA ──────────────────────────────
+let apps = [
+  {id:2,name:"Münzsammlung",icon:"🪙",color:"linear-gradient(135deg,#ff9500,#ffcc00)",cat:"hobby",desc:"Verwalte deine Münzsammlung digital. Erfasse Münzen mit Jahrgang, Zustand, Wert und Foto. CSV-Export (UTF-8 BOM) für Excel-Kompatibilität inklusive.",version:"2.1.0",rating:5,tags:["PWA","CSV","Foto"],url:"https://sw-muenzsammlung.netlify.app",changelog:"Neue Filterfunktionen, Fotovorschau",visibility:"privat",updatedAt:"2026-03-07"},
+  {id:3,name:"Reiseplaner",icon:"✈️",color:"linear-gradient(135deg,#34c759,#30d158)",cat:"reise",desc:"Mobiler Reiseplaner im Tripsy-Stil. Plane Reisen mit Zeitleiste, verwalte Dokumente und greife offline auf deine Itineraries zu.",version:"1.1.0",rating:4.5,tags:["PWA","Offline","iOS"],url:"https://sw-reiseplaner.netlify.app",changelog:"Offline-Modus verbessert",visibility:"privat",updatedAt:"2026-03-01"},
+  {id:4,name:"Vermögensübersicht",icon:"📈",color:"linear-gradient(135deg,#af52de,#ff2d55)",cat:"finanzen",desc:"Behalte dein Portfolio im Blick. Aktien, Fonds, Immobilien und Edelmetalle übersichtlich in einem Dashboard – inkl. Gewinn/Verlust-Berechnung.",version:"1.0.2",rating:4.3,tags:["React","Charts","Mac"],url:"https://sw-vermoegen.netlify.app",changelog:"Performance-Verbesserungen",visibility:"privat",updatedAt:"2026-02-20"},
+  {id:6,name:"Spesenabrechnung",icon:"🧾",color:"linear-gradient(135deg,#5ac8fa,#007aff)",cat:"tools",desc:"Einfache Spesenverwaltung für Vereins- und Privatausgaben. Foto-Upload von Belegen, Kategorisierung und Export als PDF oder Excel.",version:"1.0.0",rating:4.2,tags:["PWA","Foto","PDF","CSV"],url:"https://sw-spesenabrechnung.netlify.app",changelog:"",visibility:"alle",updatedAt:"2026-03-15"},
+  {id:7,name:"Reisetagebuch",icon:"📔",color:"linear-gradient(135deg,#ff9500,#ffcc00)",cat:"reise",desc:"Persönliches Reisetagebuch mit Fotos, Karte und PDF-Export. Inspiriert von Apple Journal – optimiert für iPhone und iPad.",version:"1.0.0",rating:5,tags:["PWA","Fotos","PDF"],url:"https://sw-reisetagebuch.netlify.app",changelog:"",visibility:"privat",updatedAt:"2026-03-15"},
+  {id:8,name:"Meine Rezepte",icon:"🍳",color:"linear-gradient(135deg,#ff3b30,#ff9500)",cat:"hobby",desc:"Digitaler Rezept-Sammelordner mit Kategorien, Fotos und PDF-Export. Alle Lieblingsrezepte immer griffbereit.",version:"1.0.0",rating:4.8,tags:["PWA","Offline","Fotos"],url:"https://sw-rezepte.netlify.app",changelog:"",visibility:"privat",updatedAt:"2026-03-15"},
+  {id:9,name:"Freelancer CRM",icon:"💼",color:"linear-gradient(135deg,#636366,#1c1c1e)",cat:"tools",desc:"Einfaches CRM für Freelancer – Kunden, Projekte und Rechnungen verwalten. Alles lokal im Browser, kein Server nötig.",version:"1.0.0",rating:4.5,tags:["PWA","CRM","Rechnung"],url:"https://sw-freelancer-crm.netlify.app",changelog:"",visibility:"privat",updatedAt:"2026-03-15"},
+  {id:10,name:"Versicherungsübersicht",icon:"🛡️",color:"linear-gradient(135deg,#0071e3,#30d158)",cat:"finanzen",desc:"Alle Versicherungsverträge im Überblick. PIN-Schutz, 16 Kategorien, Prämienberechnung, Ablaufwarnung und Export als CSV, PDF oder JSON.",version:"1.0.0",rating:4.8,tags:["PWA","PIN","PDF","CSV"],url:"https://sw-versicherungen.netlify.app",changelog:"",visibility:"privat",updatedAt:"2026-03-15"},
+  {id:11,name:"Haushaltsbuch",icon:"📒",color:"linear-gradient(135deg,#34c759,#30d158)",cat:"finanzen",desc:"Tägliche Ein- und Ausgaben verwalten. Übersichtliche Haushaltsverwaltung mit Kategorien, Monatsübersicht und Export.",version:"1.0.0",rating:4.5,tags:["PWA","Budget","Ausgaben"],url:"https://sw-haushaltsbuch.netlify.app",changelog:"Erstveröffentlichung",visibility:"privat",updatedAt:"2026-03-16"}
+];
+
+const GRADS = [
+  "linear-gradient(135deg,#0071e3,#5ac8fa)",
+  "linear-gradient(135deg,#ff9500,#ffcc00)",
+  "linear-gradient(135deg,#34c759,#30d158)",
+  "linear-gradient(135deg,#ff2d55,#ff6b6b)",
+  "linear-gradient(135deg,#af52de,#ff2d55)",
+  "linear-gradient(135deg,#5ac8fa,#007aff)",
+  "linear-gradient(135deg,#ff3b30,#ff9500)",
+  "linear-gradient(135deg,#636366,#1c1c1e)"
+];
+
+let selColor = GRADS[0];
+let savedAt = null;
+let curCat = 'alle';
+
+// ── localStorage ──────────────────────
+const STORAGE_KEY = 'kvu-apps';
+const DEFAULT_IDS = apps.map(a => a.id);
+
+(function loadFromStorage() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed.apps)) {
+        apps = parsed.apps.filter(a => ![1,5].includes(a.id));
+        if (parsed.savedAt) savedAt = new Date(parsed.savedAt);
+        // Default-Apps: neue ergänzen + URLs bei bestehenden nachrüsten
+        const storedIds = new Set(apps.map(a => a.id));
+        const defaultApps = [
+  {id:2,name:"Münzsammlung",icon:"🪙",color:"linear-gradient(135deg,#ff9500,#ffcc00)",cat:"hobby",desc:"Verwalte deine Münzsammlung digital. Erfasse Münzen mit Jahrgang, Zustand, Wert und Foto. CSV-Export (UTF-8 BOM) für Excel-Kompatibilität inklusive.",version:"2.1.0",rating:5,tags:["PWA","CSV","Foto"],url:"https://sw-muenzsammlung.netlify.app",changelog:"Neue Filterfunktionen, Fotovorschau",visibility:"privat",updatedAt:"2026-03-07"},
+  {id:3,name:"Reiseplaner",icon:"✈️",color:"linear-gradient(135deg,#34c759,#30d158)",cat:"reise",desc:"Mobiler Reiseplaner im Tripsy-Stil. Plane Reisen mit Zeitleiste, verwalte Dokumente und greife offline auf deine Itineraries zu.",version:"1.1.0",rating:4.5,tags:["PWA","Offline","iOS"],url:"https://sw-reiseplaner.netlify.app",changelog:"Offline-Modus verbessert",visibility:"privat",updatedAt:"2026-03-01"},
+  {id:4,name:"Vermögensübersicht",icon:"📈",color:"linear-gradient(135deg,#af52de,#ff2d55)",cat:"finanzen",desc:"Behalte dein Portfolio im Blick. Aktien, Fonds, Immobilien und Edelmetalle übersichtlich in einem Dashboard – inkl. Gewinn/Verlust-Berechnung.",version:"1.0.2",rating:4.3,tags:["React","Charts","Mac"],url:"https://sw-vermoegen.netlify.app",changelog:"Performance-Verbesserungen",visibility:"privat",updatedAt:"2026-02-20"},
+  {id:6,name:"Spesenabrechnung",icon:"🧾",color:"linear-gradient(135deg,#5ac8fa,#007aff)",cat:"tools",desc:"Einfache Spesenverwaltung für Vereins- und Privatausgaben. Foto-Upload von Belegen, Kategorisierung und Export als PDF oder Excel.",version:"1.0.0",rating:4.2,tags:["PWA","Foto","PDF","CSV"],url:"https://sw-spesenabrechnung.netlify.app",changelog:"",visibility:"alle",updatedAt:"2026-03-15"},
+  {id:7,name:"Reisetagebuch",icon:"📔",color:"linear-gradient(135deg,#ff9500,#ffcc00)",cat:"reise",desc:"Persönliches Reisetagebuch mit Fotos, Karte und PDF-Export. Inspiriert von Apple Journal – optimiert für iPhone und iPad.",version:"1.0.0",rating:5,tags:["PWA","Fotos","PDF"],url:"https://sw-reisetagebuch.netlify.app",changelog:"",visibility:"privat",updatedAt:"2026-03-15"},
+  {id:8,name:"Meine Rezepte",icon:"🍳",color:"linear-gradient(135deg,#ff3b30,#ff9500)",cat:"hobby",desc:"Digitaler Rezept-Sammelordner mit Kategorien, Fotos und PDF-Export. Alle Lieblingsrezepte immer griffbereit.",version:"1.0.0",rating:4.8,tags:["PWA","Offline","Fotos"],url:"https://sw-rezepte.netlify.app",changelog:"",visibility:"privat",updatedAt:"2026-03-15"},
+  {id:9,name:"Freelancer CRM",icon:"💼",color:"linear-gradient(135deg,#636366,#1c1c1e)",cat:"tools",desc:"Einfaches CRM für Freelancer – Kunden, Projekte und Rechnungen verwalten. Alles lokal im Browser, kein Server nötig.",version:"1.0.0",rating:4.5,tags:["PWA","CRM","Rechnung"],url:"https://sw-freelancer-crm.netlify.app",changelog:"",visibility:"privat",updatedAt:"2026-03-15"},
+  {id:10,name:"Versicherungsübersicht",icon:"🛡️",color:"linear-gradient(135deg,#0071e3,#30d158)",cat:"finanzen",desc:"Alle Versicherungsverträge im Überblick. PIN-Schutz, 16 Kategorien, Prämienberechnung, Ablaufwarnung und Export als CSV, PDF oder JSON.",version:"1.0.0",rating:4.8,tags:["PWA","PIN","PDF","CSV"],url:"https://sw-versicherungen.netlify.app",changelog:"",visibility:"privat",updatedAt:"2026-03-15"},
+  {id:11,name:"Haushaltsbuch",icon:"📒",color:"linear-gradient(135deg,#34c759,#30d158)",cat:"finanzen",desc:"Tägliche Ein- und Ausgaben verwalten. Übersichtliche Haushaltsverwaltung mit Kategorien, Monatsübersicht und Export.",version:"1.0.0",rating:4.5,tags:["PWA","Budget","Ausgaben"],url:"https://sw-haushaltsbuch.netlify.app",changelog:"Erstveröffentlichung",visibility:"privat",updatedAt:"2026-03-16"}
+        ];
+        defaultApps.forEach(d => {
+          if (!storedIds.has(d.id)) {
+            apps.push(d); // neue App ergänzen
+          } else if (d.url) {
+            // URL nachrüsten falls im localStorage noch leer
+            const existing = apps.find(a => a.id === d.id);
+            if (existing && !existing.url) existing.url = d.url;
+          }
+        });
+      }
+    }
+  } catch(e) { /* korrupte Daten ignorieren */ }
+})();
+
+function persistToStorage() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ apps, savedAt: savedAt ? savedAt.toISOString() : null }));
+  } catch(e) {}
+}
+
+// ── RENDER ─────────────────────────────
+function render(catFilter) {
+  const cf = catFilter || curCat;
+  const filtered = cf === 'alle' ? apps : apps.filter(a => a.cat === cf);
+  renderGrid('grid-all', filtered);
+  renderGrid('grid-verein', apps.filter(a => a.cat === 'verein'));
+  renderGrid('grid-privat', apps.filter(a => a.visibility === 'privat'));
+  renderUpdates();
+  updateHero();
+  document.getElementById('acount').textContent = filtered.length + ' Apps';
+  persistToStorage();
+}
+
+function renderGrid(id, list) {
+  const g = document.getElementById(id);
+  if (!list.length) { g.innerHTML = '<div class="empty"><div class="e">📭</div><p>Keine Apps in dieser Kategorie.</p></div>'; return; }
+  g.innerHTML = list.map(cardHTML).join('');
+}
+
+function cardHTML(a) {
+  const s = starsHTML(a.rating);
+  const t = (a.tags||[]).map(x=>`<span class="tag">${esc(x)}</span>`).join('');
+  return `<div class="card" data-id="${a.id}">
+    <div class="ca">
+      <button class="cb e" onclick="openEditor(${a.id})" title="Bearbeiten">✏️</button>
+      <button class="cb d" onclick="delApp(${a.id})" title="Löschen">🗑</button>
+    </div>
+    <div class="card-hdr">
+      <div class="aicon" style="background:${esc(a.color)}">${esc(a.icon)}</div>
+      <div class="ameta">
+        <div class="aname">${esc(a.name)}</div>
+        <div class="acat">${esc(catLabel(a.cat))}</div>
+        <div class="stars">${s} <span>${esc(String(a.rating))}</span></div>
+      </div>
+    </div>
+    <div class="adesc">${esc(a.desc)}</div>
+    ${a.url ? `<a class="card-url" href="${safeUrl(a.url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">🔗 ${esc(a.url.replace('https://',''))}</a>` : ''}
+    <div class="afooter">
+      <div class="tags">${t}</div>
+      <button class="btn-get" onclick="openDl(${a.id})">Laden</button>
+    </div>
+  </div>`;
+}
+
+function starsHTML(r) {
+  let s='';
+  for(let i=1;i<=5;i++) s += i<=Math.floor(r)?'★':(r-Math.floor(r)>=.5&&i===Math.ceil(r)?'½':'☆');
+  return s;
+}
+
+function catLabel(c) {
+  return {verein:'Vereinsverwaltung',finanzen:'Finanzen & Investitionen',reise:'Reise & Navigation',hobby:'Hobby & Sammeln',tools:'Tools & Produktivität'}[c]||c;
+}
+
+function renderUpdates() {
+  const list = [...apps].filter(a=>a.changelog).sort((a,b)=>new Date(b.updatedAt)-new Date(a.updatedAt));
+  const el = document.getElementById('ulist');
+  if (!list.length) { el.innerHTML='<div class="empty" style="padding:28px 0"><p>Keine Updates vorhanden.</p></div>'; return; }
+  el.innerHTML = list.map(a=>`
+    <div class="ul-item">
+      <div class="ul-icon" style="background:${esc(a.color)}">${esc(a.icon)}</div>
+      <div class="ul-meta">
+        <div class="ul-name">${esc(a.name)}</div>
+        <div class="ul-ver">Version ${esc(a.version)} &bull; ${esc(a.changelog)}</div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px">
+        <div class="ul-date">${esc(fmtDate(a.updatedAt))}</div>
+        <button class="btn-upd" onclick="openDl(${a.id})">Update</button>
+      </div>
+    </div>`).join('');
+}
+
+function fmtDate(d) {
+  if (!d) return '';
+  const diff = Math.floor((new Date()-new Date(d))/86400000);
+  if (diff===0) return 'heute'; if (diff===1) return 'gestern';
+  if (diff<7) return `vor ${diff} Tagen`; if (diff<14) return 'vor 1 Woche';
+  if (diff<30) return `vor ${Math.floor(diff/7)} Wochen`;
+  return new Date(d).toLocaleDateString('de-DE');
+}
+
+function updateHero() {
+  if (!apps.length) return;
+  const a = [...apps].sort((x,y) => new Date(y.updatedAt) - new Date(x.updatedAt))[0];
+  const parts = a.name.match(/^(\S+)\s(.+)$/);
+  document.getElementById('hname').innerHTML = parts
+    ? `${esc(parts[1])} <em>${esc(parts[2])}</em>`
+    : esc(a.name);
+  document.getElementById('hdesc').textContent = a.desc.length > 120 ? a.desc.slice(0,120)+'…' : a.desc;
+  document.getElementById('hicon').textContent = a.icon;
+  document.getElementById('hicon').style.background = a.color;
+  document.getElementById('hf').onclick = () => openDl(a.id);
+}
+
+// ── FILTER ─────────────────────────────
+function filterCat(cat, el) {
+  curCat = cat;
+  document.querySelectorAll('.cp').forEach(p=>p.classList.remove('active'));
+  el.classList.add('active');
+  const filtered = cat==='alle' ? apps : apps.filter(a=>a.cat===cat);
+  renderGrid('grid-all', filtered);
+  document.getElementById('acount').textContent = filtered.length + ' Apps';
+}
+
+function filterApps(q) {
+  const lq = q.toLowerCase();
+  const filtered = apps.filter(a => !lq || a.name.toLowerCase().includes(lq) || a.desc.toLowerCase().includes(lq));
+  renderGrid('grid-all', filtered);
+  document.getElementById('acount').textContent = filtered.length + ' Apps';
+}
+
+// ── TABS ───────────────────────────────
+function switchTab(id, el) {
+  document.querySelectorAll('.tc').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('tab-'+id).classList.add('active');
+  if (el) el.classList.add('active');
+}
+
+// ── EDITOR ─────────────────────────────
+function buildSwatches(sel) {
+  document.getElementById('swatches').innerHTML = GRADS.map(g =>
+    `<div class="sw${g===sel?' sel':''}" style="background:${g}" data-g="${g}" onclick="pickColor(this)"></div>`
+  ).join('');
+}
+
+function pickColor(el) {
+  selColor = el.dataset.g;
+  document.getElementById('fcol').value = selColor;
+  document.querySelectorAll('.sw').forEach(s=>s.classList.toggle('sel', s.dataset.g===selColor));
+}
+
+function openEditor(id) {
+  selColor = GRADS[0];
+  if (id === null) {
+    document.getElementById('ed-title').textContent = 'Neue App hinzufügen';
+    document.getElementById('eid').value = '';
+    document.getElementById('fn').value = '';
+    document.getElementById('fic').value = '📱';
+    document.getElementById('fcat').value = 'tools';
+    document.getElementById('fdesc').value = '';
+    document.getElementById('fver').value = '1.0.0';
+    document.getElementById('frat').value = '5';
+    document.getElementById('ftags').value = '';
+    document.getElementById('furl').value = '';
+    document.getElementById('flog').value = '';
+    document.getElementById('fvis').value = 'alle';
+  } else {
+    const a = apps.find(x=>x.id===id); if (!a) return;
+    document.getElementById('ed-title').textContent = 'App bearbeiten';
+    document.getElementById('eid').value = a.id;
+    document.getElementById('fn').value = a.name;
+    document.getElementById('fic').value = a.icon;
+    document.getElementById('fcat').value = a.cat;
+    document.getElementById('fdesc').value = a.desc;
+    document.getElementById('fver').value = a.version;
+    document.getElementById('frat').value = a.rating;
+    document.getElementById('ftags').value = (a.tags||[]).join(', ');
+    document.getElementById('furl').value = a.url||'';
+    document.getElementById('flog').value = a.changelog||'';
+    document.getElementById('fvis').value = a.visibility||'alle';
+    selColor = a.color;
+  }
+  document.getElementById('fcol').value = selColor;
+  buildSwatches(selColor);
+  document.getElementById('modal-ed').classList.add('open');
+}
+
+function closeEd() { document.getElementById('modal-ed').classList.remove('open'); }
+
+function saveApp() {
+  const name = document.getElementById('fn').value.trim();
+  if (!name) { showToast('❗ Bitte App-Name eingeben'); return; }
+  const eid = document.getElementById('eid').value;
+  const a = {
+    id: eid ? parseInt(eid) : Date.now(),
+    name, icon: document.getElementById('fic').value||'📱',
+    color: document.getElementById('fcol').value||selColor,
+    cat: document.getElementById('fcat').value,
+    desc: document.getElementById('fdesc').value,
+    version: document.getElementById('fver').value||'1.0.0',
+    rating: parseFloat(document.getElementById('frat').value)||5,
+    tags: document.getElementById('ftags').value.split(',').map(t=>t.trim()).filter(Boolean),
+    url: document.getElementById('furl').value,
+    changelog: document.getElementById('flog').value,
+    visibility: document.getElementById('fvis').value,
+    updatedAt: new Date().toISOString().slice(0,10)
+  };
+  if (eid) { const i=apps.findIndex(x=>x.id===parseInt(eid)); if(i>-1) apps[i]=a; showToast('✅ App aktualisiert'); }
+  else { apps.unshift(a); showToast('✅ App hinzugefügt'); }
+  closeEd();
+  render();
+}
+
+function delApp(id) {
+  if (!confirm('App wirklich löschen?')) return;
+  apps = apps.filter(a=>a.id!==id);
+  showToast('🗑 App gelöscht');
+  render();
+}
+
+// ── DOWNLOAD MODAL ─────────────────────
+function openDl(id) {
+  const a = apps.find(x=>x.id===id); if (!a) return;
+  document.getElementById('dl-ic').textContent = a.icon;
+  document.getElementById('dl-nm').textContent = a.name;
+  document.getElementById('dl-vr').textContent = 'Version '+a.version;
+  document.getElementById('dl-ds').textContent = a.desc.length > 140 ? a.desc.slice(0,140)+'…' : a.desc;
+  const lk = document.getElementById('dl-lk');
+  lk.href = safeUrl(a.url);
+  lk.style.display = a.url ? 'inline-flex' : 'none';
+  document.getElementById('modal-dl').classList.add('open');
+}
+function closeDl() { document.getElementById('modal-dl').classList.remove('open'); }
+
+// ── iCLOUD EXPORT / IMPORT ─────────────
+function doExport() {
+  const data = { version:1, exportedAt:new Date().toISOString(), apps };
+  const blob = new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href=url; a.download='meine-apps.json'; a.click();
+  URL.revokeObjectURL(url);
+  savedAt = new Date();
+  setSaved(true);
+  showToast('☁️ Datei gespeichert – bitte in iCloud Drive ablegen');
+}
+
+function doImport(e) {
+  const file = e.target.files[0]; if (!file) return;
+  const r = new FileReader();
+  r.onload = ev => {
+    try {
+      const d = JSON.parse(ev.target.result);
+      if (!Array.isArray(d.apps)) throw new Error();
+      apps = d.apps;
+      savedAt = new Date(d.exportedAt);
+      setSaved(true);
+      render();
+      showToast(`☁️ ${apps.length} Apps aus iCloud geladen`);
+    } catch { showToast('❗ Ungültige JSON-Datei'); }
+  };
+  r.readAsText(file);
+  e.target.value='';
+}
+
+function setSaved(ok) {
+  document.getElementById('sdot').classList.toggle('unsaved',!ok);
+  document.getElementById('shint').textContent = ok && savedAt
+    ? 'Gesichert: '+savedAt.toLocaleString('de-DE')
+    : 'Ungesicherte Änderungen';
+}
+function markUnsaved() { setSaved(false); }
+
+// ── HOWTO ──────────────────────────────
+function openHowto() { document.getElementById('modal-hw').classList.add('open'); }
+function closeHw() { document.getElementById('modal-hw').classList.remove('open'); }
+
+// Modals schließen: Klick auf Hintergrund oder Escape-Taste
+document.querySelectorAll('.mo').forEach(m=>m.addEventListener('click',e=>{ if(e.target===m) m.classList.remove('open'); }));
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') document.querySelectorAll('.mo.open').forEach(m => m.classList.remove('open'));
+});
+
+// ── TOAST ──────────────────────────────
+let tt;
+function showToast(msg) {
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.classList.add('show');
+  clearTimeout(tt); tt=setTimeout(()=>t.classList.remove('show'),3000);
+}
+
+// ── INIT ───────────────────────────────
+buildSwatches(selColor);
+render();
+</script>
+</body>
+</html>

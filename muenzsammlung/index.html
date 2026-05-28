@@ -1,0 +1,1057 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Münzsammlung</title>
+<link rel="manifest" href="manifest.json">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Münzsammlung">
+<meta name="theme-color" content="#b8860b">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Serif+Display:ital@0;1&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+<script src="https://unpkg.com/jspdf-autotable@3.8.1/dist/jspdf.plugin.autotable.min.js"></script>
+<style>
+:root {
+  --gold:       #b8860b;
+  --gold-l:     #d4a017;
+  --gold-ll:    #f0c040;
+  --gold-bg:    rgba(184,134,11,.1);
+  --bg:         #f5f0e8;
+  --surface:    #fff;
+  --surface2:   #faf7f2;
+  --border:     rgba(0,0,0,.09);
+  --text:       #1a1208;
+  --text2:      #6b5c3e;
+  --text3:      #a89070;
+  --green:      #34c759;
+  --red:        #ff3b30;
+  --blue:       #0071e3;
+  --radius:     16px;
+  --sh:         0 2px 16px rgba(0,0,0,.07),0 1px 4px rgba(0,0,0,.04);
+  --sh-lg:      0 8px 40px rgba(0,0,0,.13),0 2px 8px rgba(0,0,0,.06);
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'DM Sans',-apple-system,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;-webkit-font-smoothing:antialiased;}
+
+/* HEADER */
+header{background:rgba(26,18,8,.93);backdrop-filter:saturate(180%) blur(20px);-webkit-backdrop-filter:saturate(180%) blur(20px);position:sticky;top:0;z-index:100;border-bottom:1px solid rgba(184,134,11,.3);}
+.hdr-in{max-width:1100px;margin:0 auto;padding:0 20px;height:58px;display:flex;align-items:center;gap:14px;}
+.brand{display:flex;align-items:center;gap:9px;flex:1;}
+.brand-icon{width:34px;height:34px;background:linear-gradient(135deg,var(--gold),var(--gold-ll));border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:18px;box-shadow:0 2px 8px rgba(184,134,11,.5);}
+.brand-name{font-size:17px;font-weight:700;color:#fff;letter-spacing:-.3px;}
+.brand-count{font-size:12px;color:rgba(255,255,255,.5);margin-left:2px;}
+.hdr-btns{display:flex;gap:8px;align-items:center;}
+.search-wrap{position:relative;}
+.search-wrap input{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.15);border-radius:10px;padding:7px 12px 7px 32px;font-size:13px;color:#fff;font-family:inherit;outline:none;width:180px;transition:all .2s;}
+.search-wrap input::placeholder{color:rgba(255,255,255,.4);}
+.search-wrap input:focus{background:rgba(255,255,255,.15);width:220px;}
+.search-icon{position:absolute;left:10px;top:50%;transform:translateY(-50%);font-size:13px;pointer-events:none;opacity:.5;}
+.btn-hdr{display:inline-flex;align-items:center;gap:5px;padding:7px 14px;border-radius:20px;font-size:13px;font-weight:600;border:none;cursor:pointer;font-family:inherit;transition:all .2s;}
+.btn-add{background:linear-gradient(135deg,var(--gold),var(--gold-l));color:#fff;box-shadow:0 2px 8px rgba(184,134,11,.4);}
+.btn-add:hover{filter:brightness(1.1);}
+.btn-export{background:rgba(255,255,255,.1);color:rgba(255,255,255,.85);}
+.btn-export:hover{background:rgba(255,255,255,.18);}
+
+/* STATS BAR */
+.stats-bar{background:linear-gradient(135deg,#1a1208 0%,#2d1f0a 50%,#1a1208 100%);border-bottom:1px solid rgba(184,134,11,.2);padding:14px 20px;}
+.stats-in{max-width:1100px;margin:0 auto;display:flex;gap:6px;flex-wrap:wrap;}
+.stat-pill{background:rgba(255,255,255,.06);border:1px solid rgba(184,134,11,.2);border-radius:30px;padding:7px 16px;display:flex;align-items:center;gap:7px;}
+.stat-icon{font-size:15px;}
+.stat-val{font-size:15px;font-weight:700;color:var(--gold-ll);}
+.stat-lbl{font-size:11px;color:rgba(255,255,255,.45);font-weight:500;}
+
+/* FILTER BAR */
+.filter-bar{background:var(--surface);border-bottom:1px solid var(--border);padding:10px 20px;position:sticky;top:58px;z-index:90;}
+.filter-in{max-width:1100px;margin:0 auto;display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+.filter-group{display:flex;gap:4px;}
+.fpill{background:var(--bg);border:1px solid var(--border);border-radius:20px;padding:5px 12px;font-size:12px;font-weight:600;color:var(--text2);cursor:pointer;white-space:nowrap;transition:all .2s;font-family:inherit;}
+.fpill:hover,.fpill.active{background:var(--gold);color:#fff;border-color:var(--gold);}
+.filter-sep{width:1px;height:20px;background:var(--border);margin:0 4px;}
+.sort-sel{background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:5px 10px;font-size:12px;font-weight:600;color:var(--text2);cursor:pointer;font-family:inherit;outline:none;}
+.view-btns{margin-left:auto;display:flex;gap:4px;}
+.vbtn{width:30px;height:30px;border-radius:8px;border:1px solid var(--border);background:var(--bg);cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;transition:all .2s;}
+.vbtn.active{background:var(--gold);border-color:var(--gold);color:#fff;}
+
+/* MAIN */
+.main{max-width:1100px;margin:0 auto;padding:20px;}
+
+/* GRID */
+.coins-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px;}
+.coins-list{display:flex;flex-direction:column;gap:8px;}
+
+/* CARD – GRID */
+.coin-card{background:var(--surface);border-radius:var(--radius);box-shadow:var(--sh);border:1px solid var(--border);overflow:hidden;transition:transform .25s,box-shadow .25s;position:relative;cursor:pointer;}
+.coin-card:hover{transform:translateY(-3px);box-shadow:var(--sh-lg);}
+.coin-photo{width:100%;height:160px;object-fit:cover;display:block;background:linear-gradient(135deg,#f5e6c0,#e8d09a);}
+.coin-photo-placeholder{width:100%;height:160px;background:linear-gradient(135deg,#2d1f0a,#4a3018);display:flex;align-items:center;justify-content:center;font-size:56px;opacity:.7;}
+.coin-body{padding:14px;}
+.coin-name{font-size:15px;font-weight:700;letter-spacing:-.2px;margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.coin-sub{font-size:12px;color:var(--text2);margin-bottom:10px;}
+.coin-tags{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px;}
+.coin-tag{font-size:11px;font-weight:600;padding:2px 8px;border-radius:10px;background:var(--gold-bg);color:var(--gold);}
+.coin-tag.zustand-5{background:rgba(52,199,89,.1);color:#34c759;}
+.coin-tag.zustand-4{background:rgba(52,199,89,.08);color:#30a855;}
+.coin-tag.zustand-3{background:rgba(255,149,0,.1);color:#ff9500;}
+.coin-tag.zustand-2{background:rgba(255,59,48,.1);color:#ff3b30;}
+.coin-tag.zustand-1{background:rgba(174,174,178,.15);color:#8e8e93;}
+.coin-footer{display:flex;align-items:center;justify-content:space-between;padding-top:10px;border-top:1px solid var(--border);}
+.coin-value{font-size:16px;font-weight:700;color:var(--gold);}
+.coin-year{font-size:12px;color:var(--text3);}
+.card-actions{position:absolute;top:8px;right:8px;display:none;gap:5px;}
+.coin-card:hover .card-actions{display:flex;}
+.act-btn{width:28px;height:28px;border-radius:8px;border:none;cursor:pointer;font-size:13px;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(8px);}
+.act-btn.edit{background:rgba(255,255,255,.85);color:var(--blue);}
+.act-btn.del{background:rgba(255,255,255,.85);color:var(--red);}
+
+/* CARD – LIST */
+.coin-row{background:var(--surface);border-radius:12px;box-shadow:var(--sh);border:1px solid var(--border);padding:12px 16px;display:flex;align-items:center;gap:14px;cursor:pointer;transition:box-shadow .2s;}
+.coin-row:hover{box-shadow:var(--sh-lg);}
+.row-thumb{width:52px;height:52px;border-radius:10px;object-fit:cover;flex-shrink:0;background:linear-gradient(135deg,#f5e6c0,#e8d09a);}
+.row-thumb-ph{width:52px;height:52px;border-radius:10px;background:linear-gradient(135deg,#2d1f0a,#4a3018);display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;}
+.row-info{flex:1;min-width:0;}
+.row-name{font-size:14px;font-weight:700;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.row-sub{font-size:12px;color:var(--text2);}
+.row-right{display:flex;flex-direction:column;align-items:flex-end;gap:5px;flex-shrink:0;}
+.row-val{font-size:15px;font-weight:700;color:var(--gold);}
+.row-actions{display:none;gap:4px;}
+.coin-row:hover .row-actions{display:flex;}
+
+/* EMPTY */
+.empty{text-align:center;padding:80px 20px;color:var(--text2);}
+.empty-icon{font-size:56px;margin-bottom:14px;opacity:.5;}
+.empty-title{font-size:18px;font-weight:700;margin-bottom:6px;}
+.empty-sub{font-size:14px;color:var(--text3);}
+
+/* MODAL BACKDROP */
+.mo{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);z-index:999;align-items:center;justify-content:center;padding:20px;}
+.mo.open{display:flex;}
+.mb{background:var(--surface);border-radius:22px;padding:28px 24px;width:100%;max-width:520px;box-shadow:0 30px 80px rgba(0,0,0,.3);max-height:92vh;overflow-y:auto;}
+.mo-title{font-size:19px;font-weight:700;letter-spacing:-.3px;margin-bottom:20px;display:flex;align-items:center;gap:8px;}
+
+/* FORM */
+.fr{margin-bottom:14px;}
+.fl{font-size:11px;font-weight:700;color:var(--text2);margin-bottom:5px;display:block;text-transform:uppercase;letter-spacing:.5px;}
+.fi,.fsel,.fta{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:9px 12px;font-size:14px;font-family:inherit;color:var(--text);outline:none;transition:border .2s;}
+.fi:focus,.fsel:focus,.fta:focus{border-color:var(--gold);background:#fff;}
+.fta{min-height:72px;resize:vertical;}
+.fsel{cursor:pointer;}
+.fr2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;}
+.factions{display:flex;gap:8px;justify-content:flex-end;margin-top:6px;}
+.btn-cancel{background:var(--bg);border:none;border-radius:20px;padding:10px 18px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;color:var(--text);}
+.btn-save{background:linear-gradient(135deg,var(--gold),var(--gold-l));color:#fff;border:none;border-radius:20px;padding:10px 22px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;transition:filter .2s;}
+.btn-save:hover{filter:brightness(1.1);}
+
+/* FOTO UPLOAD */
+.photo-upload{border:2px dashed var(--border);border-radius:12px;padding:16px;text-align:center;cursor:pointer;transition:border .2s;position:relative;}
+.photo-upload:hover{border-color:var(--gold);}
+.photo-upload input{position:absolute;inset:0;opacity:0;cursor:pointer;}
+.photo-preview{width:100%;max-height:180px;object-fit:cover;border-radius:10px;display:block;}
+.photo-hint{font-size:13px;color:var(--text3);margin-top:4px;}
+
+/* DETAIL MODAL */
+.detail-photo{width:100%;max-height:260px;object-fit:cover;border-radius:14px;margin-bottom:18px;}
+.detail-photo-ph{width:100%;height:180px;background:linear-gradient(135deg,#2d1f0a,#4a3018);border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:72px;margin-bottom:18px;}
+.detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;}
+.detail-field{background:var(--bg);border-radius:10px;padding:10px 12px;}
+.detail-lbl{font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px;}
+.detail-val{font-size:14px;font-weight:600;color:var(--text);}
+.detail-val.gold{color:var(--gold);font-size:18px;}
+.detail-notes{background:var(--bg);border-radius:10px;padding:12px;font-size:13px;line-height:1.6;color:var(--text2);}
+.detail-actions{display:flex;gap:8px;margin-top:18px;}
+.btn-detail-edit{flex:1;background:var(--gold-bg);color:var(--gold);border:none;border-radius:20px;padding:10px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;}
+.btn-detail-del{background:rgba(255,59,48,.1);color:var(--red);border:none;border-radius:20px;padding:10px 18px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;}
+
+/* TOAST */
+#toast{position:fixed;bottom:28px;left:50%;transform:translateX(-50%) translateY(16px);background:#1a1208;color:#fff;padding:10px 20px;border-radius:30px;font-size:14px;font-weight:500;opacity:0;transition:all .3s;z-index:9999;pointer-events:none;white-space:nowrap;border:1px solid rgba(184,134,11,.3);}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+
+@keyframes fu{from{opacity:0;transform:translateY(12px);}to{opacity:1;transform:translateY(0);}}
+.coin-card,.coin-row{animation:fu .3s ease both;}
+
+@media(max-width:600px){
+  .stats-in{gap:4px;}.stat-pill{padding:5px 10px;}
+  .coins-grid{grid-template-columns:1fr 1fr;}
+  .fr2{grid-template-columns:1fr;}
+  .hdr-in{gap:8px;}
+  .search-wrap input{width:120px;}
+  .search-wrap input:focus{width:150px;}
+  .brand-count{display:none;}
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="hdr-in">
+    <div class="brand">
+      <div class="brand-icon">🪙</div>
+      <div>
+        <span class="brand-name">Münzsammlung</span>
+        <span class="brand-count" id="total-count"></span>
+      </div>
+    </div>
+    <div class="hdr-btns">
+      <div class="search-wrap">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="search-input" placeholder="Suchen…" oninput="applyFilters()">
+      </div>
+      <button class="btn-hdr btn-export" onclick="exportCSV()">⬇ CSV</button>
+      <button class="btn-hdr btn-export" onclick="exportPDF()">📄 PDF</button>
+      <button class="btn-hdr btn-add" onclick="openEditor(null)">＋ Münze</button>
+    </div>
+  </div>
+</header>
+
+<div class="stats-bar">
+  <div class="stats-in" id="stats-bar"></div>
+</div>
+
+<div class="filter-bar">
+  <div class="filter-in">
+    <div class="filter-group" id="filter-zustand">
+      <button class="fpill active" data-filter="zustand" data-val="alle" onclick="setFilter('zustand','alle',this)">Alle</button>
+      <button class="fpill" data-filter="zustand" data-val="5" onclick="setFilter('zustand','5',this)">⭐ Stempelglanz</button>
+      <button class="fpill" data-filter="zustand" data-val="4" onclick="setFilter('zustand','4',this)">Vorzüglich</button>
+      <button class="fpill" data-filter="zustand" data-val="3" onclick="setFilter('zustand','3',this)">Sehr schön</button>
+      <button class="fpill" data-filter="zustand" data-val="2" onclick="setFilter('zustand','2',this)">Schön</button>
+      <button class="fpill" data-filter="zustand" data-val="1" onclick="setFilter('zustand','1',this)">Gering</button>
+    </div>
+    <div class="filter-sep"></div>
+    <div class="filter-group" id="filter-material">
+      <button class="fpill active" data-filter="material" data-val="alle" onclick="setFilter('material','alle',this)">Alle</button>
+      <button class="fpill" data-filter="material" data-val="gold" onclick="setFilter('material','gold',this)">🥇 Feingold</button>
+      <button class="fpill" data-filter="material" data-val="karat" onclick="setFilter('material','karat',this)">🥇 Karat Gold</button>
+      <button class="fpill" data-filter="material" data-val="silber" onclick="setFilter('material','silber',this)">🥈 Silber</button>
+      <button class="fpill" data-filter="material" data-val="kupfer" onclick="setFilter('material','kupfer',this)">🟤 Kupfer</button>
+      <button class="fpill" data-filter="material" data-val="buntmetall" onclick="setFilter('material','buntmetall',this)">🔵 Buntmetall</button>
+      <button class="fpill" data-filter="material" data-val="sonstige" onclick="setFilter('material','sonstige',this)">⚪ Sonstige</button>
+    </div>
+    <div class="filter-sep"></div>
+    <select class="sort-sel" id="sort-sel" onchange="applyFilters()">
+      <option value="added-desc">Zuletzt hinzugefügt</option>
+      <option value="year-desc">Jahrgang ↓</option>
+      <option value="year-asc">Jahrgang ↑</option>
+      <option value="value-desc">Wert ↓</option>
+      <option value="value-asc">Wert ↑</option>
+      <option value="name-asc">Name A–Z</option>
+    </select>
+    <div class="view-btns">
+      <button class="vbtn active" id="vbtn-grid" onclick="setView('grid')" title="Kachelansicht">⊞</button>
+      <button class="vbtn" id="vbtn-list" onclick="setView('list')" title="Listenansicht">☰</button>
+    </div>
+  </div>
+</div>
+
+<main class="main">
+  <div id="coins-container"></div>
+</main>
+
+<!-- EDITOR MODAL -->
+<div class="mo" id="modal-ed" role="dialog" aria-modal="true" aria-labelledby="ed-title">
+  <div class="mb">
+    <div class="mo-title">🪙 <span id="ed-title">Neue Münze</span></div>
+    <input type="hidden" id="eid">
+
+    <div class="fr">
+      <label class="fl">Bezeichnung *</label>
+      <input class="fi" id="f-name" placeholder="z.B. 1 Mark Kaiserreich 1871">
+    </div>
+    <div class="fr2">
+      <div>
+        <label class="fl">Land</label>
+        <input class="fi" id="f-land" placeholder="z.B. Deutschland">
+      </div>
+      <div>
+        <label class="fl">Nominal</label>
+        <input class="fi" id="f-nominal" placeholder="z.B. 1 Mark">
+      </div>
+    </div>
+    <div class="fr2">
+      <div>
+        <label class="fl">Jahrgang</label>
+        <input class="fi" id="f-jahr" type="number" min="1" max="2099" placeholder="z.B. 1871">
+      </div>
+      <div>
+        <label class="fl">Zustand</label>
+        <select class="fsel" id="f-zustand">
+          <option value="5">⭐ Stempelglanz (5)</option>
+          <option value="4">Vorzüglich (4)</option>
+          <option value="3" selected>Sehr schön (3)</option>
+          <option value="2">Schön (2)</option>
+          <option value="1">Gering erhalten (1)</option>
+        </select>
+      </div>
+    </div>
+    <div class="fr2">
+      <div>
+        <label class="fl">Material</label>
+        <select class="fsel" id="f-material" onchange="toggleGoldFields()">
+          <option value="gold">🥇 Feingold (999)</option>
+          <option value="karat">🥇 Karat Gold</option>
+          <option value="silber">🥈 Silber</option>
+          <option value="kupfer">🟤 Kupfer</option>
+          <option value="buntmetall" selected>🔵 Buntmetall</option>
+          <option value="sonstige">⚪ Sonstige</option>
+        </select>
+      </div>
+      <div>
+        <label class="fl">Anzahl</label>
+        <input class="fi" id="f-anzahl" type="number" min="1" step="1" placeholder="1" value="1">
+      </div>
+    </div>
+    <div class="fr2">
+      <div>
+        <label class="fl">Katalogwert (€)</label>
+        <input class="fi" id="f-wert" type="number" min="0" step="0.01" placeholder="0.00">
+      </div>
+      <div>
+        <label class="fl">Kaufpreis (€)</label>
+        <input class="fi" id="f-kaufpreis" type="number" min="0" step="0.01" placeholder="0.00">
+      </div>
+    </div>
+    <div class="fr2">
+      <div>
+        <label class="fl">Münzstätte</label>
+        <input class="fi" id="f-muenzstaette" placeholder="z.B. A, D, J …">
+      </div>
+      <div>
+        <label class="fl">Durchmesser (mm)</label>
+        <input class="fi" id="f-durchmesser" type="number" min="0" step="0.1" placeholder="z.B. 32.5">
+      </div>
+    </div>
+    <!-- Gold-Felder (nur sichtbar bei Gold/Karat Gold) -->
+    <div id="gold-fields">
+      <div class="fr2">
+        <div>
+          <label class="fl">Feinheit (‰)</label>
+          <input class="fi" id="f-feinheit" type="number" min="1" max="999" step="1" placeholder="z.B. 999 / 750 / 585" oninput="calcReinGold()">
+        </div>
+        <div>
+          <label class="fl">Standardgewicht (g)</label>
+          <input class="fi" id="f-gewicht" type="number" min="0" step="0.001" placeholder="z.B. 7.775" oninput="calcReinGold()">
+        </div>
+      </div>
+      <div class="fr">
+        <label class="fl">Reines Goldgewicht (g)</label>
+        <input class="fi" id="f-reingold" type="number" min="0" step="0.001" placeholder="wird automatisch berechnet">
+        <div style="font-size:11px;color:var(--text3);margin-top:4px">Wird aus Feinheit × Gewicht berechnet oder manuell eingeben.</div>
+      </div>
+    </div>
+    <div class="fr">
+      <label class="fl">Foto</label>
+      <div class="photo-upload" id="photo-drop">
+        <input type="file" id="f-foto" accept="image/*" onchange="handlePhoto(event)">
+        <div id="photo-preview-wrap">
+          <div style="font-size:28px;margin-bottom:4px">📸</div>
+          <div class="photo-hint">Foto auswählen oder hierher ziehen</div>
+        </div>
+      </div>
+    </div>
+    <div class="fr">
+      <label class="fl">Notizen</label>
+      <textarea class="fta" id="f-notizen" placeholder="Herkunft, Besonderheiten, Referenznummer …"></textarea>
+    </div>
+    <div class="factions">
+      <button class="btn-cancel" onclick="closeEditor()">Abbrechen</button>
+      <button class="btn-save" onclick="saveCoin()">💾 Speichern</button>
+    </div>
+  </div>
+</div>
+
+<!-- DETAIL MODAL -->
+<div class="mo" id="modal-detail" role="dialog" aria-modal="true" aria-labelledby="detail-name">
+  <div class="mb">
+    <div id="detail-content"></div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ── UTILS ─────────────────────────
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+
+const ZUSTAND_LABEL = {5:'Stempelglanz',4:'Vorzüglich',3:'Sehr schön',2:'Schön',1:'Gering erhalten'};
+const MATERIAL_LABEL = {gold:'Feingold (999)',karat:'Karat Gold',silber:'Silber',kupfer:'Kupfer',buntmetall:'Buntmetall',sonstige:'Sonstige'};
+const MATERIAL_ICON  = {gold:'🥇',karat:'🥇',silber:'🥈',kupfer:'🟤',buntmetall:'🔵',sonstige:'⚪'};
+
+// ── DATA ──────────────────────────
+const STORAGE_KEY = 'muenzsammlung_v1';
+let coins = [];
+let activeFilters = { zustand:'alle', material:'alle' };
+let currentView = 'grid';
+let editPhoto = null; // base64 oder null
+
+function load(){
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(raw) coins = JSON.parse(raw);
+  } catch(e){ coins=[]; }
+}
+function save(){
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(coins)); } catch(e){}
+}
+load();
+
+// ── FILTER & SORT ──────────────────
+function setFilter(type, val, el){
+  activeFilters[type] = val;
+  document.querySelectorAll(`[data-filter="${type}"]`).forEach(b=>b.classList.remove('active'));
+  el.classList.add('active');
+  applyFilters();
+}
+
+function applyFilters(){
+  const q   = document.getElementById('search-input').value.toLowerCase();
+  const sort = document.getElementById('sort-sel').value;
+
+  let list = coins.filter(c => {
+    if(activeFilters.zustand !== 'alle' && String(c.zustand) !== activeFilters.zustand) return false;
+    if(activeFilters.material !== 'alle' && c.material !== activeFilters.material) return false;
+    if(q && !`${c.name} ${c.land} ${c.nominal} ${c.jahr} ${c.notizen}`.toLowerCase().includes(q)) return false;
+    return true;
+  });
+
+  list = [...list].sort((a,b)=>{
+    if(sort==='year-desc')  return (b.jahr||0)-(a.jahr||0);
+    if(sort==='year-asc')   return (a.jahr||0)-(b.jahr||0);
+    if(sort==='value-desc') return (b.wert||0)-(a.wert||0);
+    if(sort==='value-asc')  return (a.wert||0)-(b.wert||0);
+    if(sort==='name-asc')   return a.name.localeCompare(b.name,'de');
+    return b.id - a.id; // added-desc
+  });
+
+  renderCoins(list);
+  renderStats();
+}
+
+// ── RENDER ─────────────────────────
+function renderStats(){
+  const total       = coins.length;
+  const totalAnzahl = coins.reduce((s,c)=>s+(parseInt(c.anzahl)||1),0);
+  const totalVal    = coins.reduce((s,c)=>s+(parseFloat(c.wert)||0)*(parseInt(c.anzahl)||1),0);
+  const laender     = new Set(coins.map(c=>c.land).filter(Boolean)).size;
+  const goldAnz     = coins.filter(c=>c.material==='gold'||c.material==='karat').length;
+  const silber      = coins.filter(c=>c.material==='silber').length;
+  const goldGewicht = coins.reduce((s,c)=>{
+    const rgg = parseFloat(c.reinGold) || (parseFloat(c.gewicht) && parseFloat(c.feinheit) ? parseFloat(c.gewicht)*(parseFloat(c.feinheit)/1000) : 0);
+    return s + rgg * (parseInt(c.anzahl)||1);
+  },0);
+
+  let pills = `
+    <div class="stat-pill"><span class="stat-icon">🪙</span><span class="stat-val">${totalAnzahl}</span><span class="stat-lbl">Münzen</span></div>
+    <div class="stat-pill"><span class="stat-icon">💰</span><span class="stat-val">${totalVal.toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2})} €</span><span class="stat-lbl">Gesamtwert</span></div>
+    <div class="stat-pill"><span class="stat-icon">🌍</span><span class="stat-val">${laender}</span><span class="stat-lbl">Länder</span></div>
+    <div class="stat-pill"><span class="stat-icon">🥇</span><span class="stat-val">${goldAnz}</span><span class="stat-lbl">Gold</span></div>
+    <div class="stat-pill"><span class="stat-icon">🥈</span><span class="stat-val">${silber}</span><span class="stat-lbl">Silber</span></div>
+  `;
+  if(goldGewicht > 0) pills += `<div class="stat-pill"><span class="stat-icon">⚖️</span><span class="stat-val">${goldGewicht.toLocaleString('de-DE',{minimumFractionDigits:3,maximumFractionDigits:3})} g</span><span class="stat-lbl">Reines Gold</span></div>`;
+
+  document.getElementById('stats-bar').innerHTML = pills;
+  document.getElementById('total-count').textContent = totalAnzahl ? `· ${totalAnzahl}` : '';
+}
+
+function renderCoins(list){
+  const container = document.getElementById('coins-container');
+  if(!list.length){
+    container.innerHTML = `<div class="empty"><div class="empty-icon">🪙</div><div class="empty-title">${coins.length?'Keine Treffer':'Noch keine Münzen'}</div><div class="empty-sub">${coins.length?'Filter oder Suche anpassen.':'Klicke auf „＋ Münze" um deine erste Münze hinzuzufügen.'}</div></div>`;
+    return;
+  }
+
+  if(currentView === 'grid'){
+    container.innerHTML = `<div class="coins-grid">${list.map(cardGrid).join('')}</div>`;
+  } else {
+    container.innerHTML = `<div class="coins-list">${list.map(cardList).join('')}</div>`;
+  }
+}
+
+function cardGrid(c){
+  const photo = c.foto
+    ? `<img class="coin-photo" src="${esc(c.foto)}" alt="${esc(c.name)}" loading="lazy">`
+    : `<div class="coin-photo-placeholder">${MATERIAL_ICON[c.material]||'🪙'}</div>`;
+  const zClass = `zustand-${c.zustand}`;
+  return `<div class="coin-card" onclick="openDetail(${c.id})">
+    <div class="card-actions">
+      <button class="act-btn edit" onclick="event.stopPropagation();openEditor(${c.id})" title="Bearbeiten">✏️</button>
+      <button class="act-btn del"  onclick="event.stopPropagation();deleteCoin(${c.id})" title="Löschen">🗑</button>
+    </div>
+    ${photo}
+    <div class="coin-body">
+      <div class="coin-name">${esc(c.name)}</div>
+      <div class="coin-sub">${esc(c.land||'')}${c.land&&c.nominal?' · ':''}${esc(c.nominal||'')}</div>
+      <div class="coin-tags">
+        <span class="coin-tag ${zClass}">${esc(ZUSTAND_LABEL[c.zustand]||c.zustand)}</span>
+        <span class="coin-tag">${MATERIAL_ICON[c.material]} ${esc(MATERIAL_LABEL[c.material]||c.material)}</span>
+      </div>
+      <div class="coin-footer">
+        <div class="coin-value">${c.wert ? (parseFloat(c.wert)).toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2})+' €' : '–'}</div>
+        <div class="coin-year">${c.anzahl > 1 ? `<span style="background:var(--gold-bg);color:var(--gold);font-weight:700;padding:1px 7px;border-radius:8px;font-size:11px">×${c.anzahl}</span> ` : ''}${esc(String(c.jahr||''))}</div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function cardList(c){
+  const thumb = c.foto
+    ? `<img class="row-thumb" src="${esc(c.foto)}" alt="${esc(c.name)}">`
+    : `<div class="row-thumb-ph">${MATERIAL_ICON[c.material]||'🪙'}</div>`;
+  const zClass = `zustand-${c.zustand}`;
+  return `<div class="coin-row" onclick="openDetail(${c.id})">
+    ${thumb}
+    <div class="row-info">
+      <div class="row-name">${esc(c.name)}</div>
+      <div class="row-sub">${esc(c.land||'')}${c.land&&c.nominal?' · ':''}${esc(c.nominal||'')} ${c.jahr?'· '+c.jahr:''}</div>
+      <div class="coin-tags" style="margin-top:4px">
+        <span class="coin-tag ${zClass}">${esc(ZUSTAND_LABEL[c.zustand]||c.zustand)}</span>
+        <span class="coin-tag">${MATERIAL_ICON[c.material]} ${esc(MATERIAL_LABEL[c.material]||c.material)}</span>
+      </div>
+    </div>
+    <div class="row-right">
+      <div class="row-val">${c.wert ? (parseFloat(c.wert)).toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2})+' €' : '–'}</div>
+      <div class="row-actions">
+        <button class="act-btn edit" onclick="event.stopPropagation();openEditor(${c.id})" title="Bearbeiten">✏️</button>
+        <button class="act-btn del"  onclick="event.stopPropagation();deleteCoin(${c.id})" title="Löschen">🗑</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+// ── VIEW ───────────────────────────
+function setView(v){
+  currentView = v;
+  document.getElementById('vbtn-grid').classList.toggle('active', v==='grid');
+  document.getElementById('vbtn-list').classList.toggle('active', v==='list');
+  applyFilters();
+}
+
+// ── EDITOR ────────────────────────
+function openEditor(id){
+  editPhoto = null;
+  const isNew = id === null;
+  document.getElementById('ed-title').textContent = isNew ? 'Neue Münze' : 'Münze bearbeiten';
+  document.getElementById('eid').value = isNew ? '' : id;
+
+  if(isNew){
+    document.getElementById('f-name').value = '';
+    document.getElementById('f-land').value = '';
+    document.getElementById('f-nominal').value = '';
+    document.getElementById('f-jahr').value = '';
+    document.getElementById('f-zustand').value = '3';
+    document.getElementById('f-material').value = 'buntmetall';
+    document.getElementById('f-anzahl').value = '1';
+    document.getElementById('f-wert').value = '';
+    document.getElementById('f-kaufpreis').value = '';
+    document.getElementById('f-muenzstaette').value = '';
+    document.getElementById('f-durchmesser').value = '';
+    document.getElementById('f-feinheit').value = '';
+    document.getElementById('f-gewicht').value = '';
+    document.getElementById('f-reingold').value = '';
+    document.getElementById('f-notizen').value = '';
+    resetPhotoPreview();
+  } else {
+    const c = coins.find(x=>x.id===id); if(!c) return;
+    document.getElementById('f-name').value = c.name;
+    document.getElementById('f-land').value = c.land||'';
+    document.getElementById('f-nominal').value = c.nominal||'';
+    document.getElementById('f-jahr').value = c.jahr||'';
+    document.getElementById('f-zustand').value = c.zustand||'3';
+    document.getElementById('f-material').value = c.material||'buntmetall';
+    document.getElementById('f-anzahl').value = c.anzahl||1;
+    document.getElementById('f-wert').value = c.wert||'';
+    document.getElementById('f-kaufpreis').value = c.kaufpreis||'';
+    document.getElementById('f-muenzstaette').value = c.muenzstaette||'';
+    document.getElementById('f-durchmesser').value = c.durchmesser||'';
+    document.getElementById('f-feinheit').value = c.feinheit||'';
+    document.getElementById('f-gewicht').value = c.gewicht||'';
+    document.getElementById('f-reingold').value = c.reinGold||'';
+    document.getElementById('f-notizen').value = c.notizen||'';
+    if(c.foto){ editPhoto = c.foto; showPhotoPreview(c.foto); } else resetPhotoPreview();
+  }
+  toggleGoldFields();
+  document.getElementById('modal-ed').classList.add('open');
+  document.getElementById('f-name').focus();
+}
+
+function closeEditor(){ document.getElementById('modal-ed').classList.remove('open'); }
+
+function saveCoin(){
+  const name = document.getElementById('f-name').value.trim();
+  if(!name){ showToast('❗ Bezeichnung eingeben'); return; }
+
+  const eid = document.getElementById('eid').value;
+  const feinheit  = parseFloat(document.getElementById('f-feinheit').value)||null;
+  const gewicht   = parseFloat(document.getElementById('f-gewicht').value)||null;
+  const reinGoldManual = parseFloat(document.getElementById('f-reingold').value)||null;
+  const reinGold  = reinGoldManual || (feinheit && gewicht ? Math.round(gewicht*(feinheit/1000)*1000)/1000 : null);
+  const coin = {
+    id:          eid ? parseInt(eid) : Date.now(),
+    name,
+    land:        document.getElementById('f-land').value.trim(),
+    nominal:     document.getElementById('f-nominal').value.trim(),
+    jahr:        parseInt(document.getElementById('f-jahr').value)||null,
+    zustand:     parseInt(document.getElementById('f-zustand').value),
+    material:    document.getElementById('f-material').value,
+    anzahl:      parseInt(document.getElementById('f-anzahl').value)||1,
+    wert:        parseFloat(document.getElementById('f-wert').value)||null,
+    kaufpreis:   parseFloat(document.getElementById('f-kaufpreis').value)||null,
+    muenzstaette:document.getElementById('f-muenzstaette').value.trim(),
+    durchmesser: parseFloat(document.getElementById('f-durchmesser').value)||null,
+    feinheit,
+    gewicht,
+    reinGold,
+    notizen:     document.getElementById('f-notizen').value.trim(),
+    foto:        editPhoto,
+    addedAt:     eid ? (coins.find(x=>x.id===parseInt(eid))?.addedAt||new Date().toISOString()) : new Date().toISOString()
+  };
+
+  if(eid){
+    const i = coins.findIndex(x=>x.id===parseInt(eid));
+    if(i>-1) coins[i]=coin;
+    showToast('✅ Münze aktualisiert');
+  } else {
+    coins.unshift(coin);
+    showToast('✅ Münze hinzugefügt');
+  }
+
+  save();
+  closeEditor();
+  applyFilters();
+}
+
+function deleteCoin(id){
+  if(!confirm('Münze wirklich löschen?')) return;
+  coins = coins.filter(c=>c.id!==id);
+  save();
+  applyFilters();
+  showToast('🗑 Münze gelöscht');
+}
+
+// ── GOLD FELDER ───────────────────
+function toggleGoldFields(){
+  const mat = document.getElementById('f-material').value;
+  const show = mat === 'gold' || mat === 'karat';
+  document.getElementById('gold-fields').style.display = show ? '' : 'none';
+  if(mat === 'gold') document.getElementById('f-feinheit').placeholder = '999';
+  if(mat === 'karat') document.getElementById('f-feinheit').placeholder = 'z.B. 750 (18kt) / 585 (14kt) / 333 (8kt)';
+}
+
+function calcReinGold(){
+  const feinheit = parseFloat(document.getElementById('f-feinheit').value);
+  const gewicht  = parseFloat(document.getElementById('f-gewicht').value);
+  if(feinheit > 0 && gewicht > 0){
+    const rg = Math.round(gewicht*(feinheit/1000)*1000)/1000;
+    document.getElementById('f-reingold').value = rg;
+  }
+}
+
+// ── FOTO ──────────────────────────
+function handlePhoto(e){
+  const file = e.target.files[0]; if(!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => { editPhoto = ev.target.result; showPhotoPreview(ev.target.result); };
+  reader.readAsDataURL(file);
+}
+
+function showPhotoPreview(src){
+  document.getElementById('photo-preview-wrap').innerHTML =
+    `<img class="photo-preview" src="${src}" alt="Vorschau"><div class="photo-hint" style="margin-top:6px">Foto klicken zum Ändern</div>`;
+}
+
+function resetPhotoPreview(){
+  document.getElementById('photo-preview-wrap').innerHTML =
+    `<div style="font-size:28px;margin-bottom:4px">📸</div><div class="photo-hint">Foto auswählen oder hierher ziehen</div>`;
+}
+
+// ── DETAIL ────────────────────────
+function openDetail(id){
+  const c = coins.find(x=>x.id===id); if(!c) return;
+  const photo = c.foto
+    ? `<img class="detail-photo" src="${esc(c.foto)}" alt="${esc(c.name)}">`
+    : `<div class="detail-photo-ph">${MATERIAL_ICON[c.material]||'🪙'}</div>`;
+
+  const fields = [
+    {l:'Land',                  v: c.land},
+    {l:'Nominal',               v: c.nominal},
+    {l:'Jahrgang',              v: c.jahr},
+    {l:'Münzstätte',            v: c.muenzstaette},
+    {l:'Anzahl',                v: c.anzahl > 1 ? c.anzahl : null},
+    {l:'Zustand',               v: ZUSTAND_LABEL[c.zustand]},
+    {l:'Material',              v: `${MATERIAL_ICON[c.material]} ${MATERIAL_LABEL[c.material]}`},
+    {l:'Feinheit',              v: c.feinheit ? c.feinheit+'‰' : null},
+    {l:'Standardgewicht',       v: c.gewicht ? c.gewicht.toLocaleString('de-DE',{minimumFractionDigits:3,maximumFractionDigits:3})+' g' : null},
+    {l:'Reines Goldgewicht',    v: c.reinGold ? c.reinGold.toLocaleString('de-DE',{minimumFractionDigits:3,maximumFractionDigits:3})+' g' : null, gold:true},
+    {l:'Durchmesser',           v: c.durchmesser ? c.durchmesser+' mm' : null},
+    {l:'Katalogwert',           v: c.wert ? (parseFloat(c.wert)).toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2})+' €' : null, gold:true},
+    {l:'Kaufpreis',             v: c.kaufpreis ? (parseFloat(c.kaufpreis)).toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2})+' €' : null},
+  ].filter(f=>f.v);
+
+  const grid = fields.map(f=>`<div class="detail-field"><div class="detail-lbl">${esc(f.l)}</div><div class="detail-val${f.gold?' gold':''}">${esc(String(f.v))}</div></div>`).join('');
+
+  document.getElementById('detail-content').innerHTML = `
+    ${photo}
+    <div id="detail-name" style="font-size:19px;font-weight:700;letter-spacing:-.3px;margin-bottom:4px">${esc(c.name)}</div>
+    <div style="font-size:13px;color:var(--text2);margin-bottom:16px">${esc(c.land||'')}${c.land&&c.nominal?' · ':''}${esc(c.nominal||'')}</div>
+    <div class="detail-grid">${grid}</div>
+    ${c.notizen ? `<div class="detail-lbl" style="margin-bottom:6px">Notizen</div><div class="detail-notes">${esc(c.notizen)}</div>` : ''}
+    <div class="detail-actions">
+      <button class="btn-detail-edit" onclick="closeDetail();openEditor(${c.id})">✏️ Bearbeiten</button>
+      <button class="btn-detail-del"  onclick="closeDetail();deleteCoin(${c.id})">🗑 Löschen</button>
+    </div>
+  `;
+  document.getElementById('modal-detail').classList.add('open');
+}
+
+function closeDetail(){ document.getElementById('modal-detail').classList.remove('open'); }
+
+// ── CSV EXPORT ────────────────────
+function exportCSV(){
+  if(!coins.length){ showToast('❗ Keine Münzen vorhanden'); return; }
+  const BOM = '\uFEFF';
+  const headers = ['ID','Bezeichnung','Land','Nominal','Jahrgang','Münzstätte','Anzahl','Zustand','Material','Feinheit (‰)','Standardgewicht (g)','Reines Goldgewicht (g)','Durchmesser (mm)','Katalogwert (€)','Kaufpreis (€)','Notizen','Hinzugefügt'];
+  const rows = coins.map(c=>[
+    c.id,
+    c.name,
+    c.land||'',
+    c.nominal||'',
+    c.jahr||'',
+    c.muenzstaette||'',
+    c.anzahl||1,
+    ZUSTAND_LABEL[c.zustand]||c.zustand,
+    MATERIAL_LABEL[c.material]||c.material,
+    c.feinheit!=null ? String(c.feinheit).replace('.',',') : '',
+    c.gewicht!=null  ? String(c.gewicht).replace('.',',')  : '',
+    c.reinGold!=null ? String(c.reinGold).replace('.',',') : '',
+    c.durchmesser!=null ? String(c.durchmesser).replace('.',',') : '',
+    c.wert!=null     ? String(c.wert).replace('.',',')     : '',
+    c.kaufpreis!=null ? String(c.kaufpreis).replace('.',',') : '',
+    c.notizen||'',
+    c.addedAt ? new Date(c.addedAt).toLocaleDateString('de-DE') : ''
+  ].map(v=>`"${String(v).replace(/"/g,'""')}"`).join(';'));
+
+  const csv = BOM + [headers.join(';'), ...rows].join('\r\n');
+  const blob = new Blob([csv],{type:'text/csv;charset=utf-8;'});
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href=url; a.download='muenzsammlung.csv'; a.click();
+  URL.revokeObjectURL(url);
+  showToast(`☁️ ${coins.length} Münzen exportiert`);
+}
+
+// ── PDF EXPORT ────────────────────
+async function exportPDF(){
+  if(!coins.length){ showToast('❗ Keine Münzen vorhanden'); return; }
+  showToast('📄 PDF wird erstellt…');
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation:'portrait', unit:'mm', format:'a4' });
+  const pageW = doc.internal.pageSize.getWidth();
+  const pageH = doc.internal.pageSize.getHeight();
+  const gold  = [184, 134, 11];
+  const dark  = [26,  18,   8];
+  const grey  = [107, 92,  62];
+  const light = [250, 248, 244];
+
+  // ── Deckblatt ──────────────────────────────────────────
+  // Goldener Akzentstreifen oben
+  doc.setFillColor(...gold);
+  doc.rect(0, 0, pageW, 3, 'F');
+
+  // Echtes Münzfoto laden und zentriert als Kreis einfügen
+  const coinImg = await new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const sz = 300;
+      const cv = document.createElement('canvas');
+      cv.width = sz; cv.height = sz;
+      const ctx = cv.getContext('2d');
+      // Kreisförmig ausschneiden
+      ctx.beginPath();
+      ctx.arc(sz/2, sz/2, sz/2, 0, Math.PI*2);
+      ctx.clip();
+      // Foto quadratisch zentriert einpassen
+      const scale = Math.max(sz/img.width, sz/img.height);
+      const w = img.width*scale, h = img.height*scale;
+      ctx.drawImage(img, (sz-w)/2, (sz-h)/2, w, h);
+      resolve(cv.toDataURL('image/jpeg', 0.9));
+    };
+    img.onerror = () => resolve(null);
+    img.src = './goldmuenze.jpg';
+  });
+
+  const imgSize = 52;
+  if(coinImg){
+    // Schatten-Kreis
+    doc.setFillColor(220, 210, 195);
+    doc.circle(pageW/2 + 1, 73, imgSize/2 + 1, 'F');
+    // Foto
+    doc.addImage(coinImg, 'JPEG', pageW/2 - imgSize/2, 47, imgSize, imgSize);
+    // Goldener Rand
+    doc.setDrawColor(...gold);
+    doc.setLineWidth(0.8);
+    doc.circle(pageW/2, 73, imgSize/2, 'S');
+  }
+
+  // Titel
+  doc.setTextColor(...dark);
+  doc.setFontSize(32);
+  doc.setFont('helvetica','bold');
+  doc.text('Münzsammlung', pageW/2, 105, {align:'center'});
+
+  // Untertitel
+  doc.setTextColor(...grey);
+  doc.setFontSize(13);
+  doc.setFont('helvetica','normal');
+  doc.text('Persönliche Sammlung', pageW/2, 114, {align:'center'});
+
+  // Trennlinie
+  doc.setDrawColor(...gold);
+  doc.setLineWidth(0.5);
+  doc.line(pageW/2-30, 120, pageW/2+30, 120);
+
+  // Stats-Kacheln auf Deckblatt
+  const totalAnzahl = coins.reduce((s,c)=>s+(parseInt(c.anzahl)||1),0);
+  const totalVal    = coins.reduce((s,c)=>s+(parseFloat(c.wert)||0)*(parseInt(c.anzahl)||1),0);
+  const laender     = new Set(coins.map(c=>c.land).filter(Boolean)).size;
+  const goldAnz     = coins.filter(c=>c.material==='gold'||c.material==='karat').length;
+  const goldGew     = coins.reduce((s,c)=>{
+    const rg = parseFloat(c.reinGold)||(parseFloat(c.gewicht)&&parseFloat(c.feinheit)?parseFloat(c.gewicht)*(parseFloat(c.feinheit)/1000):0);
+    return s+rg*(parseInt(c.anzahl)||1);
+  },0);
+
+  const totalInvest  = coins.reduce((s,c)=>s+(parseFloat(c.kaufpreis)||0)*(parseInt(c.anzahl)||1),0);
+  const gewinnVerlust = totalVal - totalInvest;
+  const coinsWithKauf = coins.filter(c=>c.kaufpreis);
+  const anzahlMitKauf = coinsWithKauf.reduce((s,c)=>s+(parseInt(c.anzahl)||1),0);
+  const avgKaufpreis  = anzahlMitKauf > 0 ? totalInvest / anzahlMitKauf : null;
+
+  const stats = [
+    {val: String(totalAnzahl),         lbl:'Münzen'},
+    {val: totalVal.toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2})+' €', lbl:'Gesamtwert (Katalog)'},
+    {val: totalInvest.toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2})+' €', lbl:'Gesamtinvestitionen'},
+    {val: (gewinnVerlust>=0?'+ ':'– ')+Math.abs(gewinnVerlust).toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2})+' €', lbl:'Gewinn / Verlust', gewinn: gewinnVerlust},
+    ...(avgKaufpreis!==null ? [{val: avgKaufpreis.toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2})+' €', lbl:'Ø Kaufpreis je Münze'}] : []),
+    {val: String(laender),             lbl:'Länder'},
+    {val: String(goldAnz),             lbl:'Goldmünzen'},
+  ];
+  if(goldGew>0) stats.push({val:goldGew.toLocaleString('de-DE',{minimumFractionDigits:3,maximumFractionDigits:3})+' g', lbl:'Reines Gold'});
+
+  // Statistik-Tabelle: Label links, Wert rechts
+  const tblX = pageW/2 - 45;
+  const tblW = 90;
+  const rowH = 9;
+  let ty = 132;
+
+  stats.forEach((s, i) => {
+    // Zebrastreifen
+    if(i % 2 === 0){
+      doc.setFillColor(...light);
+      doc.rect(tblX, ty-1, tblW, rowH, 'F');
+    }
+    // Trennlinie
+    doc.setDrawColor(220, 210, 195);
+    doc.setLineWidth(0.2);
+    doc.line(tblX, ty + rowH - 1, tblX + tblW, ty + rowH - 1);
+    // Label
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(...grey);
+    doc.text(s.lbl, tblX + 4, ty + 5.5);
+    // Wert
+    doc.setFont('helvetica', 'bold');
+    if(s.gewinn !== undefined){
+      doc.setTextColor(...(s.gewinn >= 0 ? [34,139,34] : [200,30,30]));
+    } else {
+      doc.setTextColor(...dark);
+    }
+    doc.text(s.val, tblX + tblW - 4, ty + 5.5, {align:'right'});
+    ty += rowH;
+  });
+
+  // Rahmen um die Tabelle
+  doc.setDrawColor(...gold);
+  doc.setLineWidth(0.4);
+  doc.rect(tblX, 131, tblW, stats.length * rowH, 'S');
+
+  // Datum + Goldstreifen unten
+  doc.setFontSize(9);
+  doc.setTextColor(...grey);
+  doc.text('Erstellt am '+new Date().toLocaleDateString('de-DE'), pageW/2, 170, {align:'center'});
+  doc.setFillColor(...gold);
+  doc.rect(0, pageH-3, pageW, 3, 'F');
+
+  // ── Münz-Tabelle (neue Seite) ───────────────────────────
+  doc.addPage();
+
+  // Seitenkopf
+  const drawHeader = (pg) => {
+    doc.setFillColor(...gold);
+    doc.rect(0,0,pageW,2,'F');
+    doc.setFillColor(...light);
+    doc.rect(0,2,pageW,14,'F');
+    doc.setFontSize(9);
+    doc.setFont('helvetica','bold');
+    doc.setTextColor(...dark);
+    doc.text('Münzsammlung', 14, 12);
+    doc.setFont('helvetica','normal');
+    doc.setTextColor(...grey);
+    doc.text('Seite '+pg, pageW-14, 12, {align:'right'});
+    doc.setDrawColor(220,210,195);
+    doc.setLineWidth(0.2);
+    doc.line(0,16,pageW,16);
+  };
+  drawHeader(2);
+
+  // AutoTable
+  const colStyles = {
+    0:{cellWidth:8,  halign:'center'},  // #
+    1:{cellWidth:52},                    // Bezeichnung
+    2:{cellWidth:16, halign:'center'},   // Jahr
+    3:{cellWidth:6,  halign:'center'},   // Anz.
+    4:{cellWidth:26},                    // Material
+    5:{cellWidth:14, halign:'center'},   // Zustand
+    6:{cellWidth:16, halign:'right'},    // Feinheit
+    7:{cellWidth:16, halign:'right'},    // Gew.
+    8:{cellWidth:18, halign:'right'},    // Rein-Au
+    9:{cellWidth:14, halign:'center'},   // Ø
+   10:{cellWidth:22, halign:'right'},    // Wert
+  };
+
+  const tableRows = coins.map((c,i) => [
+    i+1,
+    c.name + (c.land?'\n'+c.land:'') + (c.nominal?' · '+c.nominal:''),
+    c.jahr||'–',
+    c.anzahl||1,
+    (MATERIAL_LABEL[c.material]||c.material),
+    ZUSTAND_LABEL[c.zustand]||c.zustand,
+    c.feinheit ? c.feinheit+'‰' : '–',
+    c.gewicht  ? c.gewicht.toLocaleString('de-DE',{maximumFractionDigits:3})+' g' : '–',
+    c.reinGold ? c.reinGold.toLocaleString('de-DE',{minimumFractionDigits:3,maximumFractionDigits:3})+' g' : '–',
+    c.durchmesser ? c.durchmesser+' mm' : '–',
+    c.wert ? c.wert.toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2})+' €' : '–',
+  ]);
+
+  // Summenzeile
+  tableRows.push([
+    '','Gesamt','','×'+totalAnzahl,'','','','',
+    goldGew>0 ? goldGew.toLocaleString('de-DE',{minimumFractionDigits:3,maximumFractionDigits:3})+' g' : '',
+    '',
+    totalVal.toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2})+' €'
+  ]);
+
+  let pageNum = 2;
+  doc.autoTable({
+    head: [['#','Bezeichnung','Jahr','Anz.','Material','Zustand','Feinheit','Gewicht','Rein-Au','Ø','Wert']],
+    body: tableRows,
+    startY: 20,
+    margin: {left:10, right:10},
+    styles: {
+      fontSize: 7.5,
+      cellPadding: 2.5,
+      font: 'helvetica',
+      textColor: [26,18,8],
+      lineColor: [220,210,195],
+      lineWidth: 0.2,
+    },
+    headStyles: {
+      fillColor: [240, 220, 160],
+      textColor: dark,
+      fontStyle: 'bold',
+      fontSize: 7,
+    },
+    alternateRowStyles: { fillColor: light },
+    columnStyles: colStyles,
+    didParseCell: (data) => {
+      // Summenzeile fett + Goldhintergrund
+      if(data.row.index === tableRows.length-1){
+        data.cell.styles.fontStyle = 'bold';
+        data.cell.styles.fillColor = [240,220,160];
+        data.cell.styles.textColor = dark;
+      }
+    },
+    didDrawPage: (data) => {
+      if(data.pageNumber > 1){ pageNum++; drawHeader(pageNum); }
+      // Fußzeile
+      doc.setFontSize(7);
+      doc.setTextColor(160,140,100);
+      doc.text('Münzsammlung · '+new Date().toLocaleDateString('de-DE'), 14, pageH-6);
+      doc.text('Seite '+data.pageNumber, pageW-14, pageH-6, {align:'right'});
+    }
+  });
+
+  // ── Detailseiten mit Fotos ──────────────────────────────
+  const coinsWithPhoto = coins.filter(c=>c.foto);
+  if(coinsWithPhoto.length > 0){
+    doc.addPage();
+    pageNum++;
+    drawHeader(pageNum);
+
+    doc.setFontSize(11);
+    doc.setFont('helvetica','bold');
+    doc.setTextColor(...dark);
+    doc.text('Münzen mit Foto', 14, 26);
+    doc.setDrawColor(...gold);
+    doc.setLineWidth(0.4);
+    doc.line(14,28,pageW-14,28);
+
+    let x = 14, y = 34;
+    const imgW = 55, imgH = 40, padX = 8, padY = 8;
+    const colCount = 3;
+    let col = 0;
+
+    for(const c of coinsWithPhoto){
+      if(y + imgH + 22 > pageH - 14){
+        doc.addPage(); pageNum++; drawHeader(pageNum); y = 24; col = 0; x = 14;
+      }
+      try {
+        // Rahmen
+        doc.setFillColor(245,240,232);
+        doc.roundedRect(x-2, y-2, imgW+4, imgH+18, 3, 3, 'F');
+        doc.setDrawColor(...gold);
+        doc.setLineWidth(0.3);
+        doc.roundedRect(x-2, y-2, imgW+4, imgH+18, 3, 3, 'S');
+        // Foto
+        const fmt = c.foto.startsWith('data:image/png') ? 'PNG' : 'JPEG';
+        doc.addImage(c.foto, fmt, x, y, imgW, imgH, undefined, 'FAST');
+        // Name darunter
+        doc.setFontSize(6.5);
+        doc.setFont('helvetica','bold');
+        doc.setTextColor(...dark);
+        const nameLines = doc.splitTextToSize(c.name, imgW);
+        doc.text(nameLines[0], x + imgW/2, y+imgH+6, {align:'center'});
+        doc.setFont('helvetica','normal');
+        doc.setTextColor(...grey);
+        const sub = [c.land, c.nominal, c.jahr].filter(Boolean).join(' · ');
+        doc.text(doc.splitTextToSize(sub, imgW)[0], x+imgW/2, y+imgH+11, {align:'center'});
+      } catch(e){ /* Foto-Fehler überspringen */ }
+
+      col++;
+      if(col >= colCount){ col=0; x=14; y += imgH+22; } else { x += imgW+padX; }
+    }
+  }
+
+  doc.save('muenzsammlung_'+new Date().toISOString().slice(0,10)+'.pdf');
+  showToast(`📄 PDF mit ${coins.length} Münzen gespeichert`);
+}
+
+// ── TOAST ─────────────────────────
+let tt;
+function showToast(msg){
+  const t = document.getElementById('toast');
+  t.textContent=msg; t.classList.add('show');
+  clearTimeout(tt); tt=setTimeout(()=>t.classList.remove('show'),3000);
+}
+
+// ── MODAL CLOSE ───────────────────
+document.querySelectorAll('.mo').forEach(m=>m.addEventListener('click',e=>{ if(e.target===m) m.classList.remove('open'); }));
+document.addEventListener('keydown',e=>{ if(e.key==='Escape') document.querySelectorAll('.mo.open').forEach(m=>m.classList.remove('open')); });
+
+// ── PWA ───────────────────────────
+if('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js');
+
+// ── INIT ──────────────────────────
+applyFilters();
+</script>
+</body>
+</html>
