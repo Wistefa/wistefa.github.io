@@ -1095,12 +1095,15 @@
         try {
           const url = `https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/${from.toLowerCase()}.json`;
           const res = await fetch(url);
+          if (!res.ok) throw new Error('HTTP ' + res.status);
           const json = await res.json();
           const rate = json[from.toLowerCase()]?.eur;
-          if (rate) {
+          // Strict validation: rate must be a finite positive number in plausible range
+          if (typeof rate === 'number' && isFinite(rate) && rate > 0 && rate < 1e6) {
             const eur = (parseFloat(amount) * rate).toFixed(2);
             setCostEur(eur);
-            setRateInfo(`1 ${from} = ${rate.toFixed(8)} EUR (${json.date})`);
+            const dateStr = typeof json.date === 'string' ? json.date.slice(0,10) : '';
+            setRateInfo(`1 ${from} = ${rate.toFixed(6)} EUR (${dateStr})`);
           } else {
             setRateInfo("Währung nicht gefunden – bitte manuell eingeben");
           }

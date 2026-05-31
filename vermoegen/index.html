@@ -892,11 +892,14 @@ async function fetchRate() {
   info.textContent = "Kurs wird abgerufen…";
   try {
     const res = await fetch(`https://api.frankfurter.app/latest?from=${currency}&to=EUR`);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
     const json = await res.json();
-    const rate = json.rates.EUR;
-    window._fwRate = { currency, amount, rate, rateDate: json.date };
+    const rate = json.rates?.EUR;
+    if (typeof rate !== 'number' || !isFinite(rate) || rate <= 0 || rate > 1e6) throw new Error('Ungültiger Kurs');
+    const dateStr = typeof json.date === 'string' ? json.date.slice(0,10) : '';
+    window._fwRate = { currency, amount, rate, rateDate: dateStr };
     if (amount > 0) document.getElementById("m-value").value = (amount * rate).toFixed(2);
-    info.textContent = `1 ${currency} = ${rate.toFixed(4)} EUR (Stand: ${json.date})`;
+    info.textContent = `1 ${currency} = ${rate.toFixed(4)} EUR (Stand: ${dateStr})`;
   } catch {
     info.textContent = "Fehler: Kurs konnte nicht abgerufen werden.";
   }
@@ -1065,7 +1068,46 @@ document.addEventListener("keydown", e => {
 function fabToggle(){const p=document.getElementById('fab-panel');p.style.display=p.style.display==='none'?'block':'none';}
 function fabDownload(obj,name){const json=JSON.stringify(obj,null,2);const blob=new Blob([json],{type:'application/json'});const fn=name.replace(/[^a-zA-Z0-9äöüÄÖÜß _-]/g,'_')+'.json';if(navigator.share&&navigator.canShare?.({files:[new File([blob],fn)]})){navigator.share({files:[new File([blob],fn,{type:'application/json'})]});}else{const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=fn;a.click();URL.revokeObjectURL(a.href);}}
 function fabExport(){const name=document.getElementById('fab-name').value.trim()||'Vermoegen_'+new Date().toLocaleDateString('de-DE').replace(/\./g,'-');fabDownload({version:'1.0',savedAt:new Date().toISOString(),name,data},name);}
-function fabImport(input){const r=new FileReader();r.onload=async e=>{try{const obj=JSON.parse(e.target.result);data=obj.data||obj;await save();render();document.getElementById('fab-panel').style.display='none';}catch{alert('Datei konnte nicht geladen werden.');}};r.readAsText(input.files[0]);input.value='';}
+function fabImport(input){
+  const file=input.files[0]; if(!file) return;
+  if(file.size>4*1024*1024){alert('Datei zu groß (max. 4 MB).');input.value='';return;}
+  const r=new FileReader();
+  r.onload=async e=>{
+    try{
+      const obj=JSON.parse(e.target.result);
+      const raw=obj.data||obj;
+      if(!Array.isArray(raw?.aktiva)||!Array.isArray(raw?.passiva)) throw new Error('Ungültiges Format');
+      const num=v=>isFinite(parseFloat(v))?parseFloat(v):0;
+      const sanitizeItem=it=>({
+        id:     typeof it.id==='number'?it.id:Date.now()+Math.random(),
+        name:   String(it.name||'').slice(0,200),
+        cat:    String(it.cat||'').slice(0,100),
+        value:  num(it.value),
+        date:   String(it.date||'').slice(0,10),
+        person: String(it.person||'').slice(0,100),
+        laufzeit:String(it.laufzeit||'').slice(0,10),
+        fremdw: it.fremdw&&typeof it.fremdw==='object'?{
+          currency:String(it.fremdw.currency||'').slice(0,10),
+          amount:  num(it.fremdw.amount),
+          rate:    num(it.fremdw.rate),
+          rateDate:String(it.fremdw.rateDate||'').slice(0,10),
+        }:undefined,
+      });
+      data={
+        aktiva:   raw.aktiva.slice(0,5000).map(sanitizeItem),
+        passiva:  raw.passiva.slice(0,5000).map(sanitizeItem),
+        snapshots:(raw.snapshots||[]).slice(0,1000).map(s=>({
+          date: String(s.date||'').slice(0,20),
+          netto:num(s.netto),
+        })),
+        persons: (raw.persons||[]).slice(0,100).map(p=>String(p).slice(0,100)),
+      };
+      if(!data.persons.includes('Gemeinsam')) data.persons.push('Gemeinsam');
+      await save();render();document.getElementById('fab-panel').style.display='none';
+    }catch{alert('Datei konnte nicht geladen werden.');}
+  };
+  r.readAsText(file);input.value='';
+}
 </script>
 <div id="fab-wrap" style="position:fixed;bottom:20px;right:16px;z-index:9000;display:flex;flex-direction:column;align-items:flex-end;gap:8px;">
   <div id="fab-panel" style="display:none;background:white;border:1px solid #ddd;border-radius:12px;padding:14px;box-shadow:0 4px 24px rgba(0,0,0,0.18);width:230px;">

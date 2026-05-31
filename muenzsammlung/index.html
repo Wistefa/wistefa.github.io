@@ -1058,7 +1058,44 @@ applyFilters();
 function fabToggle(){const p=document.getElementById('fab-panel');p.style.display=p.style.display==='none'?'block':'none';}
 function fabDownload(obj,name){const json=JSON.stringify(obj,null,2);const blob=new Blob([json],{type:'application/json'});const fn=name.replace(/[^a-zA-Z0-9äöüÄÖÜß _-]/g,'_')+'.json';if(navigator.share&&navigator.canShare?.({files:[new File([blob],fn)]})){navigator.share({files:[new File([blob],fn,{type:'application/json'})]});}else{const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=fn;a.click();URL.revokeObjectURL(a.href);}}
 function fabExport(){const name=document.getElementById('fab-name').value.trim()||'Muenzsammlung_'+new Date().toLocaleDateString('de-DE').replace(/\./g,'-');fabDownload({version:'1.0',savedAt:new Date().toISOString(),name,data:coins},name);}
-function fabImport(input){const r=new FileReader();r.onload=e=>{try{const obj=JSON.parse(e.target.result);coins=obj.data||obj;localStorage.setItem('muenzsammlung_v1',JSON.stringify(coins));applyFilters();document.getElementById('fab-panel').style.display='none';}catch{alert('Datei konnte nicht geladen werden.');}};r.readAsText(input.files[0]);input.value='';}
+function fabImport(input){
+  const file=input.files[0]; if(!file) return;
+  if(file.size>4*1024*1024){alert('Datei zu groß (max. 4 MB).');input.value='';return;}
+  const r=new FileReader();
+  r.onload=e=>{
+    try{
+      const obj=JSON.parse(e.target.result);
+      const raw=obj.data||obj;
+      if(!Array.isArray(raw)) throw new Error('Kein Array');
+      const VALID_ZST=Object.keys(ZUSTAND_LABEL).map(Number);
+      const VALID_MAT=Object.keys(MATERIAL_LABEL);
+      const num=v=>isFinite(parseFloat(v))?parseFloat(v):null;
+      coins=raw.slice(0,10000).map(c=>({
+        id:          typeof c.id==='number'?c.id:Date.now()+Math.random(),
+        name:        String(c.name||'').slice(0,200),
+        land:        String(c.land||'').slice(0,100),
+        nominal:     String(c.nominal||'').slice(0,100),
+        jahr:        typeof c.jahr==='number'&&c.jahr>0&&c.jahr<2300?c.jahr:null,
+        zustand:     VALID_ZST.includes(Number(c.zustand))?Number(c.zustand):3,
+        material:    VALID_MAT.includes(c.material)?c.material:'sonstige',
+        anzahl:      typeof c.anzahl==='number'&&c.anzahl>0?c.anzahl:1,
+        wert:        num(c.wert),
+        kaufpreis:   num(c.kaufpreis),
+        muenzstaette:String(c.muenzstaette||'').slice(0,100),
+        durchmesser: num(c.durchmesser),
+        feinheit:    num(c.feinheit),
+        gewicht:     num(c.gewicht),
+        reinGold:    num(c.reinGold),
+        notizen:     String(c.notizen||'').slice(0,1000),
+        foto:        typeof c.foto==='string'&&c.foto.startsWith('data:image/')?c.foto:'',
+        addedAt:     typeof c.addedAt==='string'?c.addedAt:new Date().toISOString(),
+      }));
+      localStorage.setItem('muenzsammlung_v1',JSON.stringify(coins));
+      applyFilters();document.getElementById('fab-panel').style.display='none';
+    }catch{alert('Datei konnte nicht geladen werden.');}
+  };
+  r.readAsText(file);input.value='';
+}
 </script>
 <div id="fab-wrap" style="position:fixed;bottom:20px;right:16px;z-index:9000;display:flex;flex-direction:column;align-items:flex-end;gap:8px;">
   <div id="fab-panel" style="display:none;background:white;border:1px solid #ddd;border-radius:12px;padding:14px;box-shadow:0 4px 24px rgba(0,0,0,0.18);width:230px;">
