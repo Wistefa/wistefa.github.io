@@ -355,6 +355,23 @@ async function hashPIN(pin) {
   return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,"0")).join("");
 }
 
+let currentPin = "";
+const _b64e = a => btoa(String.fromCharCode(...new Uint8Array(a)));
+const _b64d = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+
+async function _deriveKey(pin, salt) {
+  const km = await crypto.subtle.importKey('raw', new TextEncoder().encode(pin), 'PBKDF2', false, ['deriveKey']);
+  return crypto.subtle.deriveKey({name:'PBKDF2',salt,iterations:200000,hash:'SHA-256'}, km, {name:'AES-GCM',length:256}, false, ['encrypt','decrypt']);
+}
+
+function _defaultData() {
+  return {aktiva:[], passiva:[], snapshots:[], persons:["Ich","Ehefrau","Kind 1","Kind 2","Kind 3","Gemeinsam"]};
+}
+
+function esc(s) {
+  return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
 function pinInput(digit) {
   if (pinEntry.length >= 4) return;
   pinEntry += digit;
@@ -391,9 +408,11 @@ async function checkPIN() {
     if (pinEntry === pinNewTemp) {
       const h = await hashPIN(pinEntry);
       localStorage.setItem("vm_pin", h);
+      currentPin = pinEntry;
+      await save(); // re-encrypt with new PIN (noop if data still null on first setup)
       pinMode = "login";
       pinEntry = "";
-      unlockApp();
+      await unlockApp();
     } else {
       showPINError("PINs stimmen nicht überein");
     }
@@ -402,13 +421,14 @@ async function checkPIN() {
 
   // Normal login
   if (!stored) {
-    // Kein PIN gesetzt → direkt rein und PIN setzen lassen
-    unlockApp();
+    currentPin = pinEntry;
+    await unlockApp();
     return;
   }
   const h = await hashPIN(pinEntry);
   if (h === stored) {
-    unlockApp();
+    currentPin = pinEntry;
+    await unlockApp();
   } else {
     showPINError("Falsche PIN");
   }
@@ -424,7 +444,28 @@ function showPINError(msg) {
   }, 900);
 }
 
-function unlockApp() {
+async function unlockApp() {
+  if (data === null) {
+    const raw = localStorage.getItem('vm_data');
+    if (raw) {
+      try {
+        const stored = JSON.parse(raw);
+        if (stored.v === 2) {
+          const key = await _deriveKey(currentPin, _b64d(stored.s));
+          const plain = await crypto.subtle.decrypt({name:'AES-GCM',iv:_b64d(stored.i)}, key, _b64d(stored.d));
+          data = JSON.parse(new TextDecoder().decode(plain));
+        } else {
+          data = stored; // old plaintext → migrate below
+        }
+      } catch { data = _defaultData(); }
+    } else {
+      data = _defaultData();
+    }
+    if (!data.persons) data.persons = ["Ich","Ehefrau","Kind 1","Kind 2","Kind 3","Gemeinsam"];
+    if (!data.persons.includes("Gemeinsam")) data.persons.push("Gemeinsam");
+    if (!data.snapshots) data.snapshots = [];
+    await save(); // persist (migrates plaintext → encrypted, or stores default)
+  }
   document.getElementById("login-screen").classList.add("hidden");
   document.getElementById("btn-change-pw").style.display = "";
   render();
@@ -480,10 +521,7 @@ const CATS_PASSIVA = [
 
 const COLORS = ["#3182ce","#38a169","#d69e2e","#e53e3e","#805ad5","#dd6b20","#319795","#d53f8c"];
 
-let data = JSON.parse(localStorage.getItem("vm_data") || '{"aktiva":[],"passiva":[],"snapshots":[],"persons":["Ich","Ehefrau","Kind 1","Kind 2","Kind 3","Gemeinsam"]}');
-if (!data.persons.includes("Gemeinsam")) { data.persons.push("Gemeinsam"); save(); }
-if (!data.snapshots) data.snapshots = [];
-if (!data.persons) data.persons = ["Ich","Ehefrau","Kind 1","Kind 2","Kind 3","Gemeinsam"];
+let data = null; // loaded after PIN unlock
 let currentType = "aktiva";
 let editIndex = -1;
 let filterPerson = "alle";
@@ -503,21 +541,22 @@ function renderPersonsList() {
   if (!data.persons.length) { el.innerHTML = '<p style="color:#a0aec0;font-size:0.85rem;">Keine Personen</p>'; return; }
   el.innerHTML = data.persons.map((p, i) => `
     <div class="person-list-item">
-      <span>${p}</span>
-      <button class="btn-del-person" onclick="deletePerson(${i})">✕</button>
+      <span>${esc(p)}</span>
+      <button class="btn-del-person" data-i="${i}">✕</button>
     </div>`).join("");
+  el.querySelectorAll('.btn-del-person').forEach(b => b.addEventListener('click', () => deletePerson(+b.dataset.i)));
 }
-function addPerson() {
+async function addPerson() {
   const name = document.getElementById("p-new-name").value.trim();
   if (!name) return;
   data.persons.push(name);
-  save();
+  await save();
   document.getElementById("p-new-name").value = "";
   renderPersonsList();
 }
-function deletePerson(i) {
+async function deletePerson(i) {
   data.persons.splice(i, 1);
-  save();
+  await save();
   renderPersonsList();
 }
 document.getElementById("overlay-persons").addEventListener("click", e => { if (e.target === e.currentTarget) closePersonsModal(); });
@@ -526,7 +565,8 @@ document.getElementById("p-new-name").addEventListener("keydown", e => { if (e.k
 function renderFilterBar() {
   const bar = document.getElementById("filter-bar");
   const all = ["alle", ...data.persons];
-  bar.innerHTML = all.map(p => `<button class="filter-btn ${filterPerson===p?'active':''}" onclick="setFilter('${p}')">${p === 'alle' ? 'Alle' : p}</button>`).join("");
+  bar.innerHTML = all.map(p => `<button class="filter-btn ${filterPerson===p?'active':''}" data-p="${esc(p)}">${p === 'alle' ? 'Alle' : esc(p)}</button>`).join("");
+  bar.querySelectorAll('.filter-btn').forEach(b => b.addEventListener('click', () => setFilter(b.dataset.p)));
 }
 function setFilter(p) {
   filterPerson = p;
@@ -553,7 +593,14 @@ let chart = null;
 let passivaChart = null;
 let historyChart = null;
 
-function save() { localStorage.setItem("vm_data", JSON.stringify(data)); }
+async function save() {
+  if (!currentPin || data === null) return;
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const iv   = crypto.getRandomValues(new Uint8Array(12));
+  const key  = await _deriveKey(currentPin, salt);
+  const ct   = await crypto.subtle.encrypt({name:'AES-GCM',iv}, key, new TextEncoder().encode(JSON.stringify(data)));
+  localStorage.setItem('vm_data', JSON.stringify({v:2, s:_b64e(salt), i:_b64e(iv), d:_b64e(ct)}));
+}
 
 function fmt(n) {
   return new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(n);
@@ -599,11 +646,12 @@ function render() {
     el.innerHTML = filtered.map(item => {
       const i = item._i;
       const ci = catInfo(type, item.cat);
+      const fremdwInfo = item.fremdw ? ` · ${item.fremdw.amount.toLocaleString("de-DE")} ${esc(item.fremdw.currency)} (Kurs: ${item.fremdw.rate.toFixed(4)})` : "";
       return `<div class="item">
         <div class="item-icon">${ci.icon}</div>
         <div class="item-info">
-          <div class="item-name">${item.name}${item.person ? `<span class="person-badge">${item.person}</span>` : ""}</div>
-          <div class="item-cat">${item.cat}${item.fremdw ? ` · ${item.fremdw.amount.toLocaleString("de-DE")} ${item.fremdw.currency} (Kurs: ${item.fremdw.rate.toFixed(4)})` : ""}${item.date ? " · " + new Date(item.date).toLocaleDateString("de-DE") : ""}${item.laufzeit ? " · bis " + new Date(item.laufzeit).toLocaleDateString("de-DE") : ""}</div>
+          <div class="item-name">${esc(item.name)}${item.person ? `<span class="person-badge">${esc(item.person)}</span>` : ""}</div>
+          <div class="item-cat">${esc(item.cat)}${fremdwInfo}${item.date ? " · " + new Date(item.date).toLocaleDateString("de-DE") : ""}${item.laufzeit ? " · bis " + new Date(item.laufzeit).toLocaleDateString("de-DE") : ""}</div>
         </div>
         <div class="item-value ${type==='aktiva'?'pos':'neg'}">${fmt(item.value)}</div>
         <button class="btn-del" style="color:#a0aec0; font-size:0.95rem;" onclick="openModal('${type}',${i})">✏️</button>
@@ -644,7 +692,7 @@ function renderChart() {
       <div style="display:flex;align-items:center;justify-content:space-between;padding:5px 0;border-bottom:1px solid #f0f4f8;">
         <div style="display:flex;align-items:center;gap:8px;min-width:0;">
           <span style="width:11px;height:11px;border-radius:50%;background:${COLORS[i % COLORS.length]};flex-shrink:0;display:inline-block;"></span>
-          <span style="font-size:0.80rem;color:#4a5568;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${label}</span>
+          <span style="font-size:0.80rem;color:#4a5568;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(label)}</span>
         </div>
         <div style="display:flex;flex-direction:column;align-items:flex-end;flex-shrink:0;margin-left:10px;">
           <span style="font-size:0.85rem;font-weight:700;color:#2d3748;">${fmt(values[i])}</span>
@@ -700,7 +748,7 @@ function renderChart() {
       <div style="display:flex;align-items:center;justify-content:space-between;padding:5px 0;border-bottom:1px solid #f0f4f8;">
         <div style="display:flex;align-items:center;gap:8px;min-width:0;">
           <span style="width:11px;height:11px;border-radius:50%;background:${COLORS_P[i % COLORS_P.length]};flex-shrink:0;display:inline-block;"></span>
-          <span style="font-size:0.80rem;color:#4a5568;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${label}</span>
+          <span style="font-size:0.80rem;color:#4a5568;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(label)}</span>
         </div>
         <div style="display:flex;flex-direction:column;align-items:flex-end;flex-shrink:0;margin-left:10px;">
           <span style="font-size:0.85rem;font-weight:700;color:#c53030;">${fmt(pValues[i])}</span>
@@ -767,14 +815,13 @@ function renderChart() {
   }
 }
 
-function addSnapshot() {
+async function addSnapshot() {
   const today = new Date().toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" });
   const netto = sum(data.aktiva) - sum(data.passiva);
-  // Bestehenden Eintrag für heute überschreiben
   const idx = data.snapshots.findIndex(s => s.date === today);
   if (idx >= 0) data.snapshots[idx] = { date: today, netto };
   else data.snapshots.push({ date: today, netto });
-  save();
+  await save();
   render();
 }
 
@@ -859,7 +906,7 @@ function closeModal() {
   document.getElementById("overlay").classList.remove("open");
 }
 
-function saveItem() {
+async function saveItem() {
   const name = document.getElementById("m-name").value.trim();
   const cat = document.getElementById("m-cat").value;
   const value = parseFloat(document.getElementById("m-value").value);
@@ -878,15 +925,15 @@ function saveItem() {
   } else {
     data[currentType].push(entry);
   }
-  save();
+  await save();
   render();
   closeModal();
 }
 
-function deleteItem(type, i) {
+async function deleteItem(type, i) {
   if (!confirm(`"${data[type][i].name}" wirklich löschen?`)) return;
   data[type].splice(i, 1);
-  save();
+  await save();
   render();
 }
 
@@ -903,12 +950,12 @@ function loadFromiCloud(event) {
   const file = event.target.files[0];
   if (!file) return;
   const reader = new FileReader();
-  reader.onload = e => {
+  reader.onload = async e => {
     try {
       const loaded = JSON.parse(e.target.result);
       if (!loaded.aktiva || !loaded.passiva) throw new Error();
       data = loaded;
-      save();
+      await save();
       render();
       alert("Daten erfolgreich geladen.");
     } catch {
@@ -1018,7 +1065,7 @@ document.addEventListener("keydown", e => {
 function fabToggle(){const p=document.getElementById('fab-panel');p.style.display=p.style.display==='none'?'block':'none';}
 function fabDownload(obj,name){const json=JSON.stringify(obj,null,2);const blob=new Blob([json],{type:'application/json'});const fn=name.replace(/[^a-zA-Z0-9äöüÄÖÜß _-]/g,'_')+'.json';if(navigator.share&&navigator.canShare?.({files:[new File([blob],fn)]})){navigator.share({files:[new File([blob],fn,{type:'application/json'})]});}else{const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=fn;a.click();URL.revokeObjectURL(a.href);}}
 function fabExport(){const name=document.getElementById('fab-name').value.trim()||'Vermoegen_'+new Date().toLocaleDateString('de-DE').replace(/\./g,'-');fabDownload({version:'1.0',savedAt:new Date().toISOString(),name,data},name);}
-function fabImport(input){const r=new FileReader();r.onload=e=>{try{const obj=JSON.parse(e.target.result);data=obj.data||obj;localStorage.setItem('vm_data',JSON.stringify(data));render();document.getElementById('fab-panel').style.display='none';}catch{alert('Datei konnte nicht geladen werden.');}};r.readAsText(input.files[0]);input.value='';}
+function fabImport(input){const r=new FileReader();r.onload=async e=>{try{const obj=JSON.parse(e.target.result);data=obj.data||obj;await save();render();document.getElementById('fab-panel').style.display='none';}catch{alert('Datei konnte nicht geladen werden.');}};r.readAsText(input.files[0]);input.value='';}
 </script>
 <div id="fab-wrap" style="position:fixed;bottom:20px;right:16px;z-index:9000;display:flex;flex-direction:column;align-items:flex-end;gap:8px;">
   <div id="fab-panel" style="display:none;background:white;border:1px solid #ddd;border-radius:12px;padding:14px;box-shadow:0 4px 24px rgba(0,0,0,0.18);width:230px;">

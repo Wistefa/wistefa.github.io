@@ -298,6 +298,23 @@ async function hashPIN(pin) {
   const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(pin));
   return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,"0")).join("");
 }
+
+let currentPin = "";
+const _b64e = a => btoa(String.fromCharCode(...new Uint8Array(a)));
+const _b64d = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+
+async function _deriveKey(pin, salt) {
+  const km = await crypto.subtle.importKey('raw', new TextEncoder().encode(pin), 'PBKDF2', false, ['deriveKey']);
+  return crypto.subtle.deriveKey({name:'PBKDF2',salt,iterations:200000,hash:'SHA-256'}, km, {name:'AES-GCM',length:256}, false, ['encrypt','decrypt']);
+}
+
+function _defaultData() {
+  return {contracts:[], persons:["Ich","Ehefrau","Kind 1","Kind 2","Gemeinsam"]};
+}
+
+function esc(s) {
+  return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
 function pinInput(digit) {
   if (pinEntry.length >= 4) return;
   pinEntry += digit;
@@ -323,20 +340,42 @@ async function checkPIN() {
     if (pinEntry === pinNewTemp) {
       const h = await hashPIN(pinEntry);
       localStorage.setItem("vs_pin", h);
-      pinMode = "login"; pinEntry = ""; unlockApp();
+      currentPin = pinEntry;
+      await save();
+      pinMode = "login"; pinEntry = ""; await unlockApp();
     } else { showPINError("PINs stimmen nicht überein"); }
     return;
   }
-  if (!stored) { unlockApp(); return; }
+  if (!stored) { currentPin = pinEntry; await unlockApp(); return; }
   const h = await hashPIN(pinEntry);
-  if (h === stored) { unlockApp(); } else { showPINError("Falsche PIN"); }
+  if (h === stored) { currentPin = pinEntry; await unlockApp(); } else { showPINError("Falsche PIN"); }
 }
 function showPINError(msg) {
   updateDots("error");
   document.getElementById("login-error").textContent = msg;
   setTimeout(() => { pinEntry=""; updateDots(); document.getElementById("login-error").textContent=""; }, 900);
 }
-function unlockApp() {
+async function unlockApp() {
+  if (data === null) {
+    const raw = localStorage.getItem('vs_data');
+    if (raw) {
+      try {
+        const stored = JSON.parse(raw);
+        if (stored.v === 2) {
+          const key = await _deriveKey(currentPin, _b64d(stored.s));
+          const plain = await crypto.subtle.decrypt({name:'AES-GCM',iv:_b64d(stored.i)}, key, _b64d(stored.d));
+          data = JSON.parse(new TextDecoder().decode(plain));
+        } else {
+          data = stored; // old plaintext → migrate
+        }
+      } catch { data = _defaultData(); }
+    } else {
+      data = _defaultData();
+    }
+    if (!data.persons) data.persons = ["Ich","Ehefrau","Kind 1","Kind 2","Gemeinsam"];
+    if (!data.contracts) data.contracts = [];
+    await save();
+  }
   document.getElementById("login-screen").classList.add("hidden");
   document.getElementById("btn-change-pw").style.display = "";
   render();
@@ -384,8 +423,7 @@ const CATS = [
   { label: "Sonstiges",                     icon: "📋" },
 ];
 
-let data = JSON.parse(localStorage.getItem("vs_data") || '{"contracts":[],"persons":["Ich","Ehefrau","Kind 1","Kind 2","Gemeinsam"]}');
-if (!data.persons) data.persons = ["Ich","Ehefrau","Kind 1","Kind 2","Gemeinsam"];
+let data = null; // loaded after PIN unlock
 
 let filterPerson = "alle";
 let filterCat = "alle";
@@ -399,23 +437,31 @@ function renderPersonsList() {
   const el = document.getElementById("persons-list");
   el.innerHTML = data.persons.map((p,i) => `
     <div class="person-list-item">
-      <span>${p}</span>
-      <button class="btn-del-person" onclick="deletePerson(${i})">✕</button>
+      <span>${esc(p)}</span>
+      <button class="btn-del-person" data-i="${i}">✕</button>
     </div>`).join("") || '<p style="color:#a0aec0;font-size:0.85rem;">Keine Personen</p>';
+  el.querySelectorAll('.btn-del-person').forEach(b => b.addEventListener('click', () => deletePerson(+b.dataset.i)));
 }
-function addPerson() {
+async function addPerson() {
   const name = document.getElementById("p-new-name").value.trim();
   if (!name) return;
-  data.persons.push(name); save();
+  data.persons.push(name); await save();
   document.getElementById("p-new-name").value = "";
   renderPersonsList();
 }
-function deletePerson(i) { data.persons.splice(i,1); save(); renderPersonsList(); }
+async function deletePerson(i) { data.persons.splice(i,1); await save(); renderPersonsList(); }
 document.getElementById("overlay-persons").addEventListener("click", e => { if (e.target===e.currentTarget) closePersonsModal(); });
 document.getElementById("p-new-name").addEventListener("keydown", e => { if (e.key==="Enter") addPerson(); });
 // ─────────────────────────────────────────────────────
 
-function save() { localStorage.setItem("vs_data", JSON.stringify(data)); }
+async function save() {
+  if (!currentPin || data === null) return;
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const iv   = crypto.getRandomValues(new Uint8Array(12));
+  const key  = await _deriveKey(currentPin, salt);
+  const ct   = await crypto.subtle.encrypt({name:'AES-GCM',iv}, key, new TextEncoder().encode(JSON.stringify(data)));
+  localStorage.setItem('vs_data', JSON.stringify({v:2, s:_b64e(salt), i:_b64e(iv), d:_b64e(ct)}));
+}
 
 function fmt(n) {
   return new Intl.NumberFormat("de-DE", { style:"currency", currency:"EUR", maximumFractionDigits:2 }).format(n);
@@ -459,17 +505,17 @@ function render() {
   // Filter-Buttons Personen
   const fpEl = document.getElementById("filter-persons");
   fpEl.innerHTML = `<span class="filter-label">Person:</span>` +
-    ["alle", ...data.persons].map(p => `<button class="filter-btn ${filterPerson===p?'active':''}" onclick="setFilterPerson('${p.replace(/'/g,"\\'")}')">
-      ${p==="alle"?"Alle":p}</button>`).join("");
+    ["alle", ...data.persons].map(p => `<button class="filter-btn ${filterPerson===p?'active':''}" data-p="${esc(p)}">${p==="alle"?"Alle":esc(p)}</button>`).join("");
+  fpEl.querySelectorAll('.filter-btn[data-p]').forEach(b => b.addEventListener('click', () => setFilterPerson(b.dataset.p)));
 
   // Filter-Buttons Kategorien
   const usedCats = [...new Set(data.contracts.map(c => c.cat))].sort();
   const fcEl = document.getElementById("filter-cats");
   fcEl.innerHTML = usedCats.length > 1
     ? `<span class="filter-label">Kategorie:</span>` +
-      ["alle", ...usedCats].map(c => `<button class="filter-btn ${filterCat===c?'active':''}" onclick="setFilterCat('${c.replace(/'/g,"\\'")}')">
-        ${c==="alle"?"Alle Kategorien":c}</button>`).join("")
+      ["alle", ...usedCats].map(c => `<button class="filter-btn ${filterCat===c?'active':''}" data-c="${esc(c)}">${c==="alle"?"Alle Kategorien":esc(c)}</button>`).join("")
     : "";
+  fcEl.querySelectorAll('.filter-btn[data-c]').forEach(b => b.addEventListener('click', () => setFilterCat(b.dataset.c)));
 
   const items = getSorted();
 
@@ -505,18 +551,18 @@ function render() {
       <div class="contract-icon">${ci.icon}</div>
       <div class="contract-body">
         <div class="contract-top">
-          <span class="contract-name">${item.name}</span>
-          <span class="contract-company">${item.company||""}</span>
+          <span class="contract-name">${esc(item.name)}</span>
+          <span class="contract-company">${esc(item.company||"")}</span>
         </div>
         <div class="contract-meta">
-          <span class="badge">${item.cat}</span>
-          ${item.person ? `<span class="badge person">${item.person}</span>` : ""}
-          ${item.contractno ? `<span class="badge">Nr. ${item.contractno}</span>` : ""}
+          <span class="badge">${esc(item.cat)}</span>
+          ${item.person ? `<span class="badge person">${esc(item.person)}</span>` : ""}
+          ${item.contractno ? `<span class="badge">Nr. ${esc(item.contractno)}</span>` : ""}
           ${item.startDate ? `<span class="badge">ab ${new Date(item.startDate).toLocaleDateString("de-DE")}</span>` : ""}
           ${expiryBadge}
-          ${item.coverage ? `<span class="badge">🔒 ${item.coverage}</span>` : ""}
+          ${item.coverage ? `<span class="badge">🔒 ${esc(item.coverage)}</span>` : ""}
         </div>
-        ${item.notes ? `<div style="font-size:0.78rem;color:#718096;margin-top:6px;">${item.notes}</div>` : ""}
+        ${item.notes ? `<div style="font-size:0.78rem;color:#718096;margin-top:6px;">${esc(item.notes)}</div>` : ""}
       </div>
       <div class="contract-right">
         <div class="contract-premium">${fmt(item.premium)}</div>
@@ -576,7 +622,7 @@ function openModal(idx = -1) {
 
 function closeModal() { document.getElementById("overlay").classList.remove("open"); }
 
-function saveItem() {
+async function saveItem() {
   const name = document.getElementById("m-name").value.trim();
   const premium = parseFloat(document.getElementById("m-premium").value);
   if (!name) { document.getElementById("m-name").focus(); return; }
@@ -596,12 +642,12 @@ function saveItem() {
   };
   if (editIndex >= 0) { data.contracts[editIndex] = entry; }
   else { data.contracts.push(entry); }
-  save(); render(); closeModal();
+  await save(); render(); closeModal();
 }
 
-function deleteItem(i) {
+async function deleteItem(i) {
   if (!confirm(`"${data.contracts[i].name}" wirklich löschen?`)) return;
-  data.contracts.splice(i,1); save(); render();
+  data.contracts.splice(i,1); await save(); render();
 }
 
 // ── Export ────────────────────────────────────────────
@@ -697,7 +743,7 @@ document.getElementById("overlay").addEventListener("click", e => { if (e.target
 function fabToggle(){const p=document.getElementById('fab-panel');p.style.display=p.style.display==='none'?'block':'none';}
 function fabDownload(obj,name){const json=JSON.stringify(obj,null,2);const blob=new Blob([json],{type:'application/json'});const fn=name.replace(/[^a-zA-Z0-9äöüÄÖÜß _-]/g,'_')+'.json';if(navigator.share&&navigator.canShare?.({files:[new File([blob],fn)]})){navigator.share({files:[new File([blob],fn,{type:'application/json'})]});}else{const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=fn;a.click();URL.revokeObjectURL(a.href);}}
 function fabExport(){const name=document.getElementById('fab-name').value.trim()||'Versicherungen_'+new Date().toLocaleDateString('de-DE').replace(/\./g,'-');fabDownload({version:'1.0',savedAt:new Date().toISOString(),name,data},name);}
-function fabImport(input){const r=new FileReader();r.onload=e=>{try{const obj=JSON.parse(e.target.result);data=obj.data||obj;localStorage.setItem('vs_data',JSON.stringify(data));filterPerson='alle';filterCat='alle';render();document.getElementById('fab-panel').style.display='none';}catch{alert('Datei konnte nicht geladen werden.');}};r.readAsText(input.files[0]);input.value='';}
+function fabImport(input){const r=new FileReader();r.onload=async e=>{try{const obj=JSON.parse(e.target.result);data=obj.data||obj;await save();filterPerson='alle';filterCat='alle';render();document.getElementById('fab-panel').style.display='none';}catch{alert('Datei konnte nicht geladen werden.');}};r.readAsText(input.files[0]);input.value='';}
 </script>
 <div id="fab-wrap" style="position:fixed;bottom:20px;right:16px;z-index:9000;display:flex;flex-direction:column;align-items:flex-end;gap:8px;">
   <div id="fab-panel" style="display:none;background:white;border:1px solid #ddd;border-radius:12px;padding:14px;box-shadow:0 4px 24px rgba(0,0,0,0.18);width:230px;">
