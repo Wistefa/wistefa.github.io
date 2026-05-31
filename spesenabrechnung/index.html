@@ -554,7 +554,7 @@ function exportCSV(){
     s.notizen||''
   ].map(v=>`"${String(v).replace(/"/g,'""')}"`).join(';'));
   const total=list.reduce((s,e)=>s+(parseFloat(e.betrag)||0),0);
-  rows.push(['"Gesamt"','','','','','',`"${fmtEur(total).replace('.',',')}"`,'"'"].join(';'));
+  rows.push(['"Gesamt"','','','','','',`"${fmtEur(total).replace('.',',')}"`,'"'].join(';'));
   const csv=BOM+[heads.join(';'),...rows].join('\r\n');
   const url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8;'}));
   const a=document.createElement('a'); a.href=url; a.download='spesenabrechnung.csv'; a.click();
