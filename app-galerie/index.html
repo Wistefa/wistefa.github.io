@@ -302,7 +302,7 @@
     <div style="font-size:12px;color:var(--text2);margin-bottom:6px" id="dl-vr"></div>
     <div style="font-size:13px;color:var(--text2);margin-bottom:26px;line-height:1.5" id="dl-ds"></div>
     <div style="display:flex;gap:9px;justify-content:center;flex-wrap:wrap">
-      <a id="dl-lk" href="#" class="btn-p" target="_blank">⬇ App öffnen</a>
+      <a id="dl-lk" href="#" class="btn-p" target="_blank" rel="noopener noreferrer">⬇ App öffnen</a>
       <button onclick="closeDl()" style="background:var(--bg);border:none;padding:10px 18px;border-radius:30px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;">Schließen</button>
     </div>
   </div>
@@ -335,7 +335,7 @@ function esc(s) {
 }
 
 function safeUrl(u) {
-  return /^https?:\/\//i.test(u) ? u : '#';
+  try { const x=new URL(u); return /^https?:$/.test(x.protocol)?x.href:'#'; } catch{ return '#'; }
 }
 
 // ── DATA ──────────────────────────────
@@ -447,7 +447,7 @@ function cardHTML(a) {
       </div>
     </div>
     <div class="adesc">${esc(a.desc)}</div>
-    ${a.url ? `<a class="card-url" href="${safeUrl(a.url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">🔗 ${esc(a.url.replace('https://',''))}</a>` : ''}
+    ${a.url ? `<a class="card-url" href="${esc(safeUrl(a.url))}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()">🔗 ${esc(a.url.replace('https://',''))}</a>` : ''}
     <div class="afooter">
       <div class="tags">${t}</div>
       <button class="btn-get" onclick="openDl(${a.id})">Laden</button>

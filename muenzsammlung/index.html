@@ -10,8 +10,8 @@
 <meta name="apple-mobile-web-app-title" content="Münzsammlung">
 <meta name="theme-color" content="#b8860b">
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Serif+Display:ital@0;1&display=swap" rel="stylesheet">
-<script src="https://unpkg.com/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
-<script src="https://unpkg.com/jspdf-autotable@3.8.1/dist/jspdf.plugin.autotable.min.js"></script>
+<script src="https://unpkg.com/jspdf@2.5.1/dist/jspdf.umd.min.js" integrity="sha384-JcnsjUPPylna1s1fvi1u12X5qjY5OL56iySh75FdtrwhO/SWXgMjoVqcKyIIWOLk" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/jspdf-autotable@3.8.1/dist/jspdf.plugin.autotable.min.js" integrity="sha384-b8MpgG2ZzWN6OPAtiB1JiBmDr9MpTt3NKK6KQf61hC/L7X4wJrvoTeVmMFPgp3nL" crossorigin="anonymous"></script>
 <style>
 :root {
   --gold:       #b8860b;
@@ -655,8 +655,11 @@ function handlePhoto(e){
 }
 
 function showPhotoPreview(src){
-  document.getElementById('photo-preview-wrap').innerHTML =
-    `<img class="photo-preview" src="${src}" alt="Vorschau"><div class="photo-hint" style="margin-top:6px">Foto klicken zum Ändern</div>`;
+  const wrap=document.getElementById('photo-preview-wrap');
+  wrap.replaceChildren();
+  const img=document.createElement('img'); img.className='photo-preview'; img.alt='Vorschau'; img.src=src;
+  const hint=document.createElement('div'); hint.className='photo-hint'; hint.style.marginTop='6px'; hint.textContent='Foto klicken zum Ändern';
+  wrap.append(img,hint);
 }
 
 function resetPhotoPreview(){

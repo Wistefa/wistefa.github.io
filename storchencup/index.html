@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>KVU Storchencup 2026 – Mixed Doppel</title>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" integrity="sha384-JcnsjUPPylna1s1fvi1u12X5qjY5OL56iySh75FdtrwhO/SWXgMjoVqcKyIIWOLk" crossorigin="anonymous"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; }
 
@@ -518,6 +518,7 @@
   // ── Hilfsfunktionen ─────────────────────────────────────────────────
   function el(id) { return document.getElementById(id); }
   function getPair(id) { return players.find(p => p.id === id); }
+  function esc(s) { return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
   function getInd(iid) { return individuals.find(x => x.iid === iid); }
 
   function shuffle(arr) {
@@ -537,15 +538,15 @@
     const sel = (selectedSlot && selectedSlot.roundIdx === roundIdx &&
                  selectedSlot.mid === mid && selectedSlot.side === side) ? ' selected' : '';
     return `<div class="player-slot${sel}" data-round="${roundIdx}" data-mid="${mid}" data-side="${side}">
-      <span class="slot-dame">${dame ? dame.dame : '?'}</span>
-      <span class="slot-herr">${herr  ? herr.herr  : '?'}</span>
+      <span class="slot-dame">${dame ? esc(dame.dame) : '?'}</span>
+      <span class="slot-herr">${herr  ? esc(herr.herr)  : '?'}</span>
     </div>`;
   }
 
   function teamLabel(team) {
     if (!team) return 'Freilos';
     const d = getPair(team.d), h = getPair(team.h);
-    return `${d ? d.dame : '?'} / ${h ? h.herr : '?'}`;
+    return `${d ? esc(d.dame) : '?'} / ${h ? esc(h.herr) : '?'}`;
   }
 
   // ── Spieler ──────────────────────────────────────────────────────────
@@ -680,8 +681,8 @@
       row.innerHTML = `
         <div class="pair-num">${p.id}</div>
         <div class="pair-inputs">
-          <input type="text" class="inp-dame" data-pid="${p.id}" value="${p.dame}" placeholder="Dame (Vorname Nachname)">
-          <input type="text" class="inp-herr" data-pid="${p.id}" value="${p.herr}" placeholder="Herr (Vorname Nachname)">
+          <input type="text" class="inp-dame" data-pid="${p.id}" value="${esc(p.dame)}" placeholder="Dame (Vorname Nachname)">
+          <input type="text" class="inp-herr" data-pid="${p.id}" value="${esc(p.herr)}" placeholder="Herr (Vorname Nachname)">
         </div>`;
       grid.appendChild(row);
     });
@@ -716,7 +717,7 @@
       tr.innerHTML = `
         <td><span class="rank-badge ${badge}">${i+1}</span></td>
         <td>
-          <div style="font-weight:700;font-size:.9rem">${s.name}</div>
+          <div style="font-weight:700;font-size:.9rem">${esc(s.name)}</div>
         </td>
         <td><strong>${s.points}</strong></td>
         <td style="color:var(--text-muted);font-size:.85rem">${s.wins} / ${s.draws} / ${s.losses}</td>`;

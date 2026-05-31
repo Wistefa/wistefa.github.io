@@ -9,8 +9,8 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Spesen">
 <meta name="theme-color" content="#0071e3">
-<script src="https://unpkg.com/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
-<script src="https://unpkg.com/jspdf-autotable@3.8.1/dist/jspdf.plugin.autotable.min.js"></script>
+<script src="https://unpkg.com/jspdf@2.5.1/dist/jspdf.umd.min.js" integrity="sha384-JcnsjUPPylna1s1fvi1u12X5qjY5OL56iySh75FdtrwhO/SWXgMjoVqcKyIIWOLk" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/jspdf-autotable@3.8.1/dist/jspdf.plugin.autotable.min.js" integrity="sha384-b8MpgG2ZzWN6OPAtiB1JiBmDr9MpTt3NKK6KQf61hC/L7X4wJrvoTeVmMFPgp3nL" crossorigin="anonymous"></script>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
 :root {
@@ -507,7 +507,11 @@ function handlePhoto(e){
   r.readAsDataURL(file);
 }
 function showPhoto(src){
-  document.getElementById('photo-preview-wrap').innerHTML=`<img class="photo-preview" src="${src}" alt="Beleg"><div class="photo-hint" style="margin-top:5px">Foto klicken zum Ändern</div>`;
+  const wrap=document.getElementById('photo-preview-wrap');
+  wrap.replaceChildren();
+  const img=document.createElement('img'); img.className='photo-preview'; img.alt='Beleg'; img.src=src;
+  const hint=document.createElement('div'); hint.className='photo-hint'; hint.style.marginTop='5px'; hint.textContent='Foto klicken zum Ändern';
+  wrap.append(img,hint);
 }
 function resetPhoto(){
   document.getElementById('photo-preview-wrap').innerHTML=`<div style="font-size:26px;margin-bottom:3px">📸</div><div class="photo-hint">Beleg fotografieren oder auswählen</div>`;
