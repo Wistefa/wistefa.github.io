@@ -988,7 +988,7 @@ function uid() { return Date.now() + Math.random().toString(36).slice(2, 6); }
 // ══════════════════════════════════════
 //  STORAGE
 // ══════════════════════════════════════
-function persist() { localStorage.setItem('fcrm-v2', JSON.stringify(db)); dpSave(); }
+function persist() { localStorage.setItem('fcrm-v2', JSON.stringify(db)); if (typeof dpSave === 'function') dpSave(); }
 
 function hydrate() {
   const raw = localStorage.getItem('fcrm-v2');
