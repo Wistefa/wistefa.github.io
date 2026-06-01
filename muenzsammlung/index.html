@@ -392,6 +392,7 @@ function load(){
 }
 function save(){
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(coins)); } catch(e){}
+  dpSave();
 }
 load();
 
@@ -1055,6 +1056,100 @@ if('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js');
 
 // ── INIT ──────────────────────────
 applyFilters();
+// ── WS Datenpool ─────────────────────────────────────────────────────
+const DP_APP  = 'Münzsammlung';
+const DP_DATA = () => coins;
+const DP_LOAD = (d) => { if (Array.isArray(d)) { coins = d; applyFilters(); } };
+
+const _DP_FILE = 'daten.json';
+const _DP_IDB  = 'ws_datenpool';
+let   _dpHandle = null;
+
+async function _dpOpenDB() {
+  return new Promise((res, rej) => {
+    const req = indexedDB.open(_DP_IDB, 1);
+    req.onupgradeneeded = e => e.target.result.createObjectStore('h', { keyPath: 'k' });
+    req.onsuccess = e => res(e.target.result);
+    req.onerror = rej;
+  });
+}
+async function _dpStoreHandle(h) {
+  const db = await _dpOpenDB();
+  return new Promise((res, rej) => {
+    const tx = db.transaction('h', 'readwrite');
+    tx.objectStore('h').put({ k: 'dp_' + DP_APP, h });
+    tx.oncomplete = res; tx.onerror = rej;
+  });
+}
+async function _dpGetHandle() {
+  const db = await _dpOpenDB();
+  return new Promise((res, rej) => {
+    const tx = db.transaction('h', 'readonly');
+    const req = tx.objectStore('h').get('dp_' + DP_APP);
+    req.onsuccess = e => res(e.target.result?.h ?? null);
+    req.onerror = rej;
+  });
+}
+async function dpConnect() {
+  if (!('showDirectoryPicker' in window)) {
+    alert('File System Access API nicht verfügbar. Chrome/Edge erforderlich.');
+    return;
+  }
+  try {
+    const root = await window.showDirectoryPicker({ mode: 'readwrite', startIn: 'desktop' });
+    _dpHandle = await root.getDirectoryHandle(DP_APP, { create: true });
+    await _dpStoreHandle(_dpHandle);
+    await dpSave();
+    dpUpdateUI(true);
+  } catch (e) {
+    if (e.name !== 'AbortError') console.warn('[Datenpool] connect:', e);
+  }
+}
+async function dpSave() {
+  if (!_dpHandle) return;
+  try {
+    const perm = await _dpHandle.queryPermission({ mode: 'readwrite' });
+    if (perm !== 'granted') return;
+    const fh = await _dpHandle.getFileHandle(_DP_FILE, { create: true });
+    const wr = await fh.createWritable();
+    await wr.write(JSON.stringify({ version: '1.0', app: DP_APP, savedAt: new Date().toISOString(), data: DP_DATA() }, null, 2));
+    await wr.close();
+  } catch (e) { console.warn('[Datenpool] save:', e); }
+}
+async function dpLoad() {
+  try {
+    const handle = await _dpGetHandle();
+    if (!handle) return false;
+    const perm = await handle.queryPermission({ mode: 'readwrite' });
+    if (perm !== 'granted') { _dpHandle = handle; return false; }
+    _dpHandle = handle;
+    const fh = await handle.getFileHandle(_DP_FILE);
+    const file = await fh.getFile();
+    const obj = JSON.parse(await file.text());
+    if (obj?.data !== undefined) { DP_LOAD(obj.data); return true; }
+    return false;
+  } catch (e) {
+    if (e.name !== 'NotFoundError') console.warn('[Datenpool] load:', e);
+    return false;
+  }
+}
+function dpUpdateUI(state) {
+  const s = document.getElementById('dp-status');
+  const b = document.getElementById('dp-btn');
+  if (!s) return;
+  if (state === true)          { s.textContent = '● verbunden';               s.style.color = '#34c759'; if (b) b.style.display = 'none'; }
+  else if (state === 'prompt') { s.textContent = '⚠ Berechtigung abgelaufen'; s.style.color = '#ff9500'; if (b) { b.textContent = '☁️ Neu verbinden'; b.style.display = ''; } }
+  else                         { s.textContent = '○ nicht verbunden';         s.style.color = '#999';    if (b) { b.textContent = '☁️ Mit Datenpool verbinden'; b.style.display = ''; } }
+}
+async function dpInit() {
+  const loaded = await dpLoad();
+  const handle = await _dpGetHandle();
+  if (!handle)      dpUpdateUI(false);
+  else if (!loaded) dpUpdateUI('prompt');
+  else              dpUpdateUI(true);
+}
+dpInit();
+// ─────────────────────────────────────────────────────────────────────
 function fabToggle(){const p=document.getElementById('fab-panel');p.style.display=p.style.display==='none'?'block':'none';}
 function fabDownload(obj,name){const json=JSON.stringify(obj,null,2);const blob=new Blob([json],{type:'application/json'});const fn=name.replace(/[^a-zA-Z0-9äöüÄÖÜß _-]/g,'_')+'.json';if(navigator.share&&navigator.canShare?.({files:[new File([blob],fn)]})){navigator.share({files:[new File([blob],fn,{type:'application/json'})]});}else{const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=fn;a.click();URL.revokeObjectURL(a.href);}}
 function fabExport(){const name=document.getElementById('fab-name').value.trim()||'Muenzsammlung_'+new Date().toLocaleDateString('de-DE').replace(/\./g,'-');fabDownload({version:'1.0',savedAt:new Date().toISOString(),name,data:coins},name);}
@@ -1103,6 +1198,11 @@ function fabImport(input){
     <input type="text" id="fab-name" placeholder="Name (z.B. 28.05.2026)" style="width:100%;padding:7px 10px;border:1px solid #ddd;border-radius:7px;font-size:16px;margin-bottom:8px;box-sizing:border-box;">
     <button onclick="fabExport()" style="width:100%;padding:9px;background:#1b4332;color:#f0d080;border:1px solid #c8952a;border-radius:7px;font-weight:bold;cursor:pointer;margin-bottom:7px;font-size:0.88rem;">💾 Speichern (JSON)</button>
     <label style="display:block;width:100%;padding:9px;background:#f5f5f5;border:1px solid #ddd;border-radius:7px;font-weight:bold;cursor:pointer;text-align:center;font-size:0.88rem;box-sizing:border-box;">📂 Laden (JSON)<input type="file" accept=".json" style="display:none" onchange="fabImport(this)"></label>
+    <div style="border-top:1px solid #eee;margin-top:8px;padding-top:8px;">
+      <div style="font-size:0.75rem;font-weight:700;color:#666;letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px;">iCloud Datenpool</div>
+      <div id="dp-status" style="font-size:0.8rem;margin-bottom:6px;color:#999;">○ nicht verbunden</div>
+      <button id="dp-btn" onclick="dpConnect()" style="width:100%;padding:9px;background:#e8f5e9;color:#2e7d32;border:1px solid #a5d6a7;border-radius:7px;font-weight:bold;cursor:pointer;font-size:0.88rem;">☁️ Mit Datenpool verbinden</button>
+    </div>
   </div>
   <button onclick="fabToggle()" style="width:50px;height:50px;border-radius:50%;background:#1b4332;color:#f0d080;border:2px solid #c8952a;font-size:1.4rem;cursor:pointer;box-shadow:0 3px 14px rgba(0,0,0,0.3);" title="Daten speichern / laden">💾</button>
 </div>
