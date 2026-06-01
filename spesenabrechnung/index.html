@@ -146,7 +146,7 @@ header{background:rgba(240,244,255,.9);backdrop-filter:saturate(180%) blur(20px)
 #toast{position:fixed;bottom:28px;left:50%;transform:translateX(-50%) translateY(16px);background:#1c1c1e;color:#fff;padding:10px 20px;border-radius:30px;font-size:14px;font-weight:500;opacity:0;transition:all .3s;z-index:9999;pointer-events:none;white-space:nowrap;}
 #toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
 
-@keyframes fu{from{opacity:0;transform:translateY(10px);}to{opacity:1;transform:translateY(0);}}
+@keyframes fu{from{opacity:0;transform:translateY(10px);}to{opacity:1;transform:translateY(0);}
 .spesen-row{animation:fu .25s ease both;}
 
 @media(max-width:700px){
@@ -850,27 +850,27 @@ async function dpInit() {
 dpInit();
 // ─────────────────────────────────────────────────────────────────────
 function fabToggle(){const p=document.getElementById('fab-panel');p.style.display=p.style.display==='none'?'block':'none';}
-function fabDownload(obj,name){const json=JSON.stringify(obj,null,2);const blob=new Blob([json],{type:'application/json'});const fn=name.replace(/[^a-zA-Z0-9äöüÄÖÜß _-]/g,'_')+'.json';const isMobile=/iPhone|iPad|iPod|Android/i.test(navigator.userAgent);if(isMobile&&navigator.share&&navigator.canShare?.({files:[new File([blob],fn)]})){navigator.share({files:[new File([blob],fn,{type:'application/json'})]});}else{const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=fn;a.click();URL.revokeObjectURL(a.href);}}
-async function fabExport(){{
+function fabDownload(obj,name){const json=JSON.stringify(obj,null,2);const blob=new Blob([json],{type:'application/json'});const fn=name.replace(/[^a-zA-Z0-9äöüÄÖÜß _-]/g,'_')+'.json';const isMobile=/iPhone|iPad|iPod|Android/i.test(navigator.userAgent);if(isMobile&&navigator.share&&navigator.canShare?.({files:[new File([blob],fn)]})){navigator.share({files:[new File([blob],fn,{type:'application/json'})]});}else{const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=fn;a.click();URL.revokeObjectURL(a.href);}
+async function fabExport(){
   const name=document.getElementById('fab-name').value.trim()||DP_APP+'_'+new Date().toLocaleDateString('de-DE').replace(/\./g,'-');
   const fn=name.replace(/[^a-zA-Z0-9\u00e4\u00f6\u00fc\u00c4\u00d6\u00dc\u00df _-]/g,'_')+'.json';
-  const obj={{version:'1.0',savedAt:new Date().toISOString(),name,data:spesen}};
-  if(_dpHandle){{
-    try{{
-      const perm=await _dpHandle.queryPermission({{mode:'readwrite'}});
-      if(perm==='granted'){{
-        const fh=await _dpHandle.getFileHandle(fn,{{create:true}});
+  const obj={version:'1.0',savedAt:new Date().toISOString(),name,data:spesen};
+  if(_dpHandle){
+    try{
+      const perm=await _dpHandle.queryPermission({mode:'readwrite'});
+      if(perm==='granted'){
+        const fh=await _dpHandle.getFileHandle(fn,{create:true});
         const wr=await fh.createWritable();
         await wr.write(JSON.stringify(obj,null,2));
         await wr.close();
         document.getElementById('fab-panel').style.display='none';
         return;
-      }}
-    }}catch(e){{console.warn('[Datenpool] export:',e);}}
-  }}
+      }
+    }catch(e){console.warn('[Datenpool] export:',e);}
+  }
   fabDownload(obj,name);
-}}
-function fabImport(input){const r=new FileReader();r.onload=e=>{try{const obj=JSON.parse(e.target.result);spesen=obj.data||obj;localStorage.setItem('spesenabrechnung_v1',JSON.stringify(spesen));applyFilters();document.getElementById('fab-panel').style.display='none';}catch{alert('Datei konnte nicht geladen werden.');}};r.readAsText(input.files[0]);input.value='';}
+}
+function fabImport(input){const r=new FileReader();r.onload=e=>{try{const obj=JSON.parse(e.target.result);spesen=obj.data||obj;localStorage.setItem('spesenabrechnung_v1',JSON.stringify(spesen));applyFilters();document.getElementById('fab-panel').style.display='none';}catch{alert('Datei konnte nicht geladen werden.');};r.readAsText(input.files[0]);input.value='';}
 </script>
 <a href="../index.html" style="position:fixed;top:10px;left:10px;z-index:10000;background:rgba(0,0,0,0.6);color:rgba(255,255,255,0.9);text-decoration:none;padding:6px 14px;border-radius:20px;font-size:12px;font-weight:700;letter-spacing:.3px;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);box-shadow:0 2px 8px rgba(0,0,0,.3);">← Apps</a>
 <div id="fab-wrap" style="position:fixed;bottom:20px;right:16px;z-index:9000;display:flex;flex-direction:column;align-items:flex-end;gap:8px;">

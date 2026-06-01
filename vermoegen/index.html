@@ -1161,26 +1161,26 @@ async function dpInit() {
 dpInit();
 // ─────────────────────────────────────────────────────────────────────
 function fabToggle(){const p=document.getElementById('fab-panel');p.style.display=p.style.display==='none'?'block':'none';}
-function fabDownload(obj,name){const json=JSON.stringify(obj,null,2);const blob=new Blob([json],{type:'application/json'});const fn=name.replace(/[^a-zA-Z0-9äöüÄÖÜß _-]/g,'_')+'.json';const isMobile=/iPhone|iPad|iPod|Android/i.test(navigator.userAgent);if(isMobile&&navigator.share&&navigator.canShare?.({files:[new File([blob],fn)]})){navigator.share({files:[new File([blob],fn,{type:'application/json'})]});}else{const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=fn;a.click();URL.revokeObjectURL(a.href);}}
-async function fabExport(){{
+function fabDownload(obj,name){const json=JSON.stringify(obj,null,2);const blob=new Blob([json],{type:'application/json'});const fn=name.replace(/[^a-zA-Z0-9äöüÄÖÜß _-]/g,'_')+'.json';const isMobile=/iPhone|iPad|iPod|Android/i.test(navigator.userAgent);if(isMobile&&navigator.share&&navigator.canShare?.({files:[new File([blob],fn)]})){navigator.share({files:[new File([blob],fn,{type:'application/json'})]});}else{const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=fn;a.click();URL.revokeObjectURL(a.href);}
+async function fabExport(){
   const name=document.getElementById('fab-name').value.trim()||DP_APP+'_'+new Date().toLocaleDateString('de-DE').replace(/\./g,'-');
   const fn=name.replace(/[^a-zA-Z0-9\u00e4\u00f6\u00fc\u00c4\u00d6\u00dc\u00df _-]/g,'_')+'.json';
-  const obj={{version:'1.0',savedAt:new Date().toISOString(),name,data:data}};
-  if(_dpHandle){{
-    try{{
-      const perm=await _dpHandle.queryPermission({{mode:'readwrite'}});
-      if(perm==='granted'){{
-        const fh=await _dpHandle.getFileHandle(fn,{{create:true}});
+  const obj={version:'1.0',savedAt:new Date().toISOString(),name,data:data};
+  if(_dpHandle){
+    try{
+      const perm=await _dpHandle.queryPermission({mode:'readwrite'});
+      if(perm==='granted'){
+        const fh=await _dpHandle.getFileHandle(fn,{create:true});
         const wr=await fh.createWritable();
         await wr.write(JSON.stringify(obj,null,2));
         await wr.close();
         document.getElementById('fab-panel').style.display='none';
         return;
-      }}
-    }}catch(e){{console.warn('[Datenpool] export:',e);}}
-  }}
+      }
+    }catch(e){console.warn('[Datenpool] export:',e);}
+  }
   fabDownload(obj,name);
-}}
+}
 function fabImport(input){
   const file=input.files[0]; if(!file) return;
   if(file.size>4*1024*1024){alert('Datei zu groß (max. 4 MB).');input.value='';return;}
