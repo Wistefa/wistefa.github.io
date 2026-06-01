@@ -846,7 +846,7 @@ dpInit();
 // ─────────────────────────────────────────────────────────────────────
 
 function fabToggle(){const p=document.getElementById('fab-panel');p.style.display=p.style.display==='none'?'block':'none';}
-function fabDownload(obj,name){const json=JSON.stringify(obj,null,2);const blob=new Blob([json],{type:'application/json'});const fn=name.replace(/[^a-zA-Z0-9äöüÄÖÜß _-]/g,'_')+'.json';if(navigator.share&&navigator.canShare?.({files:[new File([blob],fn)]})){navigator.share({files:[new File([blob],fn,{type:'application/json'})]});}else{const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=fn;a.click();URL.revokeObjectURL(a.href);}}
+function fabDownload(obj,name){const json=JSON.stringify(obj,null,2);const blob=new Blob([json],{type:'application/json'});const fn=name.replace(/[^a-zA-Z0-9äöüÄÖÜß _-]/g,'_')+'.json';const isMobile=/iPhone|iPad|iPod|Android/i.test(navigator.userAgent);if(isMobile&&navigator.share&&navigator.canShare?.({files:[new File([blob],fn)]})){navigator.share({files:[new File([blob],fn,{type:'application/json'})]});}else{const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=fn;a.click();URL.revokeObjectURL(a.href);}}
 function fabExport(){const name=document.getElementById('fab-name').value.trim()||'Haushaltsbuch_'+new Date().toLocaleDateString('de-DE').replace(/\./g,'-');fabDownload({version:'1.0',savedAt:new Date().toISOString(),name,data:txs},name);}
 function fabImport(input){
   const file=input.files[0]; if(!file) return;
