@@ -12,6 +12,8 @@ Geführtes tägliches Fitnessprogramm in fünf Bereichen für Körper und Geist 
 - Täglicher Trainingsplan
 - Fortschritts-Tracking
 
+- **← Apps** – Zurück zur wistefa.github.io Übersicht
+
 ## Technik
 
 - Reines HTML/CSS/JS, kein Build-Prozess, kein Service Worker

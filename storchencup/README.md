@@ -15,6 +15,8 @@ Turnierverwaltung für den KVU Storchencup Mixed Doppel.
 - Einzelwertung
 - PDF-Export der Ergebnisse
 - Passwortschutz (Einstellungen → KVU Storchencup, Standard: `kVU1906`)
+- **💾 FAB-Button** – Turnier mit eigenem Dateinamen als JSON sichern und wiederherstellen; iCloud Datenpool unterstützt (Chrome/Edge)
+- **← Apps** – Zurück zur wistefa.github.io Übersicht
 
 ## Hinweis
 

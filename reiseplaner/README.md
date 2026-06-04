@@ -11,11 +11,13 @@ Reisen planen und verwalten — Destinationen, Zeiträume, Aktivitäten und Budg
 - Aktivitäten und Unterkünfte planen
 - Packliste
 - Auto-Save in localStorage
-- WS Datenpool: automatischer Sync bei Datenänderung (falls verbunden)
+- **💾 FAB-Button** – Reisedaten mit eigenem Dateinamen als JSON sichern; bei Datenpool-Verbindung direkt in iCloud-Ordner
+- **iCloud Datenpool** – automatischer Sync als `daten.json` bei jeder Datenänderung (Chrome/Edge)
+- **← Apps** – Zurück zur wistefa.github.io Übersicht
 
 ## Datenpool
 
-Der ☁️-Button unten rechts verbindet die App mit dem WS Datenpool-Ordner (FileSystem Access API). Bei Verbindung werden Änderungen automatisch als `daten.json` gesichert und beim nächsten Öffnen wiederhergestellt.
+Der 💾-Button unten rechts öffnet das FAB-Panel. Dateiname vergeben → Speichern schreibt direkt in den verbundenen iCloud-Ordner oder löst einen Download aus. Änderungen werden zusätzlich automatisch als `daten.json` gesichert.
 
 ## Technik
 
