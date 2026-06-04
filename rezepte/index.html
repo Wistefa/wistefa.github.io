@@ -1255,18 +1255,27 @@
       });
     };
 
-    // Export (alle Daten + Dateien)
-    const exportData = async () => {
+    // Export (alle Daten + Dateien, optionaler Name + Datenpool-Handle)
+    const exportData = async (customName, dpHandleArg) => {
       const files = await dbGetAll();
-      const datum = new Date().toISOString().split('T')[0];
-      const blob  = new Blob([JSON.stringify({recipes,menus,cats,files,exportedAt:new Date().toISOString()})],
-        {type:'application/json'});
-      const url=URL.createObjectURL(blob), a=document.createElement('a');
-      a.href=url; a.download=`rezepte_backup_${datum}.json`; a.click();
+      const safeName = (customName || ('rezepte_backup_' + new Date().toISOString().split('T')[0]))
+        .replace(/[^a-zA-Z0-9äöüÄÖÜß _-]/g, '_');
+      const data = JSON.stringify({recipes, menus, cats, files, exportedAt: new Date().toISOString()});
+      if (dpHandleArg) {
+        try {
+          const fh = await dpHandleArg.getFileHandle(safeName + '.json', {create:true});
+          const wr = await fh.createWritable();
+          await wr.write(data);
+          await wr.close();
+          return;
+        } catch(e) { console.warn('[Datenpool] export:', e); }
+      }
+      const blob = new Blob([data], {type:'application/json'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = safeName + '.json'; a.click();
       URL.revokeObjectURL(url);
     };
-    window._rezepteExport = exportData;
-    window._rezepteImportRef = importData;
 
     // Import
     const importData = async e => {
@@ -1287,6 +1296,9 @@
       };
       reader.readAsText(f);
     };
+
+    window._rezepteExport = exportData;
+    window._rezepteImport = importData;
 
     const selRecipe = recipes.find(r=>r.id===selId);
 
@@ -1340,15 +1352,64 @@
   if('serviceWorker' in navigator)
     window.addEventListener('load', ()=>navigator.serviceWorker.register('./sw.js'));
 </script>
+<script>
+// ── WS Datenpool – Rezepte ────────────────────────────────────────────
+const RZ_APP = 'rezepte';
+let rzDpHandle = null;
+
+(async () => {
+  try {
+    const db = await new Promise((res,rej)=>{const r=indexedDB.open('ws-datenpool',1);r.onupgradeneeded=e=>e.target.result.createObjectStore('handles');r.onsuccess=e=>res(e.target.result);r.onerror=rej;});
+    const req = db.transaction('handles','readonly').objectStore('handles').get(RZ_APP);
+    req.onsuccess = async () => { if(req.result){const p=await req.result.requestPermission({mode:'readwrite'});if(p==='granted'){rzDpHandle=req.result;rzDpUpdateStatus();}} };
+  } catch(e) {}
+})();
+
+async function rzDpConnect() {
+  if (!('showDirectoryPicker' in window)) { alert('Nur Chrome/Edge unterstützt.'); return; }
+  try {
+    const root = await window.showDirectoryPicker({ mode:'readwrite', startIn:'desktop' });
+    rzDpHandle = root;
+    const db = await new Promise((res,rej)=>{const r=indexedDB.open('ws-datenpool',1);r.onupgradeneeded=e=>e.target.result.createObjectStore('handles');r.onsuccess=e=>res(e.target.result);r.onerror=rej;});
+    const tx = db.transaction('handles','readwrite'); tx.objectStore('handles').put(root, RZ_APP);
+    rzDpUpdateStatus();
+  } catch(e) { if(e.name!=='AbortError') console.warn('[Datenpool]',e); }
+}
+
+function rzDpUpdateStatus() {
+  const s=document.getElementById('rz-dp-status'), b=document.getElementById('rz-dp-btn');
+  if(rzDpHandle){if(s){s.textContent='✓ verbunden: '+rzDpHandle.name;s.style.color='#2e7d32';}if(b)b.style.display='none';}
+  else{if(s){s.textContent='○ nicht verbunden';s.style.color='#999';}if(b)b.style.display='';}
+}
+
+function rzFabToggle(){
+  const p=document.getElementById('fab-panel');
+  p.style.display=p.style.display==='none'?'block':'none';
+  if(p.style.display==='block') rzDpUpdateStatus();
+}
+
+async function rzFabExport() {
+  const name = document.getElementById('fab-name').value.trim()
+    || 'Rezepte_' + new Date().toLocaleDateString('de-DE').replace(/\./g,'-');
+  await window._rezepteExport?.(name, rzDpHandle || null);
+  document.getElementById('fab-panel').style.display = 'none';
+}
+</script>
+
 <a href="../index.html" style="position:fixed;top:10px;left:10px;z-index:10000;background:rgba(0,0,0,0.6);color:rgba(255,255,255,0.9);text-decoration:none;padding:6px 14px;border-radius:20px;font-size:12px;font-weight:700;letter-spacing:.3px;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);box-shadow:0 2px 8px rgba(0,0,0,.3);">← Apps</a>
 <div id="fab-wrap" style="position:fixed;bottom:20px;right:16px;z-index:9000;display:flex;flex-direction:column;align-items:flex-end;gap:8px;">
   <div id="fab-panel" style="display:none;background:white;border:1px solid #ddd;border-radius:12px;padding:14px;box-shadow:0 4px 24px rgba(0,0,0,0.18);width:240px;">
-    <div style="font-weight:700;font-size:0.9rem;margin-bottom:10px;color:#333;">💾 Rezepte sichern / laden</div>
-    <button onclick="window._rezepteExport?.()" style="width:100%;padding:9px;background:#1b4332;color:#f0d080;border:1px solid #c8952a;border-radius:7px;font-weight:bold;cursor:pointer;margin-bottom:7px;font-size:0.88rem;">💾 Backup exportieren (JSON)</button>
-    <label style="display:block;width:100%;padding:9px;background:#f5f5f5;border:1px solid #ddd;border-radius:7px;font-weight:bold;cursor:pointer;text-align:center;font-size:0.88rem;box-sizing:border-box;">📂 Backup laden (JSON)<input type="file" accept=".json" id="fab-import-input" style="display:none" onchange="window._rezepteImportRef?.({target:this})"></label>
-    <p style="font-size:0.72rem;color:#999;margin-top:8px;">Sichert alle Rezepte inkl. Fotos und PDFs.</p>
+    <div style="font-weight:700;font-size:0.9rem;margin-bottom:10px;color:#1b4332;">💾 Rezepte sichern / laden</div>
+    <input type="text" id="fab-name" placeholder="Name (z.B. Rezepte Jun 2026)" style="width:100%;padding:7px 10px;border:1px solid #ddd;border-radius:7px;font-size:16px;margin-bottom:8px;box-sizing:border-box;">
+    <button onclick="rzFabExport()" style="width:100%;padding:9px;background:#1b4332;color:#f0d080;border:1px solid #c8952a;border-radius:7px;font-weight:bold;cursor:pointer;margin-bottom:7px;font-size:0.88rem;">💾 Speichern (JSON + Fotos)</button>
+    <label style="display:block;width:100%;padding:9px;background:#f5f5f5;border:1px solid #ddd;border-radius:7px;font-weight:bold;cursor:pointer;text-align:center;font-size:0.88rem;box-sizing:border-box;">📂 Laden (JSON)<input type="file" accept=".json" style="display:none" onchange="window._rezepteImport?.({target:this})"></label>
+    <hr style="border:none;border-top:1px solid #eee;margin:10px 0;">
+    <div style="font-size:0.75rem;font-weight:700;color:#666;letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px;">iCloud Datenpool</div>
+    <div id="rz-dp-status" style="font-size:0.78rem;color:#999;margin-bottom:6px;">○ nicht verbunden</div>
+    <button id="rz-dp-btn" onclick="rzDpConnect()" style="width:100%;padding:9px;background:#e8f5e9;color:#2e7d32;border:1px solid #a5d6a7;border-radius:7px;font-weight:bold;cursor:pointer;font-size:0.88rem;">☁️ Mit Datenpool verbinden</button>
+    <p style="font-size:0.71rem;color:#aaa;margin-top:8px;">Verbunden: Speichern schreibt direkt in iCloud-Ordner.</p>
   </div>
-  <button onclick="document.getElementById('fab-panel').style.display=document.getElementById('fab-panel').style.display==='none'?'block':'none'" style="width:50px;height:50px;border-radius:50%;background:#1b4332;color:#f0d080;border:2px solid #c8952a;font-size:1.4rem;cursor:pointer;box-shadow:0 3px 14px rgba(0,0,0,0.3);" title="Rezepte sichern">💾</button>
+  <button onclick="rzFabToggle()" style="width:50px;height:50px;border-radius:50%;background:#1b4332;color:#f0d080;border:2px solid #c8952a;font-size:1.4rem;cursor:pointer;box-shadow:0 3px 14px rgba(0,0,0,0.3);" title="Rezepte sichern / laden">💾</button>
 </div>
 </body>
 </html>
