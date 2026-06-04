@@ -1062,7 +1062,78 @@
   });
 
   init(20);
+
+  window._scGetState = () => ({ players, individuals, roundsData, playerCount });
+  window._scSetState = (d) => {
+    players = d.players || [];
+    individuals = d.individuals || [];
+    roundsData = d.roundsData || { r1: [], r2: [], r3: [], ko: null };
+    playerCount = d.playerCount || 20;
+    renderAll();
+  };
 })();
 </script>
+
+<script>
+const DP_APP = 'storchencup';
+let dpHandle = null;
+
+(async () => {
+  try {
+    const db = await new Promise((res, rej) => { const r = indexedDB.open('ws-datenpool',1); r.onupgradeneeded=e=>e.target.result.createObjectStore('handles'); r.onsuccess=e=>res(e.target.result); r.onerror=rej; });
+    const req = db.transaction('handles','readonly').objectStore('handles').get(DP_APP);
+    req.onsuccess = async () => { if(req.result){const p=await req.result.requestPermission({mode:'readwrite'});if(p==='granted'){dpHandle=req.result;dpUpdateStatus();}} };
+  } catch(e){}
+})();
+
+async function dpConnect() {
+  if (!('showDirectoryPicker' in window)) { alert('Nur Chrome/Edge unterstützt.'); return; }
+  try {
+    const root = await window.showDirectoryPicker({ mode:'readwrite', startIn:'desktop' });
+    dpHandle = root;
+    const db = await new Promise((res,rej)=>{const r=indexedDB.open('ws-datenpool',1);r.onupgradeneeded=e=>e.target.result.createObjectStore('handles');r.onsuccess=e=>res(e.target.result);r.onerror=rej;});
+    const tx = db.transaction('handles','readwrite'); tx.objectStore('handles').put(root,DP_APP);
+    dpUpdateStatus(); await dpSave();
+  } catch(e){ if(e.name!=='AbortError') console.warn('[Datenpool]',e); }
+}
+async function dpSave() {
+  if (!dpHandle) return;
+  try {
+    const fh = await dpHandle.getFileHandle('daten.json',{create:true});
+    const wr = await fh.createWritable();
+    await wr.write(JSON.stringify({version:'1.0',app:DP_APP,savedAt:new Date().toISOString(),data:window._scGetState?.()},{},2));
+    await wr.close();
+  } catch(e){ console.warn('[Datenpool] save:',e); }
+}
+function dpUpdateStatus() {
+  const s=document.getElementById('dp-status'), b=document.getElementById('dp-btn');
+  if(dpHandle){if(s){s.textContent='✓ verbunden: '+dpHandle.name;s.style.color='#2e7d32';}if(b)b.style.display='none';}
+  else{if(s){s.textContent='○ nicht verbunden';s.style.color='#999';}if(b)b.style.display='';}
+}
+function fabToggle(){const p=document.getElementById('fab-panel');p.style.display=p.style.display==='none'?'block':'none';if(p.style.display==='block')dpUpdateStatus();}
+function fabDownload(obj,name){const json=JSON.stringify(obj,null,2);const blob=new Blob([json],{type:'application/json'});const fn=name.replace(/[^a-zA-Z0-9äöüÄÖÜß _-]/g,'_')+'.json';const isMobile=/iPhone|iPad|iPod|Android/i.test(navigator.userAgent);if(isMobile&&navigator.share&&navigator.canShare?.({files:[new File([blob],fn)]})){navigator.share({files:[new File([blob],fn,{type:'application/json'})]});}else{const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=fn;a.click();URL.revokeObjectURL(a.href);}}
+async function fabExport(){
+  const name=document.getElementById('fab-name').value.trim()||'Storchencup_'+new Date().toLocaleDateString('de-DE').replace(/\./g,'-');
+  const obj={version:'1.0',savedAt:new Date().toISOString(),name,data:window._scGetState?.()};
+  if(dpHandle){try{const fh=await dpHandle.getFileHandle(name.replace(/[^a-zA-Z0-9äöüÄÖÜß _-]/g,'_')+'.json',{create:true});const wr=await fh.createWritable();await wr.write(JSON.stringify(obj,null,2));await wr.close();document.getElementById('fab-panel').style.display='none';return;}catch(e){console.warn('[Datenpool] export:',e);}}
+  fabDownload(obj,name);document.getElementById('fab-panel').style.display='none';
+}
+function fabImport(input){const r=new FileReader();r.onload=e=>{try{const obj=JSON.parse(e.target.result);const d=obj.data||obj;window._scSetState?.(d);document.getElementById('fab-panel').style.display='none';}catch{alert('Datei konnte nicht geladen werden.');}};r.readAsText(input.files[0]);input.value='';}
+</script>
+
+<a href="../index.html" style="position:fixed;top:10px;left:10px;z-index:10000;background:rgba(0,0,0,0.6);color:rgba(255,255,255,0.9);text-decoration:none;padding:6px 14px;border-radius:20px;font-size:12px;font-weight:700;letter-spacing:.3px;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);box-shadow:0 2px 8px rgba(0,0,0,.3);">← Apps</a>
+<div id="fab-wrap" style="position:fixed;bottom:20px;right:16px;z-index:9000;display:flex;flex-direction:column;align-items:flex-end;gap:8px;">
+  <div id="fab-panel" style="display:none;background:white;border:1px solid #ddd;border-radius:12px;padding:14px;box-shadow:0 4px 24px rgba(0,0,0,0.18);width:240px;">
+    <div style="font-weight:700;font-size:0.9rem;margin-bottom:10px;color:#1b4332;">💾 Turnier speichern / laden</div>
+    <input type="text" id="fab-name" placeholder="Name (z.B. Storchencup 2026)" style="width:100%;padding:7px 10px;border:1px solid #ddd;border-radius:7px;font-size:16px;margin-bottom:8px;box-sizing:border-box;">
+    <button onclick="fabExport()" style="width:100%;padding:9px;background:#1b4332;color:#f0d080;border:1px solid #c8952a;border-radius:7px;font-weight:bold;cursor:pointer;margin-bottom:7px;font-size:0.88rem;">💾 Speichern (JSON)</button>
+    <label style="display:block;width:100%;padding:9px;background:#f5f5f5;border:1px solid #ddd;border-radius:7px;font-weight:bold;cursor:pointer;text-align:center;font-size:0.88rem;box-sizing:border-box;">📂 Laden (JSON)<input type="file" accept=".json" style="display:none" onchange="fabImport(this)"></label>
+    <hr style="border:none;border-top:1px solid #eee;margin:10px 0;">
+    <div style="font-size:0.75rem;font-weight:700;color:#666;letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px;">iCloud Datenpool</div>
+    <div id="dp-status" style="font-size:0.78rem;color:#999;margin-bottom:6px;">○ nicht verbunden</div>
+    <button id="dp-btn" onclick="dpConnect()" style="width:100%;padding:9px;background:#e8f5e9;color:#2e7d32;border:1px solid #a5d6a7;border-radius:7px;font-weight:bold;cursor:pointer;font-size:0.88rem;">☁️ Mit Datenpool verbinden</button>
+  </div>
+  <button onclick="fabToggle()" style="width:50px;height:50px;border-radius:50%;background:#1b4332;color:#f0d080;border:2px solid #c8952a;font-size:1.4rem;cursor:pointer;box-shadow:0 3px 14px rgba(0,0,0,0.3);" title="Turnier speichern / laden">💾</button>
+</div>
 </body>
 </html>
