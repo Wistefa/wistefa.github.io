@@ -1,0 +1,1496 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FORM3D — 3D Modell Viewer</title>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/STLLoader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/utils/BufferGeometryUtils.js"></script>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:      #161820;
+  --surface: #1e2130;
+  --border:  #2e3550;
+  --accent:  #00e5ff;
+  --accent2: #ff6b35;
+  --accent3: #a8ff3e;
+  --text:    #e2e8f8;
+  --muted:   #8899bb;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Space Mono', 'Courier New', monospace;
+  font-size: 14px;
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* ── Header ─────────────────────────────────────── */
+header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 0 20px;
+  height: 48px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.logo {
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: 3px;
+  color: var(--accent);
+}
+.logo span { color: var(--text); opacity: 0.6; }
+.header-meta { margin-left: auto; display: flex; gap: 24px; opacity: 0.75; }
+
+/* ── Layout ──────────────────────────────────────── */
+.layout {
+  display: grid;
+  grid-template-columns: 220px 1fr 200px;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* ── Left: Fotos ─────────────────────────────────── */
+.panel-photos {
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.panel-title {
+  padding: 10px 14px;
+  font-size: 12px;
+  letter-spacing: 2px;
+  color: var(--accent);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.drop-zone {
+  margin: 10px;
+  border: 1px dashed var(--border);
+  border-radius: 4px;
+  padding: 16px 10px;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color .2s, background .2s;
+  flex-shrink: 0;
+}
+.drop-zone:hover, .drop-zone.drag-over {
+  border-color: var(--accent);
+  background: rgba(0,229,255,.04);
+}
+.drop-zone .dz-icon { font-size: 22px; margin-bottom: 6px; }
+.drop-zone .dz-label { color: var(--muted); line-height: 1.5; }
+.drop-zone .dz-label b { color: var(--accent); }
+
+.photo-grid {
+  flex: 1;
+  overflow-y: auto;
+  padding: 6px 10px 10px;
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 4px;
+  align-content: start;
+}
+.photo-grid::-webkit-scrollbar { width: 4px; }
+.photo-grid::-webkit-scrollbar-track { background: transparent; }
+.photo-grid::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+.thumb {
+  aspect-ratio: 1;
+  border-radius: 3px;
+  overflow: hidden;
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+.thumb img {
+  width: 100%; height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.photo-count {
+  padding: 8px 14px;
+  border-top: 1px solid var(--border);
+  color: var(--text);
+  flex-shrink: 0;
+}
+.photo-count b { color: var(--accent); }
+
+/* ── Center: 3D Viewer ───────────────────────────── */
+.panel-viewer {
+  position: relative;
+  background: #0e1018;
+  overflow: hidden;
+}
+
+#threeCanvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.viewer-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 12px;
+  pointer-events: none;
+}
+.viewer-overlay.hidden { display: none; }
+
+.loader-ring {
+  width: 48px; height: 48px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.loader-text { color: var(--text); letter-spacing: 2px; }
+
+.no-model-msg {
+  color: var(--text);
+  text-align: center;
+  line-height: 2;
+}
+.no-model-msg .big { font-size: 32px; margin-bottom: 8px; }
+
+/* Viewer HUD */
+.viewer-hud {
+  position: absolute;
+  bottom: 14px;
+  left: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  pointer-events: none;
+}
+.hud-line { display: flex; gap: 8px; }
+.hud-k { color: var(--muted); }
+.hud-v { color: var(--text); }
+.hud-hi { color: var(--accent); }
+
+.viewer-hint {
+  position: absolute;
+  bottom: 14px;
+  right: 14px;
+  color: var(--text);
+  font-size: 12px;
+  pointer-events: none;
+  opacity: 0.7;
+}
+
+.viewer-controls {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.ctrl-btn {
+  background: rgba(22,24,32,.9);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 12px;
+  letter-spacing: 1px;
+  padding: 8px 12px;
+  cursor: pointer;
+  transition: border-color .15s, color .15s;
+}
+.ctrl-btn:hover { border-color: var(--accent); color: var(--accent); }
+.ctrl-btn.active { border-color: var(--accent3); color: var(--accent3); }
+
+/* ── Right: Info + Export ────────────────────────── */
+.panel-export {
+  border-left: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  min-height: 0;
+}
+.panel-export::-webkit-scrollbar { width: 4px; }
+.panel-export::-webkit-scrollbar-track { background: transparent; }
+.panel-export::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+.info-block {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+}
+.info-block .block-title {
+  font-size: 12px;
+  letter-spacing: 2px;
+  color: var(--muted);
+  margin-bottom: 10px;
+}
+.info-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 3px 0;
+  border-bottom: 1px solid var(--border);
+}
+.info-row:last-child { border-bottom: none; }
+.info-row .k { color: var(--muted); }
+.info-row .v { color: var(--text); text-align: right; }
+.info-row .hi { color: var(--accent); }
+
+.load-block {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+}
+.btn-load {
+  width: 100%;
+  background: transparent;
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  font-family: inherit;
+  font-size: 12px;
+  letter-spacing: 2px;
+  padding: 10px;
+  cursor: pointer;
+  transition: background .15s;
+}
+.btn-load:hover { background: rgba(0,229,255,.08); }
+
+.export-block {
+  padding: 12px 14px;
+  flex: 1;
+}
+.export-block .block-title {
+  font-size: 12px;
+  letter-spacing: 2px;
+  color: var(--muted);
+  margin-bottom: 10px;
+}
+.export-btn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 12px;
+  padding: 9px 10px;
+  cursor: pointer;
+  text-decoration: none;
+  margin-bottom: 6px;
+  transition: border-color .15s, color .15s;
+}
+.export-btn:hover { border-color: var(--accent2); color: var(--accent2); }
+.export-btn .fmt { font-size: 13px; font-weight: 700; letter-spacing: 1px; }
+.export-btn .desc { color: var(--muted); font-size: 11px; }
+
+/* ── Druckgröße ──────────────────────────────────── */
+.size-block {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+}
+.size-block .block-title {
+  font-size: 12px;
+  letter-spacing: 2px;
+  color: var(--accent);
+  margin-bottom: 10px;
+}
+.size-input-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.size-input-row label { color: var(--muted); white-space: nowrap; }
+.size-input-row input[type=number] {
+  flex: 1;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--accent3);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  padding: 6px 8px;
+  text-align: right;
+  width: 0;
+  -moz-appearance: textfield;
+}
+.size-input-row input[type=number]::-webkit-inner-spin-button { opacity: 0.4; }
+.size-input-row input[type=number]:focus {
+  outline: none;
+  border-color: var(--accent3);
+}
+.size-input-row input:disabled { opacity: 0.35; }
+.size-input-row span { color: var(--muted); }
+.size-dims {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 4px;
+  margin-top: 4px;
+}
+.size-dim {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  padding: 6px 8px;
+  text-align: center;
+}
+.size-dim .dim-label { color: var(--muted); font-size: 10px; display: block; }
+.size-dim .dim-val   { color: var(--text); font-size: 13px; font-weight: 700; }
+.size-dim.active .dim-val { color: var(--accent3); }
+
+/* ── Mesh-Optimierung ────────────────────────────── */
+.opt-block {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+}
+.opt-block .block-title {
+  font-size: 12px;
+  letter-spacing: 2px;
+  color: var(--accent);
+  margin-bottom: 10px;
+}
+.opt-row { margin-bottom: 8px; }
+.opt-label {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 4px;
+  color: var(--muted);
+  font-size: 11px;
+}
+.opt-val { color: var(--accent2); font-weight: 700; }
+.opt-val-wrap { display: flex; align-items: center; gap: 1px; }
+.opt-val-wrap input[type=number] {
+  width: 36px;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--accent2);
+  color: var(--accent2);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: right;
+  padding: 0 2px;
+  -moz-appearance: textfield;
+}
+.opt-val-wrap input[type=number]::-webkit-outer-spin-button,
+.opt-val-wrap input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; }
+.opt-val-wrap input[type=number]:disabled { opacity: 0.3; }
+.opt-pct { color: var(--accent2); font-weight: 700; font-size: 12px; }
+.opt-row input[type=range] {
+  width: 100%;
+  accent-color: var(--accent2);
+  cursor: pointer;
+}
+.opt-row input[type=range]:disabled { opacity: 0.3; cursor: not-allowed; }
+.opt-status {
+  font-size: 11px;
+  color: var(--accent3);
+  min-height: 16px;
+  margin-bottom: 6px;
+  letter-spacing: 1px;
+}
+.btn-apply {
+  width: 100%;
+  background: transparent;
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  font-family: inherit;
+  font-size: 12px;
+  letter-spacing: 1px;
+  padding: 9px;
+  cursor: pointer;
+  transition: background .15s;
+  margin-bottom: 5px;
+}
+.btn-apply:hover:not(:disabled) { background: rgba(0,229,255,.08); }
+.btn-apply:disabled { opacity: 0.3; cursor: not-allowed; }
+.btn-reset {
+  width: 100%;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  font-family: inherit;
+  font-size: 11px;
+  padding: 7px;
+  cursor: pointer;
+  transition: border-color .15s, color .15s;
+}
+.btn-reset:hover { border-color: var(--muted); color: var(--text); }
+.btn-snapshot {
+  width: 100%;
+  background: transparent;
+  border: 1px solid var(--accent3);
+  color: var(--accent3);
+  font-family: inherit;
+  font-size: 11px;
+  letter-spacing: 1px;
+  padding: 7px;
+  cursor: pointer;
+  transition: background .15s;
+  margin-bottom: 4px;
+}
+.btn-snapshot:hover:not(:disabled) { background: rgba(168,255,62,.06); }
+.btn-snapshot:disabled { opacity: 0.3; cursor: not-allowed; }
+.snapshot-list { margin-top: 2px; }
+.snapshot-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--border);
+}
+.snapshot-item:last-child { border-bottom: none; }
+.snap-label { flex: 1; color: var(--text); }
+.snap-load {
+  background: transparent;
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  font-family: inherit;
+  font-size: 10px;
+  padding: 2px 6px;
+  cursor: pointer;
+}
+.snap-load:hover { background: rgba(0,229,255,.08); }
+.snap-del {
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  font-size: 14px;
+  padding: 0 3px;
+  cursor: pointer;
+  line-height: 1;
+}
+.snap-del:hover { color: #ff4444; }
+
+/* ── Boden-Trim ──────────────────────────────────── */
+.trim-block {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+}
+.trim-block .block-title {
+  font-size: 12px;
+  letter-spacing: 2px;
+  color: var(--accent);
+  margin-bottom: 10px;
+}
+.trim-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.trim-row input[type=range] {
+  flex: 1;
+  accent-color: var(--accent2);
+  cursor: pointer;
+}
+.trim-row input[type=range]:disabled { opacity: 0.3; cursor: not-allowed; }
+.trim-val { color: var(--accent2); min-width: 32px; text-align: right; }
+.btn-trim-export {
+  width: 100%;
+  background: transparent;
+  border: 1px solid var(--accent2);
+  color: var(--accent2);
+  font-family: inherit;
+  font-size: 12px;
+  letter-spacing: 1px;
+  padding: 10px;
+  cursor: pointer;
+  transition: background .15s;
+}
+.btn-trim-export:hover { background: rgba(255,107,53,.08); }
+.btn-trim-export:disabled { opacity: 0.3; cursor: not-allowed; }
+
+/* ── Utility ─────────────────────────────────────── */
+input[type=file] { display: none; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">FORM<span>3D</span></div>
+  <div class="header-meta">
+    <span>PHOTOGRAMMETRIE STUDIO</span>
+    <span id="hdrPolyCount">— POLY</span>
+  </div>
+</header>
+
+<div class="layout">
+
+  <!-- ── Fotos ── -->
+  <aside class="panel-photos">
+    <div class="panel-title">FOTOS</div>
+
+    <div class="drop-zone" id="dropZone">
+      <div class="dz-icon">📷</div>
+      <div class="dz-label">Fotos hierher ziehen<br>oder <b>klicken</b> zum Auswählen</div>
+    </div>
+
+    <div class="photo-grid" id="photoGrid"></div>
+
+    <div class="photo-count">
+      <b id="photoCount">0</b> Fotos geladen
+    </div>
+  </aside>
+
+  <!-- ── 3D Viewer ── -->
+  <main class="panel-viewer">
+    <canvas id="threeCanvas"></canvas>
+
+    <!-- Overlay: Ladeanzeige -->
+    <div class="viewer-overlay" id="overlayLoading">
+      <div class="loader-ring"></div>
+      <div class="loader-text">MODELL WIRD GELADEN...</div>
+    </div>
+
+    <!-- Overlay: Kein Modell -->
+    <div class="viewer-overlay" id="overlayEmpty">
+      <div class="no-model-msg">
+        <div class="big">⬡</div>
+        Kein Modell geladen<br>
+        <span style="color:var(--accent);cursor:pointer" onclick="pickModel()">STL / OBJ auswählen</span>
+      </div>
+    </div>
+
+    <!-- HUD -->
+    <div class="viewer-hud" id="viewerHud" style="display:none">
+      <div class="hud-line">
+        <span class="hud-k">MODELL</span>
+        <span class="hud-hi" id="hudName">—</span>
+      </div>
+      <div class="hud-line">
+        <span class="hud-k">POLY</span>
+        <span class="hud-v" id="hudPoly">—</span>
+      </div>
+      <div class="hud-line">
+        <span class="hud-k">FORMAT</span>
+        <span class="hud-v" id="hudFmt">—</span>
+      </div>
+    </div>
+
+    <div class="viewer-hint">🖱 Drehen · Scrollen Zoom · Doppelklick Reset</div>
+
+    <!-- View Controls -->
+    <div class="viewer-controls" id="viewerControls" style="display:none">
+      <button class="ctrl-btn" id="btnWire" onclick="toggleWireframe()">WIREFRAME</button>
+      <button class="ctrl-btn" onclick="toggleAutoRotate()">AUTO-ROTATE</button>
+      <button class="ctrl-btn" onclick="resetCamera()">RESET</button>
+    </div>
+  </main>
+
+  <!-- ── Export ── -->
+  <aside class="panel-export">
+    <div class="panel-title">MODELL-INFO</div>
+
+    <div class="info-block">
+      <div class="info-row"><span class="k">NAME</span><span class="v hi" id="infoName">—</span></div>
+      <div class="info-row"><span class="k">FORMAT</span><span class="v" id="infoFmt">—</span></div>
+      <div class="info-row"><span class="k">POLYGONE</span><span class="v hi" id="infoPoly">—</span></div>
+      <div class="info-row"><span class="k">VERTICES</span><span class="v" id="infoVert">—</span></div>
+      <div class="info-row"><span class="k">GRÖSSE</span><span class="v" id="infoSize">—</span></div>
+    </div>
+
+    <div class="load-block">
+      <button class="btn-load" onclick="pickModel()">⬡ MODELL LADEN</button>
+    </div>
+
+    <div class="size-block">
+      <div class="block-title">DRUCKGRÖSSE</div>
+      <div class="size-input-row">
+        <label>Höhe</label>
+        <input type="number" id="printHeight" min="5" max="999" placeholder="100"
+               oninput="updatePrintSize()" disabled>
+        <span>mm</span>
+      </div>
+      <div class="size-dims">
+        <div class="size-dim"><span class="dim-label">BREITE</span><span class="dim-val" id="dimW">—</span></div>
+        <div class="size-dim"><span class="dim-label">TIEFE</span><span class="dim-val" id="dimD">—</span></div>
+        <div class="size-dim active"><span class="dim-label">HÖHE</span><span class="dim-val" id="dimH">—</span></div>
+      </div>
+    </div>
+
+    <div class="trim-block">
+      <div class="block-title">BODEN ENTFERNEN</div>
+      <div class="trim-row">
+        <input type="range" id="trimSlider" min="0" max="100" value="0" step="1"
+               oninput="onTrimSlider(this.value)" disabled>
+        <span class="trim-val" id="trimVal">0%</span>
+      </div>
+      <button class="btn-trim-export" id="btnTrimExport" onclick="exportTrimmedSTL()" disabled>
+        BEREINIGT HERUNTERLADEN
+      </button>
+    </div>
+
+    <div class="opt-block">
+      <div class="block-title">MESH-OPTIMIERUNG</div>
+      <div class="opt-row">
+        <div class="opt-label">
+          <span>POLYGON-REDUKTION</span>
+          <span class="opt-val-wrap">
+            <input type="number" id="decimateVal" min="0" max="90" value="0" disabled
+                   oninput="onDecimateInput(this.value)">
+            <span class="opt-pct">%</span>
+          </span>
+        </div>
+        <input type="range" id="decimateSlider" min="0" max="90" value="0" step="1" disabled
+               oninput="onDecimateSlider(this.value)">
+      </div>
+      <div class="opt-row">
+        <div class="opt-label">
+          <span>VERFEINERUNG</span>
+          <span class="opt-val-wrap">
+            <input type="number" id="subdivideVal" min="0" max="300" value="0" disabled
+                   oninput="onSubdivideInput(this.value)">
+            <span class="opt-pct">%</span>
+          </span>
+        </div>
+        <input type="range" id="subdivideSlider" min="0" max="300" value="0" step="10" disabled
+               oninput="onSubdivideSlider(this.value)">
+      </div>
+      <div class="opt-row">
+        <div class="opt-label">
+          <span>GLÄTTUNG</span>
+          <span class="opt-val" id="smoothVal">0</span>
+        </div>
+        <input type="range" id="smoothSlider" min="0" max="5" value="0" step="1" disabled
+               oninput="document.getElementById('smoothVal').textContent=this.value">
+      </div>
+      <div class="opt-status" id="optStatus"></div>
+      <button class="btn-apply" id="btnApply" onclick="applyOptimizations()" disabled>
+        ANWENDEN
+      </button>
+      <button class="btn-reset" id="btnReset" onclick="resetOptimizations()" style="display:none">
+        ORIGINAL WIEDERHERSTELLEN
+      </button>
+      <button class="btn-snapshot" id="btnSnapshot" onclick="saveSnapshot()" disabled>
+        SNAPSHOT SPEICHERN
+      </button>
+      <div class="snapshot-list" id="snapshotList"></div>
+    </div>
+
+    <div class="export-block">
+      <div class="block-title">EXPORT / DOWNLOAD</div>
+      <a class="export-btn" id="dlSTL" href="bali_guardian.stl" download="bali_guardian.stl">
+        <span class="fmt">STL</span>
+        <span class="desc">3D-Druck (Bambu / Cura)</span>
+      </a>
+      <a class="export-btn" id="dlOBJ" href="bali_guardian.obj" download="bali_guardian.obj">
+        <span class="fmt">OBJ</span>
+        <span class="desc">Blender / Maya / Meshmixer</span>
+      </a>
+      <a class="export-btn" id="dlUSDZ" href="bali_guardian.usdz" download="bali_guardian.usdz">
+        <span class="fmt">USDZ</span>
+        <span class="desc">AR Quick Look (iOS / macOS)</span>
+      </a>
+    </div>
+  </aside>
+
+</div>
+
+<input type="file" id="photoInput" multiple accept="image/*">
+<input type="file" id="modelInput" accept=".stl,.obj">
+
+<script>
+// ── Three.js setup ──────────────────────────────────────────────────
+const T = {};
+let wireframe = false;
+let autoRotate = true;
+
+// ── Mesh-Optimierung ────────────────────────────────────────────────
+let origGeo = null; // unverändertes Original (aus STL-Datei)
+const snapshots = [];
+
+function enableOptControls() {
+  document.getElementById('decimateSlider').disabled  = false;
+  document.getElementById('decimateVal').disabled     = false;
+  document.getElementById('subdivideSlider').disabled = false;
+  document.getElementById('subdivideVal').disabled    = false;
+  document.getElementById('smoothSlider').disabled    = false;
+  document.getElementById('btnApply').disabled        = false;
+  document.getElementById('btnSnapshot').disabled    = false;
+}
+
+function onDecimateSlider(v) {
+  const val = Math.min(90, Math.max(0, parseInt(v) || 0));
+  document.getElementById('decimateVal').value = val;
+}
+
+function onDecimateInput(v) {
+  const val = Math.min(90, Math.max(0, parseInt(v) || 0));
+  document.getElementById('decimateSlider').value = val;
+}
+function onSubdivideSlider(v) {
+  const val = Math.min(300, Math.max(0, parseInt(v) || 0));
+  document.getElementById('subdivideVal').value = val;
+}
+function onSubdivideInput(v) {
+  const val = Math.min(300, Math.max(0, parseInt(v) || 0));
+  document.getElementById('subdivideSlider').value = val;
+}
+
+function saveSnapshot() {
+  if (!T.mesh) return;
+  const geo    = T.mesh.geometry.clone();
+  const polys  = geo.index
+    ? Math.round(geo.index.count / 3)
+    : Math.round(geo.attributes.position.count / 3);
+  const origPolys = origGeo ? Math.round(origGeo.attributes.position.count / 3) : polys;
+  const pct    = Math.round((1 - polys / origPolys) * 100);
+  const label  = `${polys.toLocaleString('de-DE')} Polys${pct > 0 ? ' (−' + pct + '%)' : ''}`;
+  snapshots.push({ geo, label });
+  renderSnapshotList();
+}
+
+function loadSnapshot(idx) {
+  if (!snapshots[idx]) return;
+  T.mesh.geometry.dispose();
+  T.mesh.geometry = snapshots[idx].geo.clone();
+  T.mesh.geometry.computeVertexNormals();
+  const polys = T.mesh.geometry.index
+    ? Math.round(T.mesh.geometry.index.count / 3)
+    : Math.round(T.mesh.geometry.attributes.position.count / 3);
+  document.getElementById('hudPoly').textContent      = polys.toLocaleString('de-DE');
+  document.getElementById('infoPoly').textContent     = polys.toLocaleString('de-DE');
+  document.getElementById('hdrPolyCount').textContent = polys.toLocaleString('de-DE') + ' POLY';
+  T.mesh.updateMatrixWorld(true);
+  const wb = new THREE.Box3().setFromObject(T.mesh);
+  modelMinY = wb.min.y; modelMaxY = wb.max.y;
+  updatePrintSize();
+  document.getElementById('btnReset').style.display = '';
+  setOptStatus(`Snapshot ${idx + 1} geladen`);
+}
+
+function deleteSnapshot(idx) {
+  snapshots[idx].geo.dispose();
+  snapshots.splice(idx, 1);
+  renderSnapshotList();
+}
+
+function renderSnapshotList() {
+  const list = document.getElementById('snapshotList');
+  if (snapshots.length === 0) { list.innerHTML = ''; return; }
+  list.innerHTML = snapshots.map((s, i) => `
+    <div class="snapshot-item">
+      <span class="snap-label">${i + 1}. ${s.label}</span>
+      <button class="snap-load" onclick="loadSnapshot(${i})">LADEN</button>
+      <button class="snap-del" onclick="deleteSnapshot(${i})">&#215;</button>
+    </div>
+  `).join('');
+}
+
+function setOptStatus(msg) {
+  document.getElementById('optStatus').textContent = msg;
+}
+
+// Laplacian Smoothing — funktioniert auf Soup-Mesh (räumliche Hash-Adjazenz)
+// und auf indexiertem Manifold-Mesh (Index-Adjazenz).
+function smoothGeometry(geo, iterations, strength, avgEdge) {
+  const pos    = geo.attributes.position;
+  const idxArr = geo.index ? geo.index.array : null;
+  const n      = pos.count;
+  const F      = idxArr ? idxArr.length / 3 : n / 3;
+  // Soup: jedes Dreieck hat eigene Vertices (n ≈ 3F). Manifold: n ≈ 0.5F.
+  const isSoup = (n / F > 2.5);
+
+  let adj;
+  if (!isSoup && idxArr) {
+    // Indexiertes Mesh: Index-basierte Adjazenz (schnell, korrekt)
+    adj = [];
+    for (let i = 0; i < n; i++) adj.push([]);
+    for (let i = 0; i < idxArr.length; i += 3) {
+      const a = idxArr[i], b = idxArr[i+1], c = idxArr[i+2];
+      adj[a].push(b, c); adj[b].push(a, c); adj[c].push(a, b);
+    }
+    for (let i = 0; i < n; i++) adj[i] = [...new Set(adj[i])];
+  } else {
+    // Soup-Mesh: räumliche Hash-Adjazenz — findet Nachbarn über Dreiecke hinweg
+    const R  = avgEdge * 1.2;
+    const R2 = R * R;
+    const inv = 1 / R;
+    const hash = new Map();
+    for (let i = 0; i < n; i++) {
+      const cx = Math.floor(pos.getX(i) * inv);
+      const cy = Math.floor(pos.getY(i) * inv);
+      const cz = Math.floor(pos.getZ(i) * inv);
+      const k  = `${cx},${cy},${cz}`;
+      if (!hash.has(k)) hash.set(k, []);
+      hash.get(k).push(i);
+    }
+    adj = new Array(n).fill(null).map(() => []);
+    for (let i = 0; i < n; i++) {
+      const vx = pos.getX(i), vy = pos.getY(i), vz = pos.getZ(i);
+      const cx = Math.floor(vx * inv);
+      const cy = Math.floor(vy * inv);
+      const cz = Math.floor(vz * inv);
+      for (let dx = -1; dx <= 1; dx++) {
+        for (let dy = -1; dy <= 1; dy++) {
+          for (let dz = -1; dz <= 1; dz++) {
+            const bucket = hash.get(`${cx+dx},${cy+dy},${cz+dz}`);
+            if (!bucket) continue;
+            for (const j of bucket) {
+              if (j === i) continue;
+              const ex = vx - pos.getX(j), ey = vy - pos.getY(j), ez = vz - pos.getZ(j);
+              if (ex*ex + ey*ey + ez*ez <= R2) adj[i].push(j);
+            }
+          }
+        }
+      }
+    }
+  }
+
+  const nx = new Float32Array(n);
+  const ny = new Float32Array(n);
+  const nz = new Float32Array(n);
+  for (let iter = 0; iter < iterations; iter++) {
+    for (let i = 0; i < n; i++) {
+      const ns = adj[i];
+      if (!ns.length) { nx[i] = pos.getX(i); ny[i] = pos.getY(i); nz[i] = pos.getZ(i); continue; }
+      let cx = 0, cy = 0, cz = 0;
+      for (const j of ns) { cx += pos.getX(j); cy += pos.getY(j); cz += pos.getZ(j); }
+      const cnt = ns.length;
+      nx[i] = pos.getX(i) + strength * (cx/cnt - pos.getX(i));
+      ny[i] = pos.getY(i) + strength * (cy/cnt - pos.getY(i));
+      nz[i] = pos.getZ(i) + strength * (cz/cnt - pos.getZ(i));
+    }
+    for (let i = 0; i < n; i++) pos.setXYZ(i, nx[i], ny[i], nz[i]);
+    pos.needsUpdate = true;
+  }
+  geo.computeVertexNormals();
+}
+
+// Edge-Collapse Decimation: kürzeste Kanten iterativ zusammenführen
+// Liefert präzise Kontrolle (1%-Schritte) ohne den Sprungeffekt von Voxel-Grid.
+// Dezimierung über Vertex-Voxel-Grid mit Binärsuche:
+// Vertices der gleichen Voxel-Zelle werden zu ihrem Schwerpunkt zusammengefasst.
+// Ergebnis: glattes, vollständig verbundenes Mesh ohne Lücken oder Fragmente.
+// Zellgröße per Binärsuche so kalibriert, dass genau keepRatio Dreiecke überleben.
+function decimateVoxel(geo, keepRatio, avgEdge) {
+  if (keepRatio >= 1) return geo.clone();
+  const pos  = geo.attributes.position;
+  const idxA = geo.index ? geo.index.array : null;
+  const V = pos.count;
+  const F = idxA ? idxA.length / 3 : V / 3;
+
+  // Positionen in Float32-Arrays vorhalten für schnellen Zugriff
+  const px = new Float32Array(V), py = new Float32Array(V), pz = new Float32Array(V);
+  let mnX=1e30,mnY=1e30,mnZ=1e30;
+  for (let i = 0; i < V; i++) {
+    px[i]=pos.getX(i); py[i]=pos.getY(i); pz[i]=pos.getZ(i);
+    if(px[i]<mnX)mnX=px[i]; if(py[i]<mnY)mnY=py[i]; if(pz[i]<mnZ)mnZ=pz[i];
+  }
+
+  // Überlebende nicht-degenerierte Dreiecke für gegebene Zellgröße zählen
+  function countSurviving(cell) {
+    const inv = 1/cell;
+    const vId = new Int32Array(V);
+    const km = new Map(); let nv = 0;
+    for (let i = 0; i < V; i++) {
+      const k = `${(px[i]-mnX)*inv|0},${(py[i]-mnY)*inv|0},${(pz[i]-mnZ)*inv|0}`;
+      if (!km.has(k)) km.set(k, nv++);
+      vId[i] = km.get(k);
+    }
+    let cnt = 0;
+    for (let t = 0; t < F; t++) {
+      const ia=idxA?idxA[t*3]:t*3, ib=idxA?idxA[t*3+1]:t*3+1, ic=idxA?idxA[t*3+2]:t*3+2;
+      if (vId[ia]!==vId[ib] && vId[ib]!==vId[ic] && vId[ia]!==vId[ic]) cnt++;
+    }
+    return cnt;
+  }
+
+  // Binärsuche: countSurviving ist fallend bzgl. cell
+  // größere Zelle → mehr Merges → weniger überlebende Dreiecke
+  const target = Math.max(4, Math.round(F * keepRatio));
+  let lo = avgEdge * 0.001, hi = avgEdge * 10;
+  for (let i = 0; i < 20; i++) {
+    const mid = (lo + hi) / 2;
+    if (countSurviving(mid) > target) lo = mid; // zu viele → Zelle vergrößern
+    else hi = mid;                               // zu wenige → Zelle verkleinern
+  }
+  const cell = (lo + hi) / 2;
+  const inv = 1/cell;
+
+  // Endgültige Voxel-Zuweisung: Schwerpunkt jeder Zelle als Repräsentant
+  const voxSx=new Float64Array(V), voxSy=new Float64Array(V), voxSz=new Float64Array(V);
+  const voxN=new Int32Array(V);
+  const km2 = new Map(); let nv = 0;
+  const vId2 = new Int32Array(V);
+  for (let i = 0; i < V; i++) {
+    const k = `${(px[i]-mnX)*inv|0},${(py[i]-mnY)*inv|0},${(pz[i]-mnZ)*inv|0}`;
+    if (!km2.has(k)) { km2.set(k, nv); nv++; }
+    const vi = km2.get(k);
+    vId2[i] = vi;
+    voxSx[vi]+=px[i]; voxSy[vi]+=py[i]; voxSz[vi]+=pz[i]; voxN[vi]++;
+  }
+
+  // Ausgabe-Positions-Array: gemittelte Voxel-Positionen
+  const newPosArr = new Float32Array(nv * 3);
+  for (let i = 0; i < nv; i++) {
+    const n=voxN[i];
+    newPosArr[i*3]=voxSx[i]/n; newPosArr[i*3+1]=voxSy[i]/n; newPosArr[i*3+2]=voxSz[i]/n;
+  }
+
+  // Nicht-degenerierte Dreiecke aufbauen
+  const newIdx2 = [];
+  for (let t = 0; t < F; t++) {
+    const ia=idxA?idxA[t*3]:t*3, ib=idxA?idxA[t*3+1]:t*3+1, ic=idxA?idxA[t*3+2]:t*3+2;
+    const a=vId2[ia], b=vId2[ib], c=vId2[ic];
+    if (a!==b && b!==c && a!==c) newIdx2.push(a, b, c);
+  }
+
+  const newGeo = new THREE.BufferGeometry();
+  newGeo.setAttribute('position', new THREE.BufferAttribute(newPosArr, 3));
+  newGeo.setIndex(newIdx2);
+  newGeo.computeVertexNormals();
+  return newGeo;
+}
+
+// Mesh-Verfeinerung durch Midpoint-Subdivision:
+// Jedes Dreieck → 4 kleinere Dreiecke (pro Iteration ×4 Polygone).
+// Partial: nur die größten Dreiecke werden aufgeteilt → gleichmäßige Verfeinerung.
+// increasePct=100 → 2× Dreiecke, increasePct=300 → 4× Dreiecke (eine vollständige Iteration).
+function subdivideMesh(geo, increasePct) {
+  if (increasePct <= 0) return geo.clone ? geo.clone() : geo;
+  const pos  = geo.attributes.position;
+  const idxA = geo.index ? geo.index.array : null;
+  const F    = idxA ? idxA.length/3 : pos.count/3;
+
+  // Anteil der aufzuteilenden Dreiecke: bei 300% alle, bei 100% ein Drittel
+  const F_sub = Math.min(F, Math.round(increasePct / 300 * F));
+
+  // Dreiecke nach Fläche sortieren (größte zuerst → grobe Bereiche werden verfeinert)
+  const tri_areas = new Float64Array(F);
+  for (let t = 0; t < F; t++) {
+    const ia=idxA?idxA[t*3]:t*3, ib=idxA?idxA[t*3+1]:t*3+1, ic=idxA?idxA[t*3+2]:t*3+2;
+    const ax=pos.getX(ib)-pos.getX(ia), ay=pos.getY(ib)-pos.getY(ia), az=pos.getZ(ib)-pos.getZ(ia);
+    const bx=pos.getX(ic)-pos.getX(ia), by=pos.getY(ic)-pos.getY(ia), bz=pos.getZ(ic)-pos.getZ(ia);
+    tri_areas[t] = (ay*bz-az*by)**2 + (az*bx-ax*bz)**2 + (ax*by-ay*bx)**2;
+  }
+  const order = Array.from({length:F},(_,i)=>i).sort((a,b)=>tri_areas[b]-tri_areas[a]);
+  const doSub = new Uint8Array(F);
+  for (let i = 0; i < F_sub; i++) doSub[order[i]] = 1;
+
+  // Aufgeteilte Dreiecke ausgeben
+  const nPos = [], nIdx = []; let nv = 0;
+  for (let t = 0; t < F; t++) {
+    const ia=idxA?idxA[t*3]:t*3, ib=idxA?idxA[t*3+1]:t*3+1, ic=idxA?idxA[t*3+2]:t*3+2;
+    const ax=pos.getX(ia),ay=pos.getY(ia),az=pos.getZ(ia);
+    const bx=pos.getX(ib),by=pos.getY(ib),bz=pos.getZ(ib);
+    const cx=pos.getX(ic),cy=pos.getY(ic),cz=pos.getZ(ic);
+    if (doSub[t]) {
+      const mx=(ax+bx)/2,my=(ay+by)/2,mz=(az+bz)/2; // M_AB
+      const nx=(bx+cx)/2,ny=(by+cy)/2,nz=(bz+cz)/2; // M_BC
+      const ox=(ax+cx)/2,oy=(ay+cy)/2,oz=(az+cz)/2; // M_AC
+      nPos.push(ax,ay,az,mx,my,mz,ox,oy,oz); nIdx.push(nv,nv+1,nv+2); nv+=3;
+      nPos.push(mx,my,mz,bx,by,bz,nx,ny,nz); nIdx.push(nv,nv+1,nv+2); nv+=3;
+      nPos.push(ox,oy,oz,nx,ny,nz,cx,cy,cz); nIdx.push(nv,nv+1,nv+2); nv+=3;
+      nPos.push(mx,my,mz,nx,ny,nz,ox,oy,oz); nIdx.push(nv,nv+1,nv+2); nv+=3;
+    } else {
+      nPos.push(ax,ay,az,bx,by,bz,cx,cy,cz); nIdx.push(nv,nv+1,nv+2); nv+=3;
+    }
+  }
+  const newGeo = new THREE.BufferGeometry();
+  newGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(nPos), 3));
+  newGeo.setIndex(nIdx);
+  newGeo.computeVertexNormals();
+  return newGeo;
+}
+
+function applyOptimizations() {
+  if (!origGeo) return;
+  const decimatePct  = parseInt(document.getElementById('decimateSlider').value);
+  const subdividePct = parseInt(document.getElementById('subdivideSlider').value);
+  const smoothIter   = parseInt(document.getElementById('smoothSlider').value);
+  if (decimatePct === 0 && subdividePct === 0 && smoothIter === 0) { resetOptimizations(); return; }
+
+  document.getElementById('btnApply').disabled = true;
+  setOptStatus('Mesh wird indexiert...');
+
+  setTimeout(() => {
+    try {
+      // 1. Ø-Kantenlänge aus origGeo schätzen (500 Dreiecke als Stichprobe)
+      const rawPos  = origGeo.attributes.position;
+      const rawIdxA = origGeo.index ? origGeo.index.array : null;
+      const rawF    = rawIdxA ? rawIdxA.length / 3 : rawPos.count / 3;
+      const sStep   = Math.max(1, Math.floor(rawF / 500));
+      let eSum = 0, eCnt = 0;
+      const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _c = new THREE.Vector3();
+      for (let t = 0; t < rawF; t += sStep) {
+        const ia = rawIdxA ? rawIdxA[t*3]   : t*3;
+        const ib = rawIdxA ? rawIdxA[t*3+1] : t*3+1;
+        const ic = rawIdxA ? rawIdxA[t*3+2] : t*3+2;
+        _a.fromBufferAttribute(rawPos, ia);
+        _b.fromBufferAttribute(rawPos, ib);
+        _c.fromBufferAttribute(rawPos, ic);
+        eSum += _a.distanceTo(_b) + _b.distanceTo(_c) + _c.distanceTo(_a);
+        eCnt += 3;
+      }
+      const avgEdge = eSum / eCnt;
+
+      // 2. Direkt auf origGeo arbeiten (kein mergeVertices nötig)
+      let geo = origGeo.clone ? origGeo.clone() : origGeo;
+
+      // 3. Dezimieren (Vertex-Voxel: glattes Ergebnis, kein Artefakt, Soup- und Manifold-Mesh)
+      if (decimatePct > 0) {
+        setOptStatus(`Polygon-Reduktion auf ${100-decimatePct}%...`);
+        geo = decimateVoxel(geo, 1 - decimatePct / 100, avgEdge);
+      }
+
+      // 4. Verfeinern (Midpoint-Subdivision: größte Dreiecke werden aufgeteilt)
+      if (subdividePct > 0) {
+        setOptStatus(`Verfeinerung +${subdividePct}%...`);
+        geo = subdivideMesh(geo, subdividePct);
+      }
+
+      // 5. Glätten — nach Dezimierung/Subdivision für korrekte Topologie
+      if (smoothIter > 0) {
+        setOptStatus(`Glättung läuft (${smoothIter} Durchläufe)...`);
+        smoothGeometry(geo, smoothIter, 0.5, avgEdge);
+      }
+
+      // Mesh austauschen
+      T.mesh.geometry.dispose();
+      T.mesh.geometry = geo;
+
+      // 5. Neue Poly-Zahl ermitteln
+      const newPolys = geo.index
+        ? Math.round(geo.index.count / 3)
+        : Math.round(geo.attributes.position.count / 3);
+      const origPolys = Math.round(origGeo.attributes.position.count / 3);
+
+      document.getElementById('hudPoly').textContent  = newPolys.toLocaleString('de-DE');
+      document.getElementById('infoPoly').textContent = newPolys.toLocaleString('de-DE');
+      document.getElementById('hdrPolyCount').textContent = newPolys.toLocaleString('de-DE') + ' POLY';
+
+      // Bounding-Box neu berechnen
+      T.mesh.updateMatrixWorld(true);
+      const wb = new THREE.Box3().setFromObject(T.mesh);
+      modelMinY = wb.min.y; modelMaxY = wb.max.y;
+      updatePrintSize();
+
+      const pct = Math.round((1 - newPolys/origPolys) * 100);
+      setOptStatus(`✓ ${newPolys.toLocaleString('de-DE')} Polys (−${pct}%)`);
+      document.getElementById('btnReset').style.display = '';
+    } catch(e) {
+      setOptStatus('Fehler: ' + e.message);
+      console.error(e);
+    }
+    document.getElementById('btnApply').disabled = false;
+  }, 30); // kurz yielden damit der Status-Text sichtbar wird
+}
+
+function resetOptimizations() {
+  if (!origGeo) return;
+  T.mesh.geometry.dispose();
+  T.mesh.geometry = origGeo.clone();
+  T.mesh.geometry.computeVertexNormals();
+
+  const polys = Math.round(origGeo.attributes.position.count / 3);
+  document.getElementById('hudPoly').textContent  = polys.toLocaleString('de-DE');
+  document.getElementById('infoPoly').textContent = polys.toLocaleString('de-DE');
+  document.getElementById('hdrPolyCount').textContent = polys.toLocaleString('de-DE') + ' POLY';
+  document.getElementById('decimateSlider').value  = 0;
+  document.getElementById('decimateVal').value      = 0;
+  document.getElementById('subdivideSlider').value  = 0;
+  document.getElementById('subdivideVal').value     = 0;
+  document.getElementById('smoothSlider').value     = 0;
+  document.getElementById('smoothVal').textContent  = '0';
+  document.getElementById('btnReset').style.display = 'none';
+  setOptStatus('');
+
+  T.mesh.updateMatrixWorld(true);
+  const wb = new THREE.Box3().setFromObject(T.mesh);
+  modelMinY = wb.min.y; modelMaxY = wb.max.y;
+  updatePrintSize();
+}
+
+// ── Druckgröße ──────────────────────────────────────────────────────
+let rawW = 0, rawD = 0, rawH = 0; // originale STL-Maße in STL-Einheiten
+
+function updatePrintSize() {
+  const inp = document.getElementById('printHeight');
+  const h   = parseFloat(inp.value);
+  if (!h || h <= 0 || !T.mesh) {
+    ['dimW','dimD','dimH'].forEach(id => document.getElementById(id).textContent = '—');
+    return;
+  }
+
+  let visH, visW, visD;
+
+  if (clipCutY > -1e9) {
+    // Nur sichtbare Vertices (oberhalb der Schnittlinie) scannen
+    const pos = T.mesh.geometry.attributes.position;
+    T.mesh.updateMatrixWorld(true);
+    const mat4 = T.mesh.matrixWorld;
+    let minX=Infinity, maxX=-Infinity, minZ=Infinity, maxZ=-Infinity, maxY=-Infinity;
+    const v = new THREE.Vector3();
+    for (let i = 0; i < pos.count; i++) {
+      v.fromBufferAttribute(pos, i).applyMatrix4(mat4);
+      if (v.y < clipCutY) continue;
+      if (v.x < minX) minX = v.x; if (v.x > maxX) maxX = v.x;
+      if (v.z < minZ) minZ = v.z; if (v.z > maxZ) maxZ = v.z;
+      if (v.y > maxY) maxY = v.y;
+    }
+    visH = maxY - clipCutY;
+    visW = maxX - minX;
+    visD = maxZ - minZ;
+  } else {
+    // Proportionen aus Rohmaßen
+    visH = modelMaxY - modelMinY;
+    visW = rawW / rawH * visH;
+    visD = rawD / rawH * visH;
+  }
+
+  const scale = h / visH;
+  document.getElementById('dimW').textContent = Math.round(visW * scale) + ' mm';
+  document.getElementById('dimD').textContent = Math.round(visD * scale) + ' mm';
+  document.getElementById('dimH').textContent = Math.round(h) + ' mm';
+}
+
+// ── Boden-Clip ──────────────────────────────────────────────────────
+let modelMinY = 0, modelMaxY = 0, clipCutY = -Infinity;
+const clipPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+
+function onTrimSlider(val) {
+  const pct = parseInt(val);
+  document.getElementById('trimVal').textContent = pct + '%';
+  if (pct === 0) {
+    clipCutY = -Infinity;
+    T.renderer.clippingPlanes = [];
+  } else {
+    // max 60% der Modellhöhe von unten
+    clipCutY = modelMinY + (modelMaxY - modelMinY) * (pct / 166.7);
+    clipPlane.constant = -clipCutY;
+    T.renderer.clippingPlanes = [clipPlane];
+  }
+  updatePrintSize();
+}
+
+// Sutherland-Hodgman Dreieck-Clip gegen y >= cutY
+function clipTriangle(v0, v1, v2, cutY) {
+  if (cutY <= -1e9) return [[v0, v1, v2]];
+  const verts = [v0, v1, v2];
+  const above = verts.map(v => v.y >= cutY);
+  const cnt   = above.filter(Boolean).length;
+  if (cnt === 3) return [[v0, v1, v2]];
+  if (cnt === 0) return [];
+  function ix(p, q) {
+    const t = (cutY - p.y) / (q.y - p.y);
+    return new THREE.Vector3(p.x + t*(q.x-p.x), cutY, p.z + t*(q.z-p.z));
+  }
+  if (cnt === 1) {
+    const i = above.indexOf(true);
+    const [a, b, c] = [verts[i], verts[(i+1)%3], verts[(i+2)%3]];
+    return [[a, ix(a, b), ix(c, a)]];
+  }
+  // cnt === 2
+  const i = above.indexOf(false);
+  const [bot, t1, t2] = [verts[i], verts[(i+1)%3], verts[(i+2)%3]];
+  const i1 = ix(bot, t1), i2 = ix(t2, bot);
+  return [[i1, t1, t2], [i1, t2, i2]];
+}
+
+function exportTrimmedSTL() {
+  if (!T.mesh) return;
+  const geo    = T.mesh.geometry;
+  const pos    = geo.attributes.position;
+  T.mesh.updateMatrixWorld(true);
+  const matrix = T.mesh.matrixWorld;
+
+  // Dreieck-Indices: indiziert oder nicht-indiziert
+  const triIndices = [];
+  if (geo.index) {
+    const idx = geo.index.array;
+    for (let i = 0; i < idx.length; i += 3) triIndices.push([idx[i], idx[i+1], idx[i+2]]);
+  } else {
+    for (let i = 0; i < pos.count; i += 3) triIndices.push([i, i+1, i+2]);
+  }
+
+  const triangles = [];
+  const vA = new THREE.Vector3(), vB = new THREE.Vector3(), vC = new THREE.Vector3();
+  for (const [ia, ib, ic] of triIndices) {
+    vA.fromBufferAttribute(pos, ia).applyMatrix4(matrix);
+    vB.fromBufferAttribute(pos, ib).applyMatrix4(matrix);
+    vC.fromBufferAttribute(pos, ic).applyMatrix4(matrix);
+    for (const tri of clipTriangle(vA.clone(), vB.clone(), vC.clone(), clipCutY)) {
+      triangles.push(tri);
+    }
+  }
+
+  const buf  = new ArrayBuffer(84 + triangles.length * 50);
+  const view = new DataView(buf);
+  view.setUint32(80, triangles.length, true);
+  let off = 84;
+  const e1 = new THREE.Vector3(), e2 = new THREE.Vector3(), n = new THREE.Vector3();
+  for (const [a, b, c] of triangles) {
+    e1.copy(b).sub(a); e2.copy(c).sub(a);
+    n.copy(e1).cross(e2).normalize();
+    for (const x of [n.x,n.y,n.z, a.x,a.y,a.z, b.x,b.y,b.z, c.x,c.y,c.z]) {
+      view.setFloat32(off, x, true); off += 4;
+    }
+    view.setUint16(off, 0, true); off += 2;
+  }
+  const blob = new Blob([buf], { type: 'application/octet-stream' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'bali_guardian_bereinigt.stl';
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+function initThree() {
+  const canvas = document.getElementById('threeCanvas');
+  const container = canvas.parentElement;
+
+  T.scene    = new THREE.Scene();
+  T.scene.background = new THREE.Color(0x0e1018);
+
+  T.camera   = new THREE.PerspectiveCamera(45, 1, 0.1, 10000);
+
+  T.renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+  T.renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  T.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+
+  // Lights
+  const ambient = new THREE.AmbientLight(0xffffff, 0.35);
+  const key     = new THREE.DirectionalLight(0xffffff, 1.2);
+  const fill    = new THREE.DirectionalLight(0x00e5ff,  0.4);
+  const rim     = new THREE.DirectionalLight(0xa8ff3e,  0.3);
+  const back    = new THREE.DirectionalLight(0xff6b35,  0.25);
+  key.position.set(200, 300, 200);
+  fill.position.set(-200, 100, 100);
+  rim.position.set(0, 200, -200);
+  back.position.set(-100, -50, -200);
+  T.scene.add(ambient, key, fill, rim, back);
+
+  // Grid
+  const grid = new THREE.GridHelper(400, 40, 0x1e2330, 0x1e2330);
+  grid.position.y = -1;
+  T.scene.add(grid);
+
+  T.controls = new THREE.OrbitControls(T.camera, canvas);
+  T.controls.enableDamping = true;
+  T.controls.dampingFactor = 0.08;
+  T.controls.autoRotate    = true;
+  T.controls.autoRotateSpeed = 0.6;
+  T.controls.addEventListener('start', () => {
+    if (autoRotate) { autoRotate = false; T.controls.autoRotate = false; }
+  });
+
+  canvas.addEventListener('dblclick', resetCamera);
+
+  resize();
+  new ResizeObserver(resize).observe(container);
+
+  T.renderer.setAnimationLoop(() => {
+    T.controls.update();
+    T.renderer.render(T.scene, T.camera);
+  });
+}
+
+function resize() {
+  const c = document.getElementById('threeCanvas');
+  const w = c.clientWidth, h = c.clientHeight;
+  T.renderer.setSize(w, h, false);
+  T.camera.aspect = w / h;
+  T.camera.updateProjectionMatrix();
+}
+
+function resetCamera() {
+  if (!T.mesh) return;
+  const box    = new THREE.Box3().setFromObject(T.mesh);
+  const center = box.getCenter(new THREE.Vector3());
+  const size   = box.getSize(new THREE.Vector3()).length();
+  T.camera.position.set(center.x, center.y + size * 0.3, center.z + size * 0.9);
+  T.camera.lookAt(center);
+  T.controls.target.copy(center);
+  T.controls.update();
+}
+
+function toggleWireframe() {
+  wireframe = !wireframe;
+  if (T.mesh) {
+    T.mesh.material.wireframe = wireframe;
+    T.mesh.material.color.setHex(wireframe ? 0xa8ff3e : 0xfaf8f5);
+  }
+  document.getElementById('btnWire').classList.toggle('active', wireframe);
+}
+
+function toggleAutoRotate() {
+  autoRotate = !autoRotate;
+  T.controls.autoRotate = autoRotate;
+}
+
+// ── STL laden ───────────────────────────────────────────────────────
+function loadSTLBuffer(buffer, name, sizeBytes) {
+  if (T.mesh) { T.scene.remove(T.mesh); T.mesh.geometry.dispose(); }
+
+  const geo = new THREE.STLLoader().parse(buffer);
+  geo.computeVertexNormals();
+
+  // Rohmaße aus dem STL (vor Skalierung) — für Druckgröße-Berechnung
+  const rawBox  = new THREE.Box3().setFromBufferAttribute(geo.attributes.position);
+  const rawSize = rawBox.getSize(new THREE.Vector3());
+  rawW = rawSize.x; rawD = rawSize.z; rawH = rawSize.y;
+
+  // Original speichern für Optimierungs-Reset
+  origGeo = geo.clone();
+
+  const mat  = new THREE.MeshPhongMaterial({ color: 0xfaf8f5, specular: 0x444444, shininess: 40 });
+  T.mesh = new THREE.Mesh(geo, mat);
+
+  // Zentrieren & skalieren auf 200 Einheiten
+  const box  = new THREE.Box3().setFromObject(T.mesh);
+  const size = box.getSize(new THREE.Vector3()).length();
+  const scale = 200 / size;
+  T.mesh.scale.setScalar(scale);
+  const center = box.getCenter(new THREE.Vector3()).multiplyScalar(scale);
+  T.mesh.position.sub(center);
+
+  T.scene.add(T.mesh);
+
+  // Welt-Bounds für Clip-Slider
+  T.mesh.updateMatrixWorld(true);
+  const wb = new THREE.Box3().setFromObject(T.mesh);
+  modelMinY = wb.min.y; modelMaxY = wb.max.y;
+  clipCutY  = -Infinity;
+  T.renderer.clippingPlanes = [];
+  document.getElementById('trimSlider').value    = 0;
+  document.getElementById('trimSlider').disabled = false;
+  document.getElementById('trimVal').textContent = '0%';
+  document.getElementById('btnTrimExport').disabled = false;
+
+  // Optimierungs-Controls aktivieren
+  enableOptControls();
+  setOptStatus('');
+  document.getElementById('btnReset').style.display = 'none';
+  document.getElementById('decimateSlider').value   = 0;
+  document.getElementById('decimateVal').value      = 0;
+  document.getElementById('subdivideSlider').value  = 0;
+  document.getElementById('subdivideVal').value     = 0;
+  document.getElementById('smoothSlider').value     = 0;
+  document.getElementById('smoothVal').textContent  = '0';
+
+  // Druckgröße aktivieren und mit 100 mm vorbelegen
+  const inp = document.getElementById('printHeight');
+  inp.disabled = false;
+  inp.value = 100;
+  updatePrintSize();
+
+  const polys = Math.round(geo.attributes.position.count / 3);
+  const verts = geo.attributes.position.count;
+
+  // HUD & Info updaten
+  const cleanName = name.replace(/\.(stl|obj)$/i, '').replace(/_/g, ' ');
+  document.getElementById('hudName').textContent = cleanName;
+  document.getElementById('hudPoly').textContent = polys.toLocaleString('de-DE');
+  document.getElementById('hudFmt').textContent  = 'STL';
+  document.getElementById('hdrPolyCount').textContent = polys.toLocaleString('de-DE') + ' POLY';
+
+  document.getElementById('infoName').textContent = cleanName;
+  document.getElementById('infoFmt').textContent  = 'STL';
+  document.getElementById('infoPoly').textContent = polys.toLocaleString('de-DE');
+  document.getElementById('infoVert').textContent = verts.toLocaleString('de-DE');
+  document.getElementById('infoSize').textContent = sizeBytes
+    ? (sizeBytes / 1024 / 1024).toFixed(1) + ' MB'
+    : '—';
+
+  showViewer();
+  resetCamera();
+}
+
+function showViewer() {
+  document.getElementById('overlayLoading').classList.add('hidden');
+  document.getElementById('overlayEmpty').classList.add('hidden');
+  document.getElementById('viewerHud').style.display    = '';
+  document.getElementById('viewerControls').style.display = '';
+}
+
+function showEmpty() {
+  document.getElementById('overlayLoading').classList.add('hidden');
+  document.getElementById('overlayEmpty').classList.remove('hidden');
+}
+
+// ── Auto-Load: bali_guardian.stl via fetch (braucht HTTP-Server) ───
+async function autoLoad() {
+  document.getElementById('overlayEmpty').classList.add('hidden');
+  // Nur über http(s), nicht über file://
+  if (location.protocol === 'file:') { showEmpty(); return; }
+  try {
+    const resp = await fetch('./bali_guardian.stl');
+    if (!resp.ok) throw new Error('not found');
+    const buf = await resp.arrayBuffer();
+    loadSTLBuffer(buf, 'bali_guardian.stl', buf.byteLength);
+  } catch {
+    showEmpty();
+  }
+}
+
+// ── Datei-Picker ────────────────────────────────────────────────────
+function pickModel() {
+  document.getElementById('modelInput').click();
+}
+
+document.getElementById('modelInput').addEventListener('change', e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  document.getElementById('overlayLoading').classList.remove('hidden');
+  document.getElementById('overlayEmpty').classList.add('hidden');
+  const reader = new FileReader();
+  reader.onload = ev => loadSTLBuffer(ev.target.result, file.name, file.size);
+  reader.readAsArrayBuffer(file);
+  e.target.value = '';
+});
+
+// ── Foto-Import ──────────────────────────────────────────────────────
+const photoInput = document.getElementById('photoInput');
+const dropZone   = document.getElementById('dropZone');
+const photoGrid  = document.getElementById('photoGrid');
+let photoCount   = 0;
+
+function addPhotos(files) {
+  const imgs = Array.from(files).filter(f => f.type.startsWith('image/'));
+  imgs.forEach(file => {
+    const thumb = document.createElement('div');
+    thumb.className = 'thumb';
+    const img = document.createElement('img');
+    img.src = URL.createObjectURL(file);
+    img.onload = () => URL.revokeObjectURL(img.src);
+    thumb.appendChild(img);
+    photoGrid.appendChild(thumb);
+  });
+  photoCount += imgs.length;
+  document.getElementById('photoCount').textContent = photoCount;
+}
+
+dropZone.addEventListener('click', () => photoInput.click());
+photoInput.addEventListener('change', e => { addPhotos(e.target.files); e.target.value = ''; });
+
+dropZone.addEventListener('dragover',  e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.classList.remove('drag-over');
+  addPhotos(e.dataTransfer.files);
+});
+
+// ── Start ────────────────────────────────────────────────────────────
+initThree();
+autoLoad();
+</script>
+</body>
+</html>
