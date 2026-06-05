@@ -294,7 +294,8 @@ header {
   margin-bottom: 6px;
   transition: border-color .15s, color .15s;
 }
-.export-btn:hover { border-color: var(--accent2); color: var(--accent2); }
+.export-btn:hover:not(:disabled) { border-color: var(--accent2); color: var(--accent2); }
+.export-btn:disabled { opacity: 0.35; cursor: not-allowed; }
 .export-btn .fmt { font-size: 13px; font-weight: 700; letter-spacing: 1px; }
 .export-btn .desc { color: var(--muted); font-size: 11px; }
 
@@ -684,19 +685,19 @@ input[type=file] { display: none; }
     </div>
 
     <div class="export-block">
-      <div class="block-title">EXPORT / DOWNLOAD</div>
-      <a class="export-btn" id="dlSTL" href="bali_guardian.stl" download="bali_guardian.stl">
+      <div class="block-title">EXPORT — aktuelles Modell</div>
+      <button class="export-btn" id="exportSTL" onclick="exportCurrentSTL()" disabled>
         <span class="fmt">STL</span>
         <span class="desc">3D-Druck (Bambu / Cura)</span>
-      </a>
-      <a class="export-btn" id="dlOBJ" href="bali_guardian.obj" download="bali_guardian.obj">
+      </button>
+      <button class="export-btn" id="exportOBJ" onclick="exportCurrentOBJ()" disabled>
         <span class="fmt">OBJ</span>
         <span class="desc">Blender / Maya / Meshmixer</span>
-      </a>
-      <a class="export-btn" id="dlUSDZ" href="bali_guardian.usdz" download="bali_guardian.usdz">
-        <span class="fmt">USDZ</span>
-        <span class="desc">AR Quick Look (iOS / macOS)</span>
-      </a>
+      </button>
+      <button class="export-btn" id="exportUSDZ" disabled title="USDZ kann nicht im Browser generiert werden">
+        <span class="fmt" style="opacity:0.4">USDZ</span>
+        <span class="desc">Nicht im Browser generierbar</span>
+      </button>
     </div>
   </aside>
 
@@ -1252,6 +1253,82 @@ function exportTrimmedSTL() {
   URL.revokeObjectURL(a.href);
 }
 
+function exportCurrentSTL() {
+  if (!T.mesh) return;
+  const geo = T.mesh.geometry;
+  const pos = geo.attributes.position;
+  T.mesh.updateMatrixWorld(true);
+  const matrix = T.mesh.matrixWorld;
+
+  const triIndices = [];
+  if (geo.index) {
+    const idx = geo.index.array;
+    for (let i = 0; i < idx.length; i += 3) triIndices.push([idx[i], idx[i+1], idx[i+2]]);
+  } else {
+    for (let i = 0; i < pos.count; i += 3) triIndices.push([i, i+1, i+2]);
+  }
+
+  const buf = new ArrayBuffer(84 + triIndices.length * 50);
+  const view = new DataView(buf);
+  view.setUint32(80, triIndices.length, true);
+  let off = 84;
+  const vA = new THREE.Vector3(), vB = new THREE.Vector3(), vC = new THREE.Vector3();
+  const e1 = new THREE.Vector3(), e2 = new THREE.Vector3(), nv = new THREE.Vector3();
+  for (const [ia, ib, ic] of triIndices) {
+    vA.fromBufferAttribute(pos, ia).applyMatrix4(matrix);
+    vB.fromBufferAttribute(pos, ib).applyMatrix4(matrix);
+    vC.fromBufferAttribute(pos, ic).applyMatrix4(matrix);
+    e1.copy(vB).sub(vA); e2.copy(vC).sub(vA);
+    nv.copy(e1).cross(e2).normalize();
+    for (const x of [nv.x,nv.y,nv.z, vA.x,vA.y,vA.z, vB.x,vB.y,vB.z, vC.x,vC.y,vC.z]) {
+      view.setFloat32(off, x, true); off += 4;
+    }
+    view.setUint16(off, 0, true); off += 2;
+  }
+  const blob = new Blob([buf], { type: 'application/octet-stream' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  const baseName = (document.getElementById('infoName').textContent || 'modell').replace(/ /g, '_');
+  a.download = baseName + '.stl';
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+function exportCurrentOBJ() {
+  if (!T.mesh) return;
+  const geo = T.mesh.geometry;
+  const pos = geo.attributes.position;
+  T.mesh.updateMatrixWorld(true);
+  const matrix = T.mesh.matrixWorld;
+
+  const v = new THREE.Vector3();
+  let out = '# OBJ exported by FORM3D\n';
+
+  for (let i = 0; i < pos.count; i++) {
+    v.fromBufferAttribute(pos, i).applyMatrix4(matrix);
+    out += `v ${v.x.toFixed(6)} ${v.y.toFixed(6)} ${v.z.toFixed(6)}\n`;
+  }
+
+  if (geo.index) {
+    const idx = geo.index.array;
+    for (let i = 0; i < idx.length; i += 3) {
+      out += `f ${idx[i]+1} ${idx[i+1]+1} ${idx[i+2]+1}\n`;
+    }
+  } else {
+    for (let i = 0; i < pos.count; i += 3) {
+      out += `f ${i+1} ${i+2} ${i+3}\n`;
+    }
+  }
+
+  const blob = new Blob([out], { type: 'text/plain' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  const baseName = (document.getElementById('infoName').textContent || 'modell').replace(/ /g, '_');
+  a.download = baseName + '.obj';
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
 function initThree() {
   const canvas = document.getElementById('threeCanvas');
   const container = canvas.parentElement;
@@ -1373,6 +1450,8 @@ function loadSTLBuffer(buffer, name, sizeBytes) {
   document.getElementById('trimSlider').disabled = false;
   document.getElementById('trimVal').textContent = '0%';
   document.getElementById('btnTrimExport').disabled = false;
+  document.getElementById('exportSTL').disabled = false;
+  document.getElementById('exportOBJ').disabled = false;
 
   // Optimierungs-Controls aktivieren
   enableOptControls();
