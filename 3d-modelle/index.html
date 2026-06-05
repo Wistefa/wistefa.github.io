@@ -55,7 +55,7 @@ header {
 /* ── Layout ──────────────────────────────────────── */
 .layout {
   display: grid;
-  grid-template-columns: 220px 1fr 200px;
+  grid-template-columns: 240px 1fr 200px;
   flex: 1;
   overflow: hidden;
 }
@@ -593,10 +593,41 @@ input[type=file] { display: none; }
 
 <div class="layout">
 
-  <!-- ── Fotos ── -->
+  <!-- ── Linke Spalte: Modell-Steuerung + Fotos ── -->
   <aside class="panel-photos">
-    <div class="panel-title">FOTOS</div>
 
+    <div class="panel-title">DRUCKGRÖSSE (MM)</div>
+    <div class="size-block" style="border-bottom:1px solid var(--border);">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+        <span style="font-size:11px;color:var(--muted);letter-spacing:1px;">SEITENVERHÄLTNIS</span>
+        <button id="btnLock" onclick="toggleLock()" title="Seitenverhältnis sperren / lösen"
+                style="background:transparent;border:none;color:var(--accent);cursor:pointer;font-size:14px;padding:0;line-height:1;">🔒</button>
+      </div>
+      <div class="size-input-row">
+        <label>B</label>
+        <input type="number" id="scaleB" min="1" max="9999" placeholder="—" oninput="onScaleInput('B')" disabled>
+        <span>mm</span>
+      </div>
+      <div class="size-input-row">
+        <label>T</label>
+        <input type="number" id="scaleT" min="1" max="9999" placeholder="—" oninput="onScaleInput('T')" disabled>
+        <span>mm</span>
+      </div>
+      <div class="size-input-row">
+        <label>H</label>
+        <input type="number" id="scaleH" min="1" max="9999" placeholder="—" oninput="onScaleInput('H')" disabled>
+        <span>mm</span>
+      </div>
+    </div>
+
+    <div class="panel-title">MESH-REPARATUR</div>
+    <div style="padding:10px 14px;border-bottom:1px solid var(--border);">
+      <div class="repair-status" id="repairStatus">Kein Modell geladen</div>
+      <button class="btn-analyze" id="btnAnalyze" onclick="analyzeMesh()" disabled>ANALYSIEREN</button>
+      <button class="btn-repair"  id="btnRepair"  onclick="repairMesh()"  disabled>REPARIEREN</button>
+    </div>
+
+    <div class="panel-title">FOTOS</div>
     <div class="drop-zone" id="dropZone">
       <div class="dz-icon">📷</div>
       <div class="dz-label">Fotos hierher ziehen<br>oder <b>klicken</b> zum Auswählen</div>
@@ -670,28 +701,6 @@ input[type=file] { display: none; }
       <button class="btn-load" onclick="pickModel()">⬡ MODELL LADEN</button>
     </div>
 
-    <div class="size-block">
-      <div class="block-title" style="display:flex;align-items:center;justify-content:space-between;">
-        DRUCKGRÖSSE (MM)
-        <button id="btnLock" onclick="toggleLock()" title="Seitenverhältnis sperren / lösen"
-                style="background:transparent;border:none;color:var(--accent);cursor:pointer;font-size:14px;padding:0;line-height:1;">🔒</button>
-      </div>
-      <div class="size-input-row">
-        <label>B</label>
-        <input type="number" id="scaleB" min="1" max="9999" placeholder="—" oninput="onScaleInput('B')" disabled>
-        <span>mm</span>
-      </div>
-      <div class="size-input-row">
-        <label>T</label>
-        <input type="number" id="scaleT" min="1" max="9999" placeholder="—" oninput="onScaleInput('T')" disabled>
-        <span>mm</span>
-      </div>
-      <div class="size-input-row">
-        <label>H</label>
-        <input type="number" id="scaleH" min="1" max="9999" placeholder="—" oninput="onScaleInput('H')" disabled>
-        <span>mm</span>
-      </div>
-    </div>
 
     <div class="trim-block">
       <div class="block-title">BODEN ENTFERNEN</div>
@@ -750,13 +759,6 @@ input[type=file] { display: none; }
         SNAPSHOT SPEICHERN
       </button>
       <div class="snapshot-list" id="snapshotList"></div>
-    </div>
-
-    <div class="repair-block">
-      <div class="block-title">MESH-REPARATUR</div>
-      <div class="repair-status" id="repairStatus">Kein Modell geladen</div>
-      <button class="btn-analyze" id="btnAnalyze" onclick="analyzeMesh()" disabled>ANALYSIEREN</button>
-      <button class="btn-repair"  id="btnRepair"  onclick="repairMesh()"  disabled>REPARIEREN</button>
     </div>
 
     <div class="export-block">
