@@ -517,6 +517,54 @@ header {
 .btn-trim-export:hover { background: rgba(255,107,53,.08); }
 .btn-trim-export:disabled { opacity: 0.3; cursor: not-allowed; }
 
+/* ── Mesh-Reparatur ──────────────────────────────── */
+.repair-block {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+}
+.repair-block .block-title {
+  font-size: 12px;
+  letter-spacing: 2px;
+  color: var(--accent2);
+  margin-bottom: 10px;
+}
+.repair-status {
+  font-size: 11px;
+  color: var(--muted);
+  margin-bottom: 10px;
+  min-height: 16px;
+  line-height: 1.5;
+}
+.btn-analyze {
+  width: 100%;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 12px;
+  letter-spacing: 1px;
+  padding: 9px;
+  cursor: pointer;
+  transition: border-color .15s;
+  margin-bottom: 5px;
+}
+.btn-analyze:hover:not(:disabled) { border-color: var(--text); }
+.btn-analyze:disabled { opacity: 0.3; cursor: not-allowed; }
+.btn-repair {
+  width: 100%;
+  background: transparent;
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  font-family: inherit;
+  font-size: 12px;
+  letter-spacing: 1px;
+  padding: 9px;
+  cursor: pointer;
+  transition: background .15s;
+}
+.btn-repair:hover:not(:disabled) { background: rgba(0,229,255,.08); }
+.btn-repair:disabled { opacity: 0.3; cursor: not-allowed; }
+
 /* ── Utility ─────────────────────────────────────── */
 input[type=file] { display: none; }
 
@@ -623,17 +671,25 @@ input[type=file] { display: none; }
     </div>
 
     <div class="size-block">
-      <div class="block-title">DRUCKGRÖSSE</div>
+      <div class="block-title" style="display:flex;align-items:center;justify-content:space-between;">
+        DRUCKGRÖSSE (MM)
+        <button id="btnLock" onclick="toggleLock()" title="Seitenverhältnis sperren / lösen"
+                style="background:transparent;border:none;color:var(--accent);cursor:pointer;font-size:14px;padding:0;line-height:1;">🔒</button>
+      </div>
       <div class="size-input-row">
-        <label>Höhe</label>
-        <input type="number" id="printHeight" min="5" max="999" placeholder="100"
-               oninput="updatePrintSize()" disabled>
+        <label>B</label>
+        <input type="number" id="scaleB" min="1" max="9999" placeholder="—" oninput="onScaleInput('B')" disabled>
         <span>mm</span>
       </div>
-      <div class="size-dims">
-        <div class="size-dim"><span class="dim-label">BREITE</span><span class="dim-val" id="dimW">—</span></div>
-        <div class="size-dim"><span class="dim-label">TIEFE</span><span class="dim-val" id="dimD">—</span></div>
-        <div class="size-dim active"><span class="dim-label">HÖHE</span><span class="dim-val" id="dimH">—</span></div>
+      <div class="size-input-row">
+        <label>T</label>
+        <input type="number" id="scaleT" min="1" max="9999" placeholder="—" oninput="onScaleInput('T')" disabled>
+        <span>mm</span>
+      </div>
+      <div class="size-input-row">
+        <label>H</label>
+        <input type="number" id="scaleH" min="1" max="9999" placeholder="—" oninput="onScaleInput('H')" disabled>
+        <span>mm</span>
       </div>
     </div>
 
@@ -694,6 +750,13 @@ input[type=file] { display: none; }
         SNAPSHOT SPEICHERN
       </button>
       <div class="snapshot-list" id="snapshotList"></div>
+    </div>
+
+    <div class="repair-block">
+      <div class="block-title">MESH-REPARATUR</div>
+      <div class="repair-status" id="repairStatus">Kein Modell geladen</div>
+      <button class="btn-analyze" id="btnAnalyze" onclick="analyzeMesh()" disabled>ANALYSIEREN</button>
+      <button class="btn-repair"  id="btnRepair"  onclick="repairMesh()"  disabled>REPARIEREN</button>
     </div>
 
     <div class="export-block">
@@ -1128,50 +1191,47 @@ function resetOptimizations() {
   T.mesh.updateMatrixWorld(true);
   const wb = new THREE.Box3().setFromObject(T.mesh);
   modelMinY = wb.min.y; modelMaxY = wb.max.y;
-  updatePrintSize();
+  initPrintDims();
 }
 
-// ── Druckgröße ──────────────────────────────────────────────────────
-let rawW = 0, rawD = 0, rawH = 0; // originale STL-Maße in STL-Einheiten
+// ── Druckgröße / Skalierung ──────────────────────────────────────────
+let worldW = 0, worldD = 0, worldH = 0; // Mesh-BBox in Three.js-Einheiten
+let printScale = 1.0;  // mm pro Three.js-Einheit — wird beim Export angewendet
+let lockRatio  = true;
 
-function updatePrintSize() {
-  const inp = document.getElementById('printHeight');
-  const h   = parseFloat(inp.value);
-  if (!h || h <= 0 || !T.mesh) {
-    ['dimW','dimD','dimH'].forEach(id => document.getElementById(id).textContent = '—');
-    return;
-  }
+function initPrintDims() {
+  if (!T.mesh) return;
+  T.mesh.updateMatrixWorld(true);
+  const wb = new THREE.Box3().setFromObject(T.mesh);
+  worldW = wb.max.x - wb.min.x;
+  worldD = wb.max.z - wb.min.z;
+  worldH = wb.max.y - wb.min.y;
+  if (worldH <= 0) return;
+  printScale = 100 / worldH;
+  ['scaleB','scaleT','scaleH'].forEach(id => { document.getElementById(id).disabled = false; });
+  document.getElementById('scaleB').value = Math.round(worldW * printScale);
+  document.getElementById('scaleT').value = Math.round(worldD * printScale);
+  document.getElementById('scaleH').value = 100;
+}
 
-  let visH, visW, visD;
-
-  if (clipCutY > -1e9) {
-    // Nur sichtbare Vertices (oberhalb der Schnittlinie) scannen
-    const pos = T.mesh.geometry.attributes.position;
-    T.mesh.updateMatrixWorld(true);
-    const mat4 = T.mesh.matrixWorld;
-    let minX=Infinity, maxX=-Infinity, minZ=Infinity, maxZ=-Infinity, maxY=-Infinity;
-    const v = new THREE.Vector3();
-    for (let i = 0; i < pos.count; i++) {
-      v.fromBufferAttribute(pos, i).applyMatrix4(mat4);
-      if (v.y < clipCutY) continue;
-      if (v.x < minX) minX = v.x; if (v.x > maxX) maxX = v.x;
-      if (v.z < minZ) minZ = v.z; if (v.z > maxZ) maxZ = v.z;
-      if (v.y > maxY) maxY = v.y;
-    }
-    visH = maxY - clipCutY;
-    visW = maxX - minX;
-    visD = maxZ - minZ;
+function onScaleInput(axis) {
+  if (!T.mesh || worldH <= 0) return;
+  const elId = axis === 'B' ? 'scaleB' : axis === 'T' ? 'scaleT' : 'scaleH';
+  const val  = parseFloat(document.getElementById(elId).value);
+  if (!val || val <= 0) return;
+  if (lockRatio) {
+    printScale = val / (axis === 'B' ? worldW : axis === 'T' ? worldD : worldH);
+    document.getElementById('scaleB').value = Math.round(worldW * printScale);
+    document.getElementById('scaleT').value = Math.round(worldD * printScale);
+    document.getElementById('scaleH').value = Math.round(worldH * printScale);
   } else {
-    // Proportionen aus Rohmaßen
-    visH = modelMaxY - modelMinY;
-    visW = rawW / rawH * visH;
-    visD = rawD / rawH * visH;
+    if (axis === 'H') printScale = val / worldH;
   }
+}
 
-  const scale = h / visH;
-  document.getElementById('dimW').textContent = Math.round(visW * scale) + ' mm';
-  document.getElementById('dimD').textContent = Math.round(visD * scale) + ' mm';
-  document.getElementById('dimH').textContent = Math.round(h) + ' mm';
+function toggleLock() {
+  lockRatio = !lockRatio;
+  document.getElementById('btnLock').textContent = lockRatio ? '🔒' : '🔓';
 }
 
 // ── Boden-Clip ──────────────────────────────────────────────────────
@@ -1190,7 +1250,6 @@ function onTrimSlider(val) {
     clipPlane.constant = -clipCutY;
     T.renderer.clippingPlanes = [clipPlane];
   }
-  updatePrintSize();
 }
 
 // Sutherland-Hodgman Dreieck-Clip gegen y >= cutY
@@ -1236,10 +1295,10 @@ function exportTrimmedSTL() {
   const triangles = [];
   const vA = new THREE.Vector3(), vB = new THREE.Vector3(), vC = new THREE.Vector3();
   for (const [ia, ib, ic] of triIndices) {
-    vA.fromBufferAttribute(pos, ia).applyMatrix4(matrix);
-    vB.fromBufferAttribute(pos, ib).applyMatrix4(matrix);
-    vC.fromBufferAttribute(pos, ic).applyMatrix4(matrix);
-    for (const tri of clipTriangle(vA.clone(), vB.clone(), vC.clone(), clipCutY)) {
+    vA.fromBufferAttribute(pos, ia).applyMatrix4(matrix).multiplyScalar(printScale);
+    vB.fromBufferAttribute(pos, ib).applyMatrix4(matrix).multiplyScalar(printScale);
+    vC.fromBufferAttribute(pos, ic).applyMatrix4(matrix).multiplyScalar(printScale);
+    for (const tri of clipTriangle(vA.clone(), vB.clone(), vC.clone(), clipCutY * printScale)) {
       triangles.push(tri);
     }
   }
@@ -1287,9 +1346,9 @@ async function exportCurrentSTL() {
   const vA = new THREE.Vector3(), vB = new THREE.Vector3(), vC = new THREE.Vector3();
   const e1 = new THREE.Vector3(), e2 = new THREE.Vector3(), nv = new THREE.Vector3();
   for (const [ia, ib, ic] of triIndices) {
-    vA.fromBufferAttribute(pos, ia).applyMatrix4(matrix);
-    vB.fromBufferAttribute(pos, ib).applyMatrix4(matrix);
-    vC.fromBufferAttribute(pos, ic).applyMatrix4(matrix);
+    vA.fromBufferAttribute(pos, ia).applyMatrix4(matrix).multiplyScalar(printScale);
+    vB.fromBufferAttribute(pos, ib).applyMatrix4(matrix).multiplyScalar(printScale);
+    vC.fromBufferAttribute(pos, ic).applyMatrix4(matrix).multiplyScalar(printScale);
     e1.copy(vB).sub(vA); e2.copy(vC).sub(vA);
     nv.copy(e1).cross(e2).normalize();
     for (const x of [nv.x,nv.y,nv.z, vA.x,vA.y,vA.z, vB.x,vB.y,vB.z, vC.x,vC.y,vC.z]) {
@@ -1313,7 +1372,7 @@ async function exportCurrentOBJ() {
   let out = '# OBJ exported by FORM3D\n';
 
   for (let i = 0; i < pos.count; i++) {
-    v.fromBufferAttribute(pos, i).applyMatrix4(matrix);
+    v.fromBufferAttribute(pos, i).applyMatrix4(matrix).multiplyScalar(printScale);
     out += `v ${v.x.toFixed(6)} ${v.y.toFixed(6)} ${v.z.toFixed(6)}\n`;
   }
 
@@ -1331,6 +1390,98 @@ async function exportCurrentOBJ() {
   const blob = new Blob([out], { type: 'text/plain' });
   const baseName = (document.getElementById('infoName').textContent || 'modell').replace(/ /g, '_');
   await dpSaveFile(blob, baseName + '.obj');
+}
+
+// ── Mesh-Reparatur ────────────────────────────────────────────────────
+function analyzeMesh() {
+  if (!T.mesh) return;
+  const geo = T.mesh.geometry;
+  const pos = geo.attributes.position;
+
+  // Doppelte Vertices (Spatial Hash)
+  const eps = 1e-4;
+  const seen = new Set();
+  let dupCount = 0;
+  for (let i = 0; i < pos.count; i++) {
+    const key = `${Math.round(pos.getX(i)/eps)},${Math.round(pos.getY(i)/eps)},${Math.round(pos.getZ(i)/eps)}`;
+    if (seen.has(key)) dupCount++; else seen.add(key);
+  }
+
+  // Entartete Dreiecke
+  const triIdx = geo.index
+    ? Array.from({length: geo.index.count/3}, (_,i) => [geo.index.array[i*3], geo.index.array[i*3+1], geo.index.array[i*3+2]])
+    : Array.from({length: pos.count/3}, (_,i) => [i*3, i*3+1, i*3+2]);
+  const vA = new THREE.Vector3(), vB = new THREE.Vector3(), vC = new THREE.Vector3();
+  let degCount = 0;
+  for (const [ia,ib,ic] of triIdx) {
+    vA.fromBufferAttribute(pos,ia); vB.fromBufferAttribute(pos,ib); vC.fromBufferAttribute(pos,ic);
+    if (vB.clone().sub(vA).cross(vC.clone().sub(vA)).length() < 1e-10) degCount++;
+  }
+
+  const s   = document.getElementById('repairStatus');
+  const btn = document.getElementById('btnRepair');
+  if (dupCount === 0 && degCount === 0) {
+    s.textContent = '✓ Keine Probleme gefunden';
+    s.style.color = '#3fb950';
+    btn.disabled  = true;
+  } else {
+    const parts = [];
+    if (dupCount > 0) parts.push(`${dupCount.toLocaleString('de-DE')} doppelte Vertices`);
+    if (degCount > 0) parts.push(`${degCount.toLocaleString('de-DE')} entartete Dreiecke`);
+    s.textContent = parts.join(' · ');
+    s.style.color = '#ff9500';
+    btn.disabled  = false;
+  }
+  document.getElementById('btnAnalyze').textContent = 'ERNEUT ANALYSIEREN';
+}
+
+function repairMesh() {
+  if (!T.mesh) return;
+  const geo  = T.mesh.geometry;
+  const flat = geo.index ? geo.toNonIndexed() : geo.clone();
+  const pos  = flat.attributes.position;
+
+  // Entartete Dreiecke entfernen
+  const vA = new THREE.Vector3(), vB = new THREE.Vector3(), vC = new THREE.Vector3();
+  const kept = []; let degRemoved = 0;
+  for (let i = 0; i < pos.count; i += 3) {
+    vA.fromBufferAttribute(pos,i); vB.fromBufferAttribute(pos,i+1); vC.fromBufferAttribute(pos,i+2);
+    if (vB.clone().sub(vA).cross(vC.clone().sub(vA)).length() >= 1e-10)
+      kept.push(vA.x,vA.y,vA.z, vB.x,vB.y,vB.z, vC.x,vC.y,vC.z);
+    else degRemoved++;
+  }
+
+  // Vertices verschmelzen
+  const eps = 1e-4;
+  const vertMap = new Map(); const uniqV = []; const idxArr = [];
+  let welded = 0;
+  for (let i = 0; i < kept.length; i += 3) {
+    const key = `${Math.round(kept[i]/eps)},${Math.round(kept[i+1]/eps)},${Math.round(kept[i+2]/eps)}`;
+    if (vertMap.has(key)) { idxArr.push(vertMap.get(key)); welded++; }
+    else { const vi = uniqV.length/3; vertMap.set(key,vi); uniqV.push(kept[i],kept[i+1],kept[i+2]); idxArr.push(vi); }
+  }
+
+  const newGeo = new THREE.BufferGeometry();
+  newGeo.setAttribute('position', new THREE.Float32BufferAttribute(uniqV, 3));
+  newGeo.setIndex(idxArr);
+  newGeo.computeVertexNormals();
+  T.mesh.geometry.dispose();
+  T.mesh.geometry = newGeo;
+
+  const polys = Math.round(idxArr.length / 3);
+  const verts = Math.round(uniqV.length / 3);
+  ['hudPoly','infoPoly'].forEach(id => document.getElementById(id).textContent = polys.toLocaleString('de-DE'));
+  document.getElementById('infoVert').textContent = verts.toLocaleString('de-DE');
+  document.getElementById('hdrPolyCount').textContent = polys.toLocaleString('de-DE') + ' POLY';
+
+  const parts = [];
+  if (welded     > 0) parts.push(`${welded.toLocaleString('de-DE')} Vertices verschmolzen`);
+  if (degRemoved > 0) parts.push(`${degRemoved.toLocaleString('de-DE')} Dreiecke entfernt`);
+  const s = document.getElementById('repairStatus');
+  s.textContent = '✓ ' + (parts.length ? parts.join(' · ') : 'Keine Änderungen nötig');
+  s.style.color = '#3fb950';
+  document.getElementById('btnRepair').disabled = true;
+  document.getElementById('btnAnalyze').textContent = 'ERNEUT ANALYSIEREN';
 }
 
 function initThree() {
@@ -1423,11 +1574,6 @@ function loadSTLBuffer(buffer, name, sizeBytes) {
   const geo = new THREE.STLLoader().parse(buffer);
   geo.computeVertexNormals();
 
-  // Rohmaße aus dem STL (vor Skalierung) — für Druckgröße-Berechnung
-  const rawBox  = new THREE.Box3().setFromBufferAttribute(geo.attributes.position);
-  const rawSize = rawBox.getSize(new THREE.Vector3());
-  rawW = rawSize.x; rawD = rawSize.z; rawH = rawSize.y;
-
   // Original speichern für Optimierungs-Reset
   origGeo = geo.clone();
 
@@ -1468,11 +1614,14 @@ function loadSTLBuffer(buffer, name, sizeBytes) {
   document.getElementById('smoothSlider').value     = 0;
   document.getElementById('smoothVal').textContent  = '0';
 
-  // Druckgröße aktivieren und mit 100 mm vorbelegen
-  const inp = document.getElementById('printHeight');
-  inp.disabled = false;
-  inp.value = 100;
-  updatePrintSize();
+  // Druckgröße initialisieren (Default 100 mm Höhe)
+  initPrintDims();
+
+  // Reparatur-Buttons aktivieren
+  document.getElementById('btnAnalyze').disabled    = false;
+  document.getElementById('btnRepair').disabled     = true;
+  document.getElementById('repairStatus').textContent = '—';
+  document.getElementById('repairStatus').style.color  = '';
 
   const polys = Math.round(geo.attributes.position.count / 3);
   const verts = geo.attributes.position.count;
