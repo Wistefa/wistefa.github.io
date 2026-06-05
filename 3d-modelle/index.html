@@ -9,6 +9,9 @@
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/STLLoader.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/utils/BufferGeometryUtils.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/OBJLoader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/MTLLoader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/PLYLoader.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -657,7 +660,7 @@ input[type=file] { display: none; }
       <div class="no-model-msg">
         <div class="big">⬡</div>
         Kein Modell geladen<br>
-        <span style="color:var(--accent);cursor:pointer" onclick="pickModel()">STL / OBJ auswählen</span>
+        <span style="color:var(--accent);cursor:pointer" onclick="pickModel()">STL · OBJ · 3MF · GLB · PLY · STEP auswählen<br><span style="font-size:10px;opacity:.6">OBJ+MTL: beide Dateien gleichzeitig wählen</span></span>
       </div>
     </div>
 
@@ -791,7 +794,7 @@ input[type=file] { display: none; }
 </div>
 
 <input type="file" id="photoInput" multiple accept="image/*">
-<input type="file" id="modelInput" accept=".stl,.obj,.3mf,.step,.stp">
+<input type="file" id="modelInput" accept=".stl,.obj,.mtl,.3mf,.step,.stp,.gltf,.glb,.ply" multiple>
 
 <script>
 // ── Three.js setup ──────────────────────────────────────────────────
@@ -1632,7 +1635,12 @@ function loadGeometry(geo, name, sizeBytes, fmt) {
   geo.computeVertexNormals();
   origGeo = geo.clone();
 
-  const mat = new THREE.MeshPhongMaterial({ color: 0xfaf8f5, specular: 0x444444, shininess: 40 });
+  const hasVC = !!geo.attributes.color;
+  const mat = new THREE.MeshPhongMaterial({
+    color: hasVC ? 0xffffff : 0xfaf8f5,
+    specular: 0x444444, shininess: 40,
+    vertexColors: hasVC
+  });
   T.mesh = new THREE.Mesh(geo, mat);
 
   const box  = new THREE.Box3().setFromObject(T.mesh);
@@ -1711,6 +1719,55 @@ function loadOBJText(text, name, sizeBytes) {
     loadGeometry(merged, name, sizeBytes, 'OBJ');
   } catch(e) {
     alert('Fehler beim Laden der OBJ-Datei: ' + e.message);
+    showEmpty();
+  }
+}
+
+// ── OBJ + MTL laden ─────────────────────────────────────────────────
+function loadOBJWithMTL(objText, mtlText, name, sizeBytes) {
+  try {
+    const materials = new THREE.MTLLoader().parse(mtlText, '');
+    materials.preload();
+    const group = new THREE.OBJLoader().setMaterials(materials).parse(objText);
+    const geos  = [];
+    group.traverse(child => {
+      if (child.isMesh && child.geometry) {
+        const g = child.geometry.index ? child.geometry.toNonIndexed() : child.geometry.clone();
+        geos.push(g);
+      }
+    });
+    if (!geos.length) throw new Error('Kein Mesh im OBJ gefunden.');
+    const merged = geos.length === 1 ? geos[0] : THREE.BufferGeometryUtils.mergeBufferGeometries(geos);
+    loadGeometry(merged, name, sizeBytes, 'OBJ+MTL');
+  } catch(e) {
+    alert('Fehler beim Laden (OBJ+MTL): ' + e.message);
+    showEmpty();
+  }
+}
+
+// ── GLB / GLTF laden ─────────────────────────────────────────────────
+function loadGLTFBuffer(buffer, name, sizeBytes) {
+  const loader = new THREE.GLTFLoader();
+  loader.parse(buffer, '', gltf => {
+    const geos = [];
+    gltf.scene.traverse(child => {
+      if (child.isMesh && child.geometry) {
+        const g = child.geometry.index ? child.geometry.toNonIndexed() : child.geometry.clone();
+        geos.push(g);
+      }
+    });
+    if (!geos.length) { alert('Kein Mesh in GLTF/GLB gefunden.'); showEmpty(); return; }
+    const merged = geos.length === 1 ? geos[0] : THREE.BufferGeometryUtils.mergeBufferGeometries(geos);
+    loadGeometry(merged, name, sizeBytes, name.toLowerCase().endsWith('.glb') ? 'GLB' : 'GLTF');
+  }, err => { alert('Fehler beim Laden (GLTF): ' + err); showEmpty(); });
+}
+
+// ── PLY laden ────────────────────────────────────────────────────────
+function loadPLYBuffer(buffer, name, sizeBytes) {
+  try {
+    loadGeometry(new THREE.PLYLoader().parse(buffer), name, sizeBytes, 'PLY');
+  } catch(e) {
+    alert('Fehler beim Laden der PLY-Datei: ' + e.message);
     showEmpty();
   }
 }
@@ -1821,22 +1878,43 @@ function pickModel() {
 }
 
 document.getElementById('modelInput').addEventListener('change', e => {
-  const file = e.target.files[0];
-  if (!file) return;
+  const files = Array.from(e.target.files);
+  if (!files.length) return;
   document.getElementById('overlayLoading').classList.remove('hidden');
   document.getElementById('overlayEmpty').classList.add('hidden');
-  const ext    = file.name.split('.').pop().toLowerCase();
-  const reader = new FileReader();
-  if (ext === 'obj') {
-    reader.onload = ev => loadOBJText(ev.target.result, file.name, file.size);
-    reader.readAsText(file);
+
+  const objFile = files.find(f => /\.obj$/i.test(f.name));
+  const mtlFile = files.find(f => /\.mtl$/i.test(f.name));
+
+  if (objFile && mtlFile) {
+    // OBJ + MTL gleichzeitig geladen
+    let objText = null, mtlText = null;
+    const done = () => { if (objText !== null && mtlText !== null) loadOBJWithMTL(objText, mtlText, objFile.name, objFile.size); };
+    const r1 = new FileReader(); r1.onload = ev => { objText = ev.target.result; done(); }; r1.readAsText(objFile);
+    const r2 = new FileReader(); r2.onload = ev => { mtlText = ev.target.result; done(); }; r2.readAsText(mtlFile);
   } else {
-    reader.onload = ev => {
-      if (ext === '3mf')                        load3MFBuffer(ev.target.result, file.name, file.size);
-      else if (ext === 'step' || ext === 'stp') loadSTEPBuffer(ev.target.result, file.name, file.size);
-      else                                       loadSTLBuffer(ev.target.result, file.name, file.size);
-    };
-    reader.readAsArrayBuffer(file);
+    const file = objFile || files[0];
+    const ext  = file.name.split('.').pop().toLowerCase();
+    const r    = new FileReader();
+    if (ext === 'obj') {
+      r.onload = ev => loadOBJText(ev.target.result, file.name, file.size);
+      r.readAsText(file);
+    } else if (ext === 'ply') {
+      r.onload = ev => loadPLYBuffer(ev.target.result, file.name, file.size);
+      r.readAsArrayBuffer(file);
+    } else if (ext === 'gltf' || ext === 'glb') {
+      r.onload = ev => loadGLTFBuffer(ev.target.result, file.name, file.size);
+      r.readAsArrayBuffer(file);
+    } else if (ext === '3mf') {
+      r.onload = ev => load3MFBuffer(ev.target.result, file.name, file.size);
+      r.readAsArrayBuffer(file);
+    } else if (ext === 'step' || ext === 'stp') {
+      r.onload = ev => loadSTEPBuffer(ev.target.result, file.name, file.size);
+      r.readAsArrayBuffer(file);
+    } else {
+      r.onload = ev => loadSTLBuffer(ev.target.result, file.name, file.size);
+      r.readAsArrayBuffer(file);
+    }
   }
   e.target.value = '';
 });
