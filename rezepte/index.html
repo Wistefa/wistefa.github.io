@@ -1366,7 +1366,7 @@ let rzDpHandle = null;
 })();
 
 async function rzDpConnect() {
-  if (!('showDirectoryPicker' in window)) { alert('Nur Chrome/Edge unterstützt.'); return; }
+  if (!('showDirectoryPicker' in window)) { const s=document.getElementById('rz-dp-status'),b=document.getElementById('rz-dp-btn'); if(s){s.textContent='— nur Chrome/Edge';s.style.color='#999';}if(b)b.style.display='none'; return; }
   try {
     const root = await window.showDirectoryPicker({ mode:'readwrite', startIn:'desktop' });
     rzDpHandle = root;

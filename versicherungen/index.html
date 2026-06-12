@@ -777,7 +777,7 @@ async function _dpGetHandle() {
 }
 async function dpConnect() {
   if (!('showDirectoryPicker' in window)) {
-    alert('File System Access API nicht verfügbar. Chrome/Edge erforderlich.');
+    dpUpdateUI('unsupported');
     return;
   }
   try {
@@ -824,9 +824,11 @@ function dpUpdateUI(state) {
   if (!s) return;
   if (state === true)          { s.textContent = '● verbunden';               s.style.color = '#34c759'; if (b) b.style.display = 'none'; }
   else if (state === 'prompt') { s.textContent = '⚠ Berechtigung abgelaufen'; s.style.color = '#ff9500'; if (b) { b.textContent = '☁️ Neu verbinden'; b.style.display = ''; } }
+  else if (state === 'unsupported') { s.textContent = '— nur Chrome/Edge'; s.style.color = '#999'; if (b) b.style.display = 'none'; }
   else                         { s.textContent = '○ nicht verbunden';         s.style.color = '#999';    if (b) { b.textContent = '☁️ Mit Datenpool verbinden'; b.style.display = ''; } }
 }
 async function dpInit() {
+  if (!('showDirectoryPicker' in window)) { dpUpdateUI('unsupported'); return; }
   const loaded = await dpLoad();
   const handle = await _dpGetHandle();
   if (!handle)      dpUpdateUI(false);
