@@ -150,7 +150,7 @@
       <button class="btn-export" onclick="exportPDF()">PDF</button>
       <button class="btn-export" onclick="saveToiCloud()">☁️ Speichern</button>
       <button class="btn-export" onclick="document.getElementById('icloud-load').click()">☁️ Laden</button>
-      <input type="file" id="icloud-load" accept=".json" style="display:none" onchange="loadFromiCloud(event)">
+      <input type="file" id="icloud-load" accept=".json,application/json,text/plain" style="display:none" onchange="loadFromiCloud(event)">
     </div>
   </div>
 </header>
@@ -957,8 +957,10 @@ function loadFromiCloud(event) {
   reader.onload = async e => {
     try {
       const loaded = JSON.parse(e.target.result);
-      if (!loaded.aktiva || !loaded.passiva) throw new Error();
-      data = loaded;
+      // Datenpool-Format: { data: { aktiva, passiva } } oder direkt { aktiva, passiva }
+      const payload = (loaded.data && loaded.data.aktiva) ? loaded.data : loaded;
+      if (!payload.aktiva || !payload.passiva) throw new Error();
+      data = payload;
       await save();
       render();
       alert("Daten erfolgreich geladen.");
