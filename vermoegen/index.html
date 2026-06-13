@@ -944,25 +944,17 @@ async function deleteItem(type, i) {
 function saveToiCloud() {
   const json = JSON.stringify(data, null, 2);
   const blob = new Blob([json], { type: "application/json" });
-  const filename = "vermoegen.json";
-  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-  if (isMobile && typeof navigator.share === 'function') {
-    const file = new File([blob], filename, { type: "application/json" });
-    const canShare = typeof navigator.canShare === 'function' ? navigator.canShare({ files: [file] }) : true;
-    if (canShare) {
-      navigator.share({ files: [file] }).catch(err => {
-        if (err.name !== 'AbortError') {
-          const url = URL.createObjectURL(blob);
-          window.open(url, '_blank');
-          setTimeout(() => URL.revokeObjectURL(url), 5000);
-        }
-      });
-      return;
-    }
-  }
   const url = URL.createObjectURL(blob);
+  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+  if (isMobile) {
+    // iPad/iPhone: neuen Tab öffnen → Safari Teilen-Button (□↑) → "In Dateien sichern"
+    window.open(url, '_blank');
+    setTimeout(() => URL.revokeObjectURL(url), 30000);
+    return;
+  }
+  // Desktop: direkter Download
   const a = document.createElement("a");
-  a.href = url; a.download = filename;
+  a.href = url; a.download = "vermoegen.json";
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
