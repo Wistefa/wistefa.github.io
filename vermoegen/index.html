@@ -942,12 +942,17 @@ async function deleteItem(type, i) {
 }
 
 function saveToiCloud() {
-  const json = JSON.stringify(data, null, 2);
-  const blob = new Blob([json], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url; a.download = "vermoegen.json"; a.click();
-  URL.revokeObjectURL(url);
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+  const filename = "vermoegen.json";
+  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+  if (isMobile && navigator.share && navigator.canShare?.({ files: [new File([blob], filename)] })) {
+    navigator.share({ files: [new File([blob], filename, { type: "application/json" })] });
+  } else {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = filename; a.click();
+    URL.revokeObjectURL(url);
+  }
 }
 
 function loadFromiCloud(event) {
@@ -956,16 +961,37 @@ function loadFromiCloud(event) {
   const reader = new FileReader();
   reader.onload = async e => {
     try {
-      const loaded = JSON.parse(e.target.result);
-      // Datenpool-Format: { data: { aktiva, passiva } } oder direkt { aktiva, passiva }
-      const payload = (loaded.data && loaded.data.aktiva) ? loaded.data : loaded;
-      if (!payload.aktiva || !payload.passiva) throw new Error();
-      data = payload;
+      const obj = JSON.parse(e.target.result);
+      // fabExport-Format: { version, data: { aktiva, passiva } } oder direkt { aktiva, passiva }
+      const raw = (obj.data && Array.isArray(obj.data.aktiva)) ? obj.data : obj;
+      if (!Array.isArray(raw?.aktiva) || !Array.isArray(raw?.passiva)) throw new Error();
+      const num = v => isFinite(parseFloat(v)) ? parseFloat(v) : 0;
+      const sanitizeItem = it => ({
+        name: String(it.name || '').slice(0, 200),
+        cat:  String(it.cat  || '').slice(0, 100),
+        value: num(it.value),
+        date:  String(it.date || '').slice(0, 10),
+        person: String(it.person || '').slice(0, 100),
+        laufzeit: String(it.laufzeit || '').slice(0, 10),
+        ...(it.fremdw && typeof it.fremdw === 'object' ? { fremdw: {
+          currency: String(it.fremdw.currency || '').slice(0, 10),
+          amount:   num(it.fremdw.amount),
+          rate:     num(it.fremdw.rate),
+          rateDate: String(it.fremdw.rateDate || '').slice(0, 10),
+        }} : {}),
+      });
+      data = {
+        aktiva:    raw.aktiva.slice(0, 5000).map(sanitizeItem),
+        passiva:   raw.passiva.slice(0, 5000).map(sanitizeItem),
+        snapshots: (raw.snapshots || []).slice(0, 1000).map(s => ({ date: String(s.date || '').slice(0, 20), netto: num(s.netto) })),
+        persons:   (raw.persons || []).slice(0, 100).map(p => String(p).slice(0, 100)),
+      };
+      if (!data.persons.includes('Gemeinsam')) data.persons.push('Gemeinsam');
       await save();
       render();
       alert("Daten erfolgreich geladen.");
     } catch {
-      alert("Fehler: Ungültige Datei.");
+      alert("Fehler: Ungültige Datei. Bitte eine gültige vermoegen.json auswählen.");
     }
     event.target.value = "";
   };
@@ -1233,7 +1259,7 @@ function fabImport(input){
     <div style="font-size:0.75rem;font-weight:700;color:#666;letter-spacing:.08em;text-transform:uppercase;margin-bottom:10px;">Daten sichern</div>
     <input type="text" id="fab-name" placeholder="Name (z.B. 28.05.2026)" style="width:100%;padding:7px 10px;border:1px solid #ddd;border-radius:7px;font-size:16px;margin-bottom:8px;box-sizing:border-box;">
     <button onclick="fabExport()" style="width:100%;padding:9px;background:#1b4332;color:#f0d080;border:1px solid #c8952a;border-radius:7px;font-weight:bold;cursor:pointer;margin-bottom:7px;font-size:0.88rem;">💾 Speichern (JSON)</button>
-    <label style="display:block;width:100%;padding:9px;background:#f5f5f5;border:1px solid #ddd;border-radius:7px;font-weight:bold;cursor:pointer;text-align:center;font-size:0.88rem;box-sizing:border-box;">📂 Laden (JSON)<input type="file" accept=".json" style="display:none" onchange="fabImport(this)"></label>
+    <label style="display:block;width:100%;padding:9px;background:#f5f5f5;border:1px solid #ddd;border-radius:7px;font-weight:bold;cursor:pointer;text-align:center;font-size:0.88rem;box-sizing:border-box;">📂 Laden (JSON)<input type="file" accept=".json,application/json,text/plain" style="display:none" onchange="fabImport(this)"></label>
     <div style="border-top:1px solid #eee;margin-top:8px;padding-top:8px;">
       <div style="font-size:0.75rem;font-weight:700;color:#666;letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px;">iCloud Datenpool</div>
       <div id="dp-status" style="font-size:0.8rem;margin-bottom:6px;color:#999;">○ nicht verbunden</div>
