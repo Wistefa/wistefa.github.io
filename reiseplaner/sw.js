@@ -1,4 +1,4 @@
-const CACHE = "reiseplaner-v5";
+const CACHE = "reiseplaner-v6";
 const ASSETS = [
   "./index.html",
   "./manifest.json",
