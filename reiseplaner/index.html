@@ -433,15 +433,16 @@
     // ──────────────────────────────────────────────────
     //  EVENT FORM
     // ──────────────────────────────────────────────────
-    function EventForm({ event, onSave, onClose }) {
+    function EventForm({ event, onSave, onClose, defaultDate }) {
       const [type, setType] = useState(event?.type||"flight");
       const [title, setTitle] = useState(event?.title||"");
-      const [startDate, setStartDate] = useState(event?.startDate||"");
+      const [startDate, setStartDate] = useState(event?.startDate||defaultDate||"");
       const [startTime, setStartTime] = useState(event?.startTime||"");
       const [endDate, setEndDate] = useState(event?.endDate||"");
       const [endTime, setEndTime] = useState(event?.endTime||"");
       const [location, setLocation] = useState(event?.location||"");
       const [confirmation, setConfirmation] = useState(event?.confirmation||"");
+      const [link, setLink] = useState(event?.link||"");
       const [note, setNote] = useState(event?.note||"");
       const [kosten, setKosten] = useState(event?.kosten||"");
       const [photos, setPhotos] = useState(event?.photos||[]);
@@ -452,7 +453,7 @@
       const save = () => {
         if (!title) { setError("Bitte einen Titel eingeben."); return; }
         onSave({ id:event?.id||uid(), type, title, startDate, startTime,
-          endDate, endTime, location, confirmation, note, kosten, photos, pdfs, gpxFiles });
+          endDate, endTime, location, confirmation, link, note, kosten, photos, pdfs, gpxFiles });
         onClose();
       };
 
@@ -511,6 +512,7 @@
           )}
           <Field label="Ort / Adresse"><Input value={location} onChange={setLocation} placeholder="Hotel, Flughafen, Restaurant…" /></Field>
           <Field label="Bestätigungsnummer"><Input value={confirmation} onChange={setConfirmation} placeholder="Buchungs-/Bestätigungscode" /></Field>
+          <Field label="Link (z.B. booking.com)"><Input type="url" value={link} onChange={setLink} placeholder="https://www.booking.com/…" /></Field>
           <Field label="Fotos">
             <div>
               <label style={{display:"inline-flex",alignItems:"center",gap:6,cursor:"pointer",
@@ -1703,6 +1705,7 @@
                                   : `${parseFloat(ev.kosten).toFixed(2)} €`}
                               </div>
                             )}
+                            {ev.link && <a href={ev.link} target="_blank" rel="noopener noreferrer" style={{display:"inline-flex",alignItems:"center",gap:5,marginTop:6,fontSize:13,color:"#4A9EFF",textDecoration:"none",background:"rgba(74,158,255,0.1)",border:"1px solid rgba(74,158,255,0.25)",borderRadius:14,padding:"4px 10px"}}>🔗 {(()=>{try{return new URL(ev.link).hostname.replace('www.','')}catch{return ev.link}})()}</a>}
                             {ev.note && <div style={{fontSize:13,color:"#666",marginTop:4,fontStyle:"italic"}}>{ev.note}</div>}
                             {ev.photos && ev.photos.length>0 && (
                               <div style={{display:"flex",gap:6,flexWrap:"wrap",marginTop:8}}>
@@ -1935,7 +1938,8 @@
           {showEventForm && (
             <EventForm event={editEvent}
               onSave={ev=>{saveEvent(ev);setShowEventForm(false);}}
-              onClose={()=>setShowEventForm(false)} />
+              onClose={()=>setShowEventForm(false)}
+              defaultDate={!editEvent && sortedEvents.length>0 ? (sortedEvents[sortedEvents.length-1].endDate||sortedEvents[sortedEvents.length-1].startDate) : undefined} />
           )}
           {showDocForm && (
             <DocumentForm doc={editDoc}
