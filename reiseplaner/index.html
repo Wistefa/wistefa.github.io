@@ -1939,7 +1939,7 @@
             <EventForm event={editEvent}
               onSave={ev=>{saveEvent(ev);setShowEventForm(false);}}
               onClose={()=>setShowEventForm(false)}
-              defaultDate={!editEvent && sortedEvents.length>0 ? (sortedEvents[sortedEvents.length-1].endDate||sortedEvents[sortedEvents.length-1].startDate) : undefined} />
+              defaultDate={!editEvent ? (sortedEvents.length>0 ? (sortedEvents[sortedEvents.length-1].endDate||sortedEvents[sortedEvents.length-1].startDate) : trip.startDate) : undefined} />
           )}
           {showDocForm && (
             <DocumentForm doc={editDoc}
