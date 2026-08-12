@@ -520,6 +520,7 @@ const CATS_PASSIVA = [
 ];
 
 const COLORS = ["#3182ce","#38a169","#d69e2e","#e53e3e","#805ad5","#dd6b20","#319795","#d53f8c"];
+const COLORS_PASSIVA = ["#e53e3e","#dd6b20","#d69e2e","#805ad5","#d53f8c","#c53030"];
 
 let data = null; // loaded after PIN unlock
 let currentType = "aktiva";
@@ -735,7 +736,7 @@ function renderChart() {
   });
   const pLabels = Object.keys(pGrouped);
   const pValues = pLabels.map(l => pGrouped[l]);
-  const COLORS_P = ["#e53e3e","#dd6b20","#d69e2e","#805ad5","#d53f8c","#c53030"];
+  const COLORS_P = COLORS_PASSIVA;
   const hasPassivaDonut = pLabels.length > 0;
 
   document.getElementById("passiva-chart-row").style.display = hasPassivaDonut ? "" : "none";
@@ -1048,6 +1049,61 @@ function exportPDF() {
   doc.setDrawColor(200,200,200); doc.line(14, 61, pageW - 14, 61);
 
   let y = 70;
+  const hexToRgb = hex => {
+    const n = parseInt(hex.replace("#",""), 16);
+    return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+  };
+
+  // Verteilung als Donut-Chart, wie auf dem Bildschirm — eigenes Offscreen-Chart mit fester
+  // Pixelgröße statt des Live-Canvas, damit Timing/Größe des sichtbaren Charts keine Rolle spielt.
+  const addDonutSection = (title, items, colors) => {
+    const filtered = filterPerson === "alle" ? items : items.filter(i => (i.person || "") === filterPerson);
+    const grouped = {};
+    filtered.forEach(it => { grouped[it.cat] = (grouped[it.cat] || 0) + it.value; });
+    const labels = Object.keys(grouped);
+    if (!labels.length) return;
+    const values = labels.map(l => grouped[l]);
+    const total  = values.reduce((s, v) => s + v, 0);
+
+    const offCanvas = document.createElement("canvas");
+    offCanvas.width = 300; offCanvas.height = 300;
+    const offChart = new Chart(offCanvas, {
+      type: "doughnut",
+      data: { labels, datasets: [{ data: values, backgroundColor: colors.slice(0, labels.length), borderWidth: 2 }] },
+      options: {
+        responsive: false, animation: false,
+        plugins: { legend: { display: false }, tooltip: { enabled: false } },
+      },
+    });
+    const img = offCanvas.toDataURL("image/png");
+    offChart.destroy();
+
+    if (y > 190) { doc.addPage(); y = 20; }
+    doc.setFontSize(12); doc.setFont("helvetica","bold"); doc.setTextColor(30,58,95);
+    doc.text(title, 14, y); y += 6;
+
+    const imgSize = 40, imgY = y, legendX = 14 + imgSize + 10;
+    doc.addImage(img, "PNG", 14, imgY, imgSize, imgSize);
+
+    let ly = imgY + 3;
+    doc.setFontSize(8.5);
+    labels.forEach((label, i) => {
+      doc.setFillColor(...hexToRgb(colors[i % colors.length]));
+      doc.rect(legendX, ly - 3, 3, 3, "F");
+      doc.setFont("helvetica","normal"); doc.setTextColor(80,80,80);
+      doc.text(label, legendX + 5, ly);
+      doc.setFont("helvetica","bold"); doc.setTextColor(40,40,40);
+      doc.text(`${fmt(values[i])}  (${((values[i]/total)*100).toFixed(1)}%)`, legendX + 5, ly + 4);
+      ly += 9;
+    });
+
+    y = Math.max(imgY + imgSize, ly) + 10;
+  };
+
+  addDonutSection("Aktiva – Verteilung", data.aktiva, COLORS);
+  addDonutSection("Passiva – Verteilung", data.passiva, COLORS_PASSIVA);
+  if (y > 70) { doc.addPage(); y = 20; }
+
   const addSection = (title, items, catList, color) => {
     if (!items.length) return;
     if (y > 265) { doc.addPage(); y = 20; }
