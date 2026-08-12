@@ -919,7 +919,7 @@ async function saveItem() {
   const person = document.getElementById("m-person").value;
   const laufzeit = document.getElementById("m-laufzeit").value;
   if (!name) { document.getElementById("m-name").focus(); return; }
-  if (!value || value <= 0) { document.getElementById("m-value").focus(); return; }
+  if (isNaN(value) || value < 0) { document.getElementById("m-value").focus(); return; }
   const fwAmount = parseFloat(document.getElementById("m-fw-amount").value) || 0;
   const fremdw = (cat === "Fremdwährungskonto" && window._fwRate && fwAmount > 0)
     ? { ...window._fwRate, amount: fwAmount }
