@@ -1205,6 +1205,83 @@ function exportPDF() {
     });
   }
 
+  // Seite 4: erbrechtliche Einordnung (fester Hinweistext)
+  doc.addPage(); y = 20;
+  doc.setFontSize(14); doc.setFont("helvetica","bold"); doc.setTextColor(30,58,95);
+  doc.text("Erbrechtliche Einordnung", 14, y); y += 10;
+
+  const textW = pageW - 28;
+  const addHeading = text => {
+    if (y > 275) { doc.addPage(); y = 20; }
+    doc.setFontSize(10.5); doc.setFont("helvetica","bold"); doc.setTextColor(30,58,95);
+    doc.splitTextToSize(text, textW).forEach(line => {
+      if (y > 282) { doc.addPage(); y = 20; }
+      doc.text(line, 14, y); y += 5;
+    });
+    y += 2;
+  };
+  const addParagraph = text => {
+    doc.setFontSize(9); doc.setFont("helvetica","normal"); doc.setTextColor(70,70,70);
+    doc.splitTextToSize(text, textW).forEach(line => {
+      if (y > 282) { doc.addPage(); y = 20; }
+      doc.text(line, 14, y); y += 4.3;
+    });
+    y += 4;
+  };
+  const addBullet = text => {
+    doc.setFontSize(9); doc.setFont("helvetica","bold"); doc.setTextColor(70,70,70);
+    doc.splitTextToSize(text, textW - 5).forEach((line, i) => {
+      if (y > 282) { doc.addPage(); y = 20; }
+      doc.text(i === 0 ? "•" : "", 14, y);
+      doc.text(line, 19, y); y += 4.3;
+    });
+  };
+
+  addParagraph("Für diesen konkreten Fall – verheirateter Elternteil, Zugewinngemeinschaft, drei Kinder, und ein Testament liegt vor – sieht die Berechnung so aus:");
+
+  addHeading("Ausgangspunkt: die gesetzliche Erbquote (als Referenzgröße)");
+  addParagraph("Auch wenn ein Testament existiert, braucht man die gesetzliche Erbquote als Bezugsgröße, weil sich daraus der Pflichtteil berechnet. Bei Zugewinngemeinschaft ohne Testament wäre die Verteilung: Ehegatte 1/2 (1/4 gesetzlicher Erbteil plus pauschal 1/4 Zugewinnausgleich), die drei Kinder teilen sich die restliche Hälfte zu gleichen Teilen, also je 1/6.");
+
+  addHeading("Mit Testament: Der Erblasser kann davon abweichen");
+  addParagraph("Ein Testament setzt diese gesetzliche Quote außer Kraft. Der verstorbene Elternteil konnte also frei bestimmen, wer was bekommt – zum Beispiel den Ehegatten als Alleinerben einsetzen, einzelne Kinder bevorzugen oder benachteiligen, oder auch Dritte bedenken. Maßgeblich ist dann ausschließlich der Inhalt des Testaments. Häufig ist bei Ehepaaren das sogenannte Berliner Testament: Die Ehegatten setzen sich gegenseitig als Alleinerben ein, und die Kinder werden erst beim Tod des zweiten Elternteils als Schlusserben bedacht. In diesem Fall erben die Kinder beim Tod des ersten Elternteils zunächst gar nichts.");
+
+  addHeading("Der Pflichtteil als Korrektiv");
+  addParagraph("Wird ein Kind oder der Ehegatte im Testament übergangen oder erhält weniger als die Hälfte seines gesetzlichen Erbteils, entsteht ein Pflichtteilsanspruch. Der Pflichtteil beträgt immer die Hälfte des gesetzlichen Erbteils, ausgezahlt als reiner Geldanspruch gegen die tatsächlichen Erben, nicht als Beteiligung am Nachlass selbst. Auf Basis der obigen Quoten wären das:");
+  addBullet("Ehegatte: Pflichtteil = 1/4 des Nachlasswerts (die Hälfte von 1/2)");
+  y += 1.5;
+  addBullet("Jedes Kind: Pflichtteil = 1/12 des Nachlasswerts (die Hälfte von 1/6)");
+  y += 5.5;
+  addParagraph("Beim Berliner Testament bedeutet das konkret: Die Kinder könnten beim Tod des ersten Elternteils sofort ihren Pflichtteil von je 1/12 vom überlebenden Ehegatten einfordern, obwohl sie testamentarisch nicht als Erben vorgesehen sind. Viele Berliner Testamente enthalten deshalb eine Pflichtteilsstrafklausel, die ein Kind, das den Pflichtteil beim ersten Erbfall einfordert, auch beim zweiten Erbfall auf den Pflichtteil verweist – um genau das zu verhindern.");
+
+  addHeading("Zusätzlich relevant: Pflichtteilsergänzungsanspruch");
+  addParagraph("Hat der Erblasser innerhalb der letzten zehn Jahre vor seinem Tod größere Schenkungen gemacht, kann sich der Pflichtteil um einen Ergänzungsanspruch erhöhen, der diese Schenkungen anteilig einbezieht (mit einer Abschmelzung von 10 % pro Jahr).");
+
+  addHeading("Erbschaftsteuerlich");
+  addParagraph("Die Freibeträge bleiben unverändert: 500.000 Euro für den Ehegatten, 400.000 Euro je Kind. Beim Zugewinnausgleich gibt es eine steuerliche Besonderheit: Der pauschale erbrechtliche Zugewinnausgleich (das zusätzliche 1/4) ist bei der Erbschaftsteuer grundsätzlich mit einzubeziehen, während ein tatsächlich güterrechtlich geltend gemachter Zugewinnausgleich steuerfrei wäre – das ist ein Detail, das im Einzelfall genau geprüft werden sollte.");
+
+  addParagraph("Um die tatsächliche Verteilung im Detail durchzurechnen, bräuchte ich den genauen Inhalt des Testaments – wer als Erbe eingesetzt ist und in welcher Höhe. Wenn Sie mir das Testament oder zumindest die relevanten Klauseln nennen, rechne ich die konkreten Erb- und Pflichtteilsquoten gerne aus.");
+
+  // Seite 5: Sonderfall gleichzeitiger Tod beider Elternteile
+  doc.addPage(); y = 20;
+  doc.setFontSize(14); doc.setFont("helvetica","bold"); doc.setTextColor(30,58,95);
+  doc.text("Sonderfall: Gleichzeitiger Tod beider Elternteile", 14, y); y += 10;
+
+  addParagraph("Beim gleichzeitigen Tod beider Elternteile ändert sich die Ausgangslage grundlegend, weil ein zentraler Grundsatz des Erbrechts eingreift: Nach § 1923 BGB kann nur erben, wer den Erbfall auch \"erlebt\", also den anderen überlebt. Stirbt niemand nachweislich zuerst – etwa bei einem gemeinsamen Unfall, oder weil die Reihenfolge schlicht nicht feststellbar ist – greift die sogenannte Kommorientenvermutung (§ 11 Verschollenheitsgesetz, analog angewendet): Es wird unterstellt, dass beide gleichzeitig verstorben sind. Die Konsequenz: Die Ehegatten beerben sich in diesem Fall gegenseitig nicht.");
+
+  addHeading("Ohne Testament");
+  addParagraph("Da kein Ehegattenerbrecht zum Tragen kommt, entstehen zwei völlig getrennte Nachlässe – der des Vaters und der der Mutter. Jeder Nachlass fällt unmittelbar an die nächstberufenen gesetzlichen Erben, hier also direkt an die drei gemeinsamen Kinder, und zwar in jedem der beiden Nachlässe zu je 1/3. Es gibt also weder den hälftigen Ehegattenanteil noch den pauschalen Zugewinnausgleich – diese Mechanismen setzen ja voraus, dass ein Ehegatte den anderen überlebt. Wirtschaftlich betrachtet erben die Kinder damit unmittelbar das gesamte Vermögen beider Elternteile, aufgeteilt in zwei separate Erbmassen, aber im Ergebnis zu je einem Drittel des Gesamtvermögens pro Kind, sofern beide Nachlässe ähnlich groß sind.");
+
+  addHeading("Mit Testament (insbesondere Berliner Testament)");
+  addParagraph("Hier kommt es entscheidend darauf an, ob das Testament diesen Fall ausdrücklich regelt. Ein klassisches Berliner Testament setzt die Ehegatten zunächst gegenseitig als Alleinerben ein und die Kinder erst als Schlusserben nach dem Tod des Letztversterbenden. Bei gleichzeitigem Tod gibt es aber keinen \"Letztversterbenden\" – die Grundkonstruktion greift ins Leere. Gut formulierte Testamente enthalten deshalb eine ausdrückliche Ersatzklausel für genau diesen Fall (oft als \"gleichzeitiger Tod\" oder \"Tod innerhalb kurzer Frist\" bezeichnet), die anordnet, dass die Kinder dann unmittelbar und direkt zu Vollerben beider Elternteile werden. Fehlt eine solche Klausel, muss im Wege der ergänzenden Testamentsauslegung (§ 2084 BGB) ermittelt werden, was die Eltern mutmaßlich gewollt hätten – in der Praxis kommen Gerichte dabei meist ebenfalls zu dem Ergebnis, dass die Kinder direkt erben sollen.");
+
+  addHeading("Pflichtteil spielt hier praktisch keine Rolle mehr");
+  addParagraph("Die ganze Problematik der Pflichtteilsstrafklausel beim Berliner Testament – dass ein Kind beim ersten Erbfall den Pflichtteil vom überlebenden Elternteil einfordern könnte – entfällt komplett, weil es keinen überlebenden Elternteil gibt, gegen den sich ein solcher Anspruch richten könnte. Etwaige Pflichtteilsansprüche würden sich direkt gegen den jeweiligen Nachlass richten, falls ein Kind testamentarisch benachteiligt wurde.");
+
+  addHeading("Erbschaftsteuerlich");
+  addParagraph("Da es sich um zwei unabhängige Erbfälle mit zwei unterschiedlichen Erblassern handelt, steht jedem Kind für jeden der beiden Erwerbe der volle Freibetrag von 400.000 Euro zu – also im Ergebnis 800.000 Euro steuerfrei pro Kind, da keine Zusammenrechnung nach § 14 ErbStG erfolgt (die gilt nur für mehrere Erwerbe von derselben Person). Das unterscheidet sich vom Fall des zeitlich versetzten Versterbens, wo das Vermögen erst über den überlebenden Ehegatten läuft und dort teilweise zusammengerechnet werden kann.");
+
+  addParagraph("Falls in Ihrem Fall tatsächlich ein Berliner Testament vorliegt, wäre der wichtigste nächste Schritt zu prüfen, ob es eine Klausel für den gleichzeitigen Tod oder den Tod innerhalb einer bestimmten Frist enthält – das entscheidet, ob die gesetzliche Auslegung überhaupt nötig wird.");
+
   // Footer
   doc.setFontSize(8); doc.setTextColor(160,160,160);
   doc.text("Erstellt am " + today, pageW / 2, 290, { align: "center" });
