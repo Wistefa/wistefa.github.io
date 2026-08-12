@@ -1093,8 +1093,8 @@ function exportPDF() {
       doc.setFont("helvetica","normal"); doc.setTextColor(80,80,80);
       doc.text(label, legendX + 5, ly);
       doc.setFont("helvetica","bold"); doc.setTextColor(40,40,40);
-      doc.text(`${fmt(values[i])}  (${((values[i]/total)*100).toFixed(1)}%)`, legendX + 5, ly + 4);
-      ly += 9;
+      doc.text(`${fmt(values[i])} (${((values[i]/total)*100).toFixed(1)}%)`, pageW - 14, ly, { align: "right" });
+      ly += 7;
     });
 
     y = Math.max(imgY + imgSize, ly) + 10;
