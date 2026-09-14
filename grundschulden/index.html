@@ -50,6 +50,7 @@
   table.gs-table tr.status-geloescht .status-badge { text-decoration: none; }
   .status-badge { display: inline-block; padding: 2px 9px; border-radius: 20px; font-size: 0.7rem; font-weight: 700; }
   .status-badge.aktiv { background: #f0fff4; color: #276749; }
+  .status-badge.ungenutzt { background: #fffbea; color: #b7791f; }
   .status-badge.geloescht { background: #edf2f7; color: #718096; }
   .bemerkung-cell { color: #718096; font-size: 0.78rem; max-width: 180px; }
   .betrag-cell { font-weight: 700; color: #1e3a5f; white-space: nowrap; }
@@ -116,6 +117,10 @@
     <div class="card">
       <div class="label">Restschuld gesamt</div>
       <div class="value" id="sum-restschuld">0 €</div>
+    </div>
+    <div class="card">
+      <div class="label">Ungenutzt (Reserve)</div>
+      <div class="value" id="sum-ungenutzt" style="color:#b7791f;">0 €</div>
     </div>
   </div>
 
@@ -199,6 +204,7 @@
       <label>Status</label>
       <select id="g-status">
         <option value="aktiv">aktiv</option>
+        <option value="ungenutzt">ungenutzt (Reserve)</option>
         <option value="geloescht">gelöscht</option>
       </select>
     </div>
@@ -270,17 +276,26 @@ function gsProperties(g) {
   return [];
 }
 
+const STATUS_LABEL = { aktiv: "aktiv", ungenutzt: "ungenutzt", geloescht: "gelöscht" };
+function statusOf(g) { return g.status === "geloescht" ? "geloescht" : g.status === "ungenutzt" ? "ungenutzt" : "aktiv"; }
+
 function render() {
-  const activeGS = data.grundschulden.filter(g => g.status !== "geloescht");
+  // "aktiv" = zählt in Summen/Diagrammen als aktuell genutzte Sicherheit.
+  // "ungenutzt" = weiterhin im Grundbuch eingetragen, sichert aber aktuell nichts (Reserve).
+  // "geloescht" = im Grundbuch gelöscht.
+  const activeGS = data.grundschulden.filter(g => statusOf(g) === "aktiv");
+  const ungenutztGS = data.grundschulden.filter(g => statusOf(g) === "ungenutzt");
   // Dedupe: jede Grundschuld (auch Gesamtgrundschuld über mehrere Immobilien) zählt in der
   // Gesamtsumme nur einmal, nicht pro verknüpfter Immobilie.
   const total = activeGS.reduce((s, g) => s + (Number(g.betrag) || 0), 0);
   const restschuldTotal = activeGS.reduce((s, g) => s + (Number(g.restschuld) || 0), 0);
+  const ungenutztTotal = ungenutztGS.reduce((s, g) => s + (Number(g.betrag) || 0), 0);
 
   document.getElementById("sum-total").textContent = fmt(total);
   document.getElementById("sum-properties").textContent = data.properties.length;
   document.getElementById("sum-count").textContent = activeGS.length;
   document.getElementById("sum-restschuld").textContent = fmt(restschuldTotal);
+  document.getElementById("sum-ungenutzt").textContent = fmt(ungenutztTotal) + (ungenutztGS.length ? ` (${ungenutztGS.length})` : "");
 
   const container = document.getElementById("properties-container");
   if (!data.properties.length) {
@@ -288,19 +303,20 @@ function render() {
   } else {
     container.innerHTML = data.properties.map(prop => {
       const items = data.grundschulden.filter(g => gsProperties(g).includes(prop.id));
-      const sumActive = items.filter(g => g.status !== "geloescht").reduce((s, g) => s + (Number(g.betrag) || 0), 0);
+      const sumActive = items.filter(g => statusOf(g) === "aktiv").reduce((s, g) => s + (Number(g.betrag) || 0), 0);
       const rows = items.length ? items.map(g => {
         const others = gsProperties(g).filter(id => id !== prop.id).map(id => data.properties.find(p => p.id === id)?.name).filter(Boolean);
         const gesamtNote = others.length ? `<div style="font-size:0.72rem;color:#c8952a;font-weight:600;margin-top:2px;">🔗 Gesamtgrundschuld – auch: ${esc(others.join(", "))}</div>` : "";
         const abtretungNote = g.abgetretenVon ? `<div style="font-size:0.72rem;color:#718096;margin-top:2px;">↪ abgetreten von ${esc(g.abgetretenVon)}${g.abtretungsdatum ? " am " + fmtDate(g.abtretungsdatum) : ""}</div>` : "";
         const zweckNote = g.zweck ? `<div style="font-size:0.72rem;color:#2b6cb0;margin-top:2px;">🎯 Sicherheit für: ${esc(g.zweck)}</div>` : "";
+        const st = statusOf(g);
         return `
-        <tr class="${g.status === 'geloescht' ? 'status-geloescht' : ''}">
+        <tr class="${st === 'geloescht' ? 'status-geloescht' : ''}">
           <td>${esc(g.glaeubiger)}${gesamtNote}${abtretungNote}${zweckNote}</td>
           <td class="betrag-cell">${fmt(g.betrag)}</td>
           <td>${esc(g.rang || "–")}</td>
           <td>${fmtDate(g.datum)}</td>
-          <td><span class="status-badge ${g.status === 'geloescht' ? 'geloescht' : 'aktiv'}">${g.status === 'geloescht' ? 'gelöscht' : 'aktiv'}</span></td>
+          <td><span class="status-badge ${st}">${STATUS_LABEL[st]}</span></td>
           <td class="restschuld-cell">${g.restschuld ? fmt(g.restschuld) : "–"}</td>
           <td class="bemerkung-cell">${esc(g.bemerkung || "")}</td>
           <td style="white-space:nowrap;"><button class="icon-btn" onclick="openGSModal(${prop.id}, ${g.id})">✏️</button></td>
@@ -336,7 +352,7 @@ function render() {
 // ── Charts ─────────────────────────────────────────────
 let chartByProperty = null, chartByCreditor = null;
 function renderCharts() {
-  const activeGS = data.grundschulden.filter(g => g.status !== "geloescht");
+  const activeGS = data.grundschulden.filter(g => statusOf(g) === "aktiv");
   const creditors = [...new Set(activeGS.map(g => g.glaeubiger))].sort();
 
   // Stacked bar: one bar per property, segments per creditor
@@ -391,20 +407,25 @@ function renderSankey(activeGS) {
   }
   wrap.style.display = "";
 
-  // aggregate by (Immobilie -> Bank); Gesamtgrundschulden erzeugen einen Fluss je verknüpfter Immobilie
+  // Stufe 1: Immobilie (Grundbuch-Eintrag) -> Bank; Gesamtgrundschulden erzeugen einen Fluss je verknüpfter Immobilie
+  // Stufe 2: Bank -> Verwendungszweck, falls die Grundschuld für eine andere Immobilie/einen anderen Zweck als Sicherheit diente
   const flowMap = new Map();
+  const addFlow = (from, to, amount) => flowMap.set(from + "→" + to, (flowMap.get(from + "→" + to) || 0) + amount);
   activeGS.forEach(g => {
     gsProperties(g).forEach(propId => {
       const prop = data.properties.find(p => p.id === propId);
       if (!prop) return;
-      const key = prop.name + "→" + g.glaeubiger;
-      flowMap.set(key, (flowMap.get(key) || 0) + (Number(g.betrag) || 0));
+      addFlow(prop.name, g.glaeubiger, Number(g.betrag) || 0);
     });
+    if (g.zweck) addFlow(g.glaeubiger, "🎯 " + g.zweck, Number(g.betrag) || 0);
   });
   const flows = [...flowMap.entries()].map(([key, flow]) => {
     const [from, to] = key.split("→");
     return { from, to, flow };
   });
+
+  const propLabelMap = Object.fromEntries(data.properties.map(p => [p.name, "🏠 " + p.name]));
+  const propPriority = Object.fromEntries(data.properties.map((p, i) => [p.name, i]));
 
   if (chartSankey) chartSankey.destroy();
   chartSankey = new Chart(canvas, {
@@ -413,11 +434,11 @@ function renderSankey(activeGS) {
       datasets: [{
         label: "Sicherheiten",
         data: flows,
-        colorFrom: c => "#a0aec0",
-        colorTo: c => colorForCreditor(c.dataset.data[c.dataIndex].to),
+        colorFrom: c => propLabelMap[c.dataset.data[c.dataIndex].from] ? "#a0aec0" : colorForCreditor(c.dataset.data[c.dataIndex].from),
+        colorTo: c => colorForCreditor(c.dataset.data[c.dataIndex].to) ,
         colorMode: "gradient",
-        labels: Object.fromEntries(data.properties.map(p => [p.name, "🏠 " + p.name])),
-        priority: Object.fromEntries(data.properties.map((p, i) => [p.name, i])),
+        labels: propLabelMap,
+        priority: propPriority,
       }],
     },
     options: {
