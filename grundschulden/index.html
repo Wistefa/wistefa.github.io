@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Grundschulden-Übersicht</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js" integrity="sha384-NrKB+u6Ts6AtkIhwPixiKTzgSKNblyhlk0Sohlgar9UHUBzai/sgnNNWWd291xqt" crossorigin="anonymous"></script>
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f0f4f8; color: #1a202c; min-height: 100vh; margin: 0; }
+
+  header { background: #1e3a5f; color: white; padding: 20px 24px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
+  header h1 { font-size: 1.25rem; margin: 0; }
+  header .sub { font-size: 0.8rem; color: #cbd5e0; margin-top: 2px; }
+  header .actions { display: flex; gap: 8px; }
+  header .actions button { background: rgba(255,255,255,.12); color: white; border: 1px solid rgba(255,255,255,.3); border-radius: 8px; padding: 7px 12px; font-size: 0.8rem; font-weight: 600; cursor: pointer; }
+  header .actions button:hover { background: rgba(255,255,255,.22); }
+
+  main { max-width: 980px; margin: 0 auto; padding: 20px 16px 60px; }
+
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 22px; }
+  .card { background: white; border-radius: 12px; padding: 16px 18px; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+  .card .label { font-size: 0.75rem; color: #718096; text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 6px; }
+  .card .value { font-size: 1.4rem; font-weight: 700; color: #1e3a5f; }
+
+  .chart-box { background: white; border-radius: 12px; padding: 18px 20px; box-shadow: 0 1px 3px rgba(0,0,0,.08); margin-bottom: 22px; }
+  .chart-box h2 { font-size: 0.95rem; font-weight: 700; color: #2d3748; margin: 0 0 14px; }
+  .charts-row { display: grid; grid-template-columns: 1.5fr 1fr; gap: 16px; }
+  @media (max-width: 720px) { .charts-row { grid-template-columns: 1fr; } }
+  .chart-box canvas { max-height: 340px; }
+
+  .prop-add-row { display: flex; justify-content: flex-end; margin-bottom: 16px; }
+  .btn-primary { background: #1e3a5f; color: white; border: none; border-radius: 8px; padding: 9px 16px; font-size: 0.85rem; font-weight: 600; cursor: pointer; }
+  .btn-primary:hover { background: #2a4f7f; }
+
+  .property { background: white; border-radius: 12px; padding: 18px 20px; box-shadow: 0 1px 3px rgba(0,0,0,.08); margin-bottom: 16px; }
+  .property-head { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; gap: 10px; }
+  .property-head h3 { margin: 0; font-size: 1.05rem; color: #2d3748; }
+  .property-head .addr { font-size: 0.78rem; color: #a0aec0; margin-top: 2px; }
+  .property-head-actions { display: flex; gap: 6px; flex-shrink: 0; }
+  .icon-btn { background: none; border: none; cursor: pointer; font-size: 0.95rem; color: #a0aec0; padding: 4px; }
+  .icon-btn:hover { color: #4a5568; }
+  .icon-btn.danger:hover { color: #e53e3e; }
+
+  table.gs-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+  table.gs-table th { text-align: left; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.5px; color: #a0aec0; padding: 6px 8px; border-bottom: 1.5px solid #edf2f7; }
+  table.gs-table td { padding: 9px 8px; border-bottom: 1px solid #f0f4f8; vertical-align: top; }
+  table.gs-table tr.status-geloescht td { color: #a0aec0; text-decoration: line-through; }
+  table.gs-table tr.status-geloescht .status-badge { text-decoration: none; }
+  .status-badge { display: inline-block; padding: 2px 9px; border-radius: 20px; font-size: 0.7rem; font-weight: 700; }
+  .status-badge.aktiv { background: #f0fff4; color: #276749; }
+  .status-badge.geloescht { background: #edf2f7; color: #718096; }
+  .bemerkung-cell { color: #718096; font-size: 0.78rem; max-width: 180px; }
+  .betrag-cell { font-weight: 700; color: #1e3a5f; white-space: nowrap; }
+  .restschuld-cell { color: #718096; font-size: 0.78rem; white-space: nowrap; }
+
+  .property-foot { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; padding-top: 10px; border-top: 1.5px solid #edf2f7; flex-wrap: wrap; gap: 8px; }
+  .property-sum { font-size: 0.85rem; color: #4a5568; }
+  .property-sum b { color: #1e3a5f; font-size: 1rem; }
+  .btn-add-gs { background: #edf2f7; color: #1e3a5f; border: none; border-radius: 8px; padding: 7px 14px; font-size: 0.8rem; font-weight: 600; cursor: pointer; }
+  .btn-add-gs:hover { background: #e2e8f0; }
+
+  .empty { text-align: center; color: #a0aec0; font-size: 0.85rem; padding: 30px 0; }
+
+  /* Modal */
+  .overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.4); z-index: 500; align-items: center; justify-content: center; padding: 16px; }
+  .overlay.open { display: flex; }
+  .modal { background: white; border-radius: 14px; padding: 24px; width: 100%; max-width: 420px; max-height: 90vh; overflow-y: auto; }
+  .modal h3 { margin: 0 0 16px; font-size: 1.1rem; color: #1e3a5f; }
+  .field { margin-bottom: 14px; }
+  .field label { display: block; font-size: 0.8rem; font-weight: 600; color: #4a5568; margin-bottom: 5px; }
+  .field input, .field select, .field textarea { width: 100%; padding: 9px 11px; border: 1.5px solid #e2e8f0; border-radius: 8px; font-size: 0.9rem; outline: none; font-family: inherit; box-sizing: border-box; }
+  .field input:focus, .field select:focus, .field textarea:focus { border-color: #1e3a5f; }
+  .field textarea { resize: vertical; }
+  .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; }
+  .btn-cancel { background: none; border: none; color: #718096; font-size: 0.88rem; font-weight: 600; cursor: pointer; padding: 9px 12px; }
+  .btn-save { background: #1e3a5f; color: white; border: none; border-radius: 8px; padding: 9px 18px; font-size: 0.88rem; font-weight: 600; cursor: pointer; }
+  .btn-save:hover { background: #2a4f7f; }
+  .btn-delete-inline { background: none; border: none; color: #e53e3e; font-size: 0.82rem; font-weight: 600; cursor: pointer; margin-right: auto; padding: 9px 4px; }
+
+  input[type="file"] { display: none; }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>🏠 Grundschulden-Übersicht</h1>
+    <div class="sub">eingetragene Grundschulden je Immobilie</div>
+  </div>
+  <div class="actions">
+    <button onclick="document.getElementById('gs-import').click()">📂 Laden</button>
+    <button onclick="exportJSON()">💾 Sichern</button>
+    <input type="file" id="gs-import" accept=".json,application/json,text/plain" onchange="importJSON(event)">
+  </div>
+</header>
+
+<main>
+
+  <div class="cards">
+    <div class="card">
+      <div class="label">Gesamtsumme aktiv</div>
+      <div class="value" id="sum-total">0 €</div>
+    </div>
+    <div class="card">
+      <div class="label">Immobilien</div>
+      <div class="value" id="sum-properties">0</div>
+    </div>
+    <div class="card">
+      <div class="label">Grundschulden (aktiv)</div>
+      <div class="value" id="sum-count">0</div>
+    </div>
+    <div class="card">
+      <div class="label">Restschuld gesamt</div>
+      <div class="value" id="sum-restschuld">0 €</div>
+    </div>
+  </div>
+
+  <div class="chart-box">
+    <h2>Grafische Übersicht</h2>
+    <div class="charts-row">
+      <div>
+        <div style="font-size:0.78rem;color:#718096;margin-bottom:8px;">Grundschulden je Immobilie (gestapelt nach Gläubiger)</div>
+        <canvas id="chartByProperty"></canvas>
+      </div>
+      <div>
+        <div style="font-size:0.78rem;color:#718096;margin-bottom:8px;">Verteilung nach Gläubiger</div>
+        <canvas id="chartByCreditor"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <div class="prop-add-row">
+    <button class="btn-primary" onclick="openPropertyModal()">+ Immobilie hinzufügen</button>
+  </div>
+
+  <div id="properties-container"></div>
+
+</main>
+
+<!-- Immobilie Modal -->
+<div class="overlay" id="overlay-property">
+  <div class="modal">
+    <h3 id="property-modal-title">Immobilie hinzufügen</h3>
+    <div class="field">
+      <label>Bezeichnung</label>
+      <input type="text" id="p-name" placeholder="z. B. Lenzhalde">
+    </div>
+    <div class="field">
+      <label>Adresse (optional)</label>
+      <input type="text" id="p-addr" placeholder="Straße, Ort">
+    </div>
+    <div class="modal-actions">
+      <button class="btn-delete-inline" id="p-delete-btn" onclick="deleteProperty()" style="display:none">Immobilie löschen</button>
+      <button class="btn-cancel" onclick="closePropertyModal()">Abbrechen</button>
+      <button class="btn-save" onclick="saveProperty()">Speichern</button>
+    </div>
+  </div>
+</div>
+
+<!-- Grundschuld Modal -->
+<div class="overlay" id="overlay-gs">
+  <div class="modal">
+    <h3 id="gs-modal-title">Grundschuld hinzufügen</h3>
+    <div class="field">
+      <label>Immobilie</label>
+      <select id="g-property"></select>
+    </div>
+    <div class="field">
+      <label>Gläubiger / Bank</label>
+      <input type="text" id="g-glaeubiger" placeholder="z. B. SpardaBank">
+    </div>
+    <div class="field">
+      <label>Grundschuldbetrag (€)</label>
+      <input type="number" id="g-betrag" placeholder="0" min="0" step="0.01">
+    </div>
+    <div class="field">
+      <label>Rang (Abt. III, Nr.)</label>
+      <input type="text" id="g-rang" placeholder="z. B. Abt. III, Nr. 2">
+    </div>
+    <div class="field">
+      <label>Eintragungsdatum</label>
+      <input type="date" id="g-datum">
+    </div>
+    <div class="field">
+      <label>Status</label>
+      <select id="g-status">
+        <option value="aktiv">aktiv</option>
+        <option value="geloescht">gelöscht</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>Aktuelle Restschuld (€, optional)</label>
+      <input type="number" id="g-restschuld" placeholder="zum Abgleich mit Grundschuldbetrag" min="0" step="0.01">
+    </div>
+    <div class="field">
+      <label>Bemerkung</label>
+      <textarea id="g-bemerkung" rows="3" maxlength="500" placeholder="z. B. Grundbuchblatt, Zinssatz, Zweck …"></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-delete-inline" id="g-delete-btn" onclick="deleteGS()" style="display:none">Löschen</button>
+      <button class="btn-cancel" onclick="closeGSModal()">Abbrechen</button>
+      <button class="btn-save" onclick="saveGS()">Speichern</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const STORAGE_KEY = "gs_data_v1";
+let data = loadData();
+let editPropertyId = null;
+let editGSId = null;
+
+function loadData() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch {}
+  return { properties: [], grundschulden: [] };
+}
+function persist() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+}
+function uid() { return Date.now() + Math.floor(Math.random() * 1000); }
+function esc(s) { return String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+function fmt(n) { return (Number(n) || 0).toLocaleString("de-DE", { minimumFractionDigits: 0, maximumFractionDigits: 0 }) + " €"; }
+function fmtDate(d) { if (!d) return "–"; const dt = new Date(d); return isNaN(dt) ? d : dt.toLocaleDateString("de-DE"); }
+
+const CREDITOR_COLORS = ["#1e3a5f","#c8952a","#276749","#c53030","#6b46c1","#2b6cb0","#b7791f","#2c7a7b","#975a16","#805ad5"];
+function colorForCreditor(name) {
+  const list = [...new Set(data.grundschulden.map(g => g.glaeubiger))].sort();
+  const idx = list.indexOf(name);
+  return CREDITOR_COLORS[idx % CREDITOR_COLORS.length] || "#718096";
+}
+
+// ── Rendering ──────────────────────────────────────────
+function render() {
+  const activeGS = data.grundschulden.filter(g => g.status !== "geloescht");
+  const total = activeGS.reduce((s, g) => s + (Number(g.betrag) || 0), 0);
+  const restschuldTotal = activeGS.reduce((s, g) => s + (Number(g.restschuld) || 0), 0);
+
+  document.getElementById("sum-total").textContent = fmt(total);
+  document.getElementById("sum-properties").textContent = data.properties.length;
+  document.getElementById("sum-count").textContent = activeGS.length;
+  document.getElementById("sum-restschuld").textContent = fmt(restschuldTotal);
+
+  const container = document.getElementById("properties-container");
+  if (!data.properties.length) {
+    container.innerHTML = '<div class="empty">Noch keine Immobilie angelegt. Oben auf „+ Immobilie hinzufügen" klicken.</div>';
+  } else {
+    container.innerHTML = data.properties.map(prop => {
+      const items = data.grundschulden.filter(g => g.propertyId === prop.id);
+      const sumActive = items.filter(g => g.status !== "geloescht").reduce((s, g) => s + (Number(g.betrag) || 0), 0);
+      const rows = items.length ? items.map(g => `
+        <tr class="${g.status === 'geloescht' ? 'status-geloescht' : ''}">
+          <td>${esc(g.glaeubiger)}</td>
+          <td class="betrag-cell">${fmt(g.betrag)}</td>
+          <td>${esc(g.rang || "–")}</td>
+          <td>${fmtDate(g.datum)}</td>
+          <td><span class="status-badge ${g.status === 'geloescht' ? 'geloescht' : 'aktiv'}">${g.status === 'geloescht' ? 'gelöscht' : 'aktiv'}</span></td>
+          <td class="restschuld-cell">${g.restschuld ? fmt(g.restschuld) : "–"}</td>
+          <td class="bemerkung-cell">${esc(g.bemerkung || "")}</td>
+          <td style="white-space:nowrap;"><button class="icon-btn" onclick="openGSModal(${prop.id}, ${g.id})">✏️</button></td>
+        </tr>`).join("") : `<tr><td colspan="8" style="color:#a0aec0;padding:14px 8px;">Keine Grundschulden erfasst</td></tr>`;
+      return `<div class="property">
+        <div class="property-head">
+          <div>
+            <h3>${esc(prop.name)}</h3>
+            ${prop.addr ? `<div class="addr">${esc(prop.addr)}</div>` : ""}
+          </div>
+          <div class="property-head-actions">
+            <button class="icon-btn" onclick="openPropertyModal(${prop.id})" title="Immobilie bearbeiten">✏️</button>
+          </div>
+        </div>
+        <div style="overflow-x:auto;">
+        <table class="gs-table">
+          <thead><tr><th>Gläubiger</th><th>Betrag</th><th>Rang</th><th>Eintragung</th><th>Status</th><th>Restschuld</th><th>Bemerkung</th><th></th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+        </div>
+        <div class="property-foot">
+          <div class="property-sum">Summe aktiv: <b>${fmt(sumActive)}</b></div>
+          <button class="btn-add-gs" onclick="openGSModal(${prop.id})">+ Grundschuld hinzufügen</button>
+        </div>
+      </div>`;
+    }).join("");
+  }
+
+  renderCharts();
+}
+
+// ── Charts ─────────────────────────────────────────────
+let chartByProperty = null, chartByCreditor = null;
+function renderCharts() {
+  const activeGS = data.grundschulden.filter(g => g.status !== "geloescht");
+  const creditors = [...new Set(activeGS.map(g => g.glaeubiger))].sort();
+
+  // Stacked bar: one bar per property, segments per creditor
+  const propLabels = data.properties.map(p => p.name);
+  const datasets = creditors.map(cred => ({
+    label: cred,
+    data: data.properties.map(p => activeGS
+      .filter(g => g.propertyId === p.id && g.glaeubiger === cred)
+      .reduce((s, g) => s + (Number(g.betrag) || 0), 0)),
+    backgroundColor: colorForCreditor(cred),
+  }));
+
+  if (chartByProperty) chartByProperty.destroy();
+  chartByProperty = new Chart(document.getElementById("chartByProperty"), {
+    type: "bar",
+    data: { labels: propLabels, datasets },
+    options: {
+      indexAxis: "y",
+      responsive: true,
+      plugins: { legend: { display: creditors.length > 1, position: "bottom" } },
+      scales: {
+        x: { stacked: true, ticks: { callback: v => fmt(v) } },
+        y: { stacked: true },
+      },
+    },
+  });
+
+  // Donut: distribution by creditor
+  const byCreditor = creditors.map(c => activeGS.filter(g => g.glaeubiger === c).reduce((s, g) => s + (Number(g.betrag) || 0), 0));
+  if (chartByCreditor) chartByCreditor.destroy();
+  chartByCreditor = new Chart(document.getElementById("chartByCreditor"), {
+    type: "doughnut",
+    data: { labels: creditors, datasets: [{ data: byCreditor, backgroundColor: creditors.map(colorForCreditor) }] },
+    options: {
+      responsive: true,
+      plugins: { legend: { position: "bottom", labels: { boxWidth: 12, font: { size: 11 } } } },
+    },
+  });
+}
+
+// ── Immobilie Modal ────────────────────────────────────
+function openPropertyModal(id = null) {
+  editPropertyId = id;
+  const isEdit = id !== null;
+  document.getElementById("property-modal-title").textContent = isEdit ? "Immobilie bearbeiten" : "Immobilie hinzufügen";
+  document.getElementById("p-delete-btn").style.display = isEdit ? "" : "none";
+  if (isEdit) {
+    const p = data.properties.find(p => p.id === id);
+    document.getElementById("p-name").value = p.name;
+    document.getElementById("p-addr").value = p.addr || "";
+  } else {
+    document.getElementById("p-name").value = "";
+    document.getElementById("p-addr").value = "";
+  }
+  document.getElementById("overlay-property").classList.add("open");
+  setTimeout(() => document.getElementById("p-name").focus(), 80);
+}
+function closePropertyModal() { document.getElementById("overlay-property").classList.remove("open"); }
+function saveProperty() {
+  const name = document.getElementById("p-name").value.trim();
+  const addr = document.getElementById("p-addr").value.trim();
+  if (!name) { document.getElementById("p-name").focus(); return; }
+  if (editPropertyId !== null) {
+    const p = data.properties.find(p => p.id === editPropertyId);
+    p.name = name; p.addr = addr;
+  } else {
+    data.properties.push({ id: uid(), name, addr });
+  }
+  persist(); render(); closePropertyModal();
+}
+function deleteProperty() {
+  if (editPropertyId === null) return;
+  const hasGS = data.grundschulden.some(g => g.propertyId === editPropertyId);
+  if (hasGS && !confirm("Diese Immobilie hat noch Grundschulden erfasst. Immobilie und alle zugehörigen Grundschulden wirklich löschen?")) return;
+  data.properties = data.properties.filter(p => p.id !== editPropertyId);
+  data.grundschulden = data.grundschulden.filter(g => g.propertyId !== editPropertyId);
+  persist(); render(); closePropertyModal();
+}
+
+// ── Grundschuld Modal ──────────────────────────────────
+function openGSModal(propertyId, gsId = null) {
+  editGSId = gsId;
+  const isEdit = gsId !== null;
+  document.getElementById("gs-modal-title").textContent = isEdit ? "Grundschuld bearbeiten" : "Grundschuld hinzufügen";
+  document.getElementById("g-delete-btn").style.display = isEdit ? "" : "none";
+  const sel = document.getElementById("g-property");
+  sel.innerHTML = data.properties.map(p => `<option value="${p.id}">${esc(p.name)}</option>`).join("");
+  sel.value = propertyId;
+  if (isEdit) {
+    const g = data.grundschulden.find(g => g.id === gsId);
+    sel.value = g.propertyId;
+    document.getElementById("g-glaeubiger").value = g.glaeubiger || "";
+    document.getElementById("g-betrag").value = g.betrag ?? "";
+    document.getElementById("g-rang").value = g.rang || "";
+    document.getElementById("g-datum").value = g.datum || "";
+    document.getElementById("g-status").value = g.status || "aktiv";
+    document.getElementById("g-restschuld").value = g.restschuld ?? "";
+    document.getElementById("g-bemerkung").value = g.bemerkung || "";
+  } else {
+    document.getElementById("g-glaeubiger").value = "";
+    document.getElementById("g-betrag").value = "";
+    document.getElementById("g-rang").value = "";
+    document.getElementById("g-datum").value = new Date().toISOString().slice(0, 10);
+    document.getElementById("g-status").value = "aktiv";
+    document.getElementById("g-restschuld").value = "";
+    document.getElementById("g-bemerkung").value = "";
+  }
+  document.getElementById("overlay-gs").classList.add("open");
+  setTimeout(() => document.getElementById("g-glaeubiger").focus(), 80);
+}
+function closeGSModal() { document.getElementById("overlay-gs").classList.remove("open"); }
+function saveGS() {
+  const propertyId = Number(document.getElementById("g-property").value);
+  const glaeubiger = document.getElementById("g-glaeubiger").value.trim();
+  const betrag = parseFloat(document.getElementById("g-betrag").value);
+  const rang = document.getElementById("g-rang").value.trim();
+  const datum = document.getElementById("g-datum").value;
+  const status = document.getElementById("g-status").value;
+  const restschuldRaw = document.getElementById("g-restschuld").value;
+  const restschuld = restschuldRaw === "" ? undefined : parseFloat(restschuldRaw);
+  const bemerkung = document.getElementById("g-bemerkung").value.trim();
+  if (!glaeubiger) { document.getElementById("g-glaeubiger").focus(); return; }
+  if (isNaN(betrag) || betrag < 0) { document.getElementById("g-betrag").focus(); return; }
+  const entry = { propertyId, glaeubiger, betrag, rang, datum, status, bemerkung, ...(restschuld !== undefined && !isNaN(restschuld) ? { restschuld } : {}) };
+  if (editGSId !== null) {
+    const idx = data.grundschulden.findIndex(g => g.id === editGSId);
+    data.grundschulden[idx] = { ...entry, id: editGSId };
+  } else {
+    data.grundschulden.push({ ...entry, id: uid() });
+  }
+  persist(); render(); closeGSModal();
+}
+function deleteGS() {
+  if (editGSId === null) return;
+  data.grundschulden = data.grundschulden.filter(g => g.id !== editGSId);
+  persist(); render(); closeGSModal();
+}
+
+// ── Export / Import ────────────────────────────────────
+function exportJSON() {
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = "grundschulden.json";
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+function importJSON(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const obj = JSON.parse(e.target.result);
+      if (!Array.isArray(obj.properties) || !Array.isArray(obj.grundschulden)) throw new Error();
+      data = obj;
+      persist(); render();
+      alert("Daten erfolgreich geladen.");
+    } catch {
+      alert("Fehler: ungültige Datei.");
+    }
+    event.target.value = "";
+  };
+  reader.readAsText(file);
+}
+
+// close modals on overlay click
+document.querySelectorAll(".overlay").forEach(ov => {
+  ov.addEventListener("click", e => { if (e.target === ov) ov.classList.remove("open"); });
+});
+
+render();
+</script>
+</body>
+</html>
