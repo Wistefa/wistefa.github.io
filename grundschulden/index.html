@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Grundschulden-Übersicht</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js" integrity="sha384-NrKB+u6Ts6AtkIhwPixiKTzgSKNblyhlk0Sohlgar9UHUBzai/sgnNNWWd291xqt" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-chart-sankey@0.14.0/dist/chartjs-chart-sankey.min.js"></script>
 <style>
   * { box-sizing: border-box; }
   body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f0f4f8; color: #1a202c; min-height: 100vh; margin: 0; }
@@ -128,6 +129,12 @@
         <canvas id="chartByCreditor"></canvas>
       </div>
     </div>
+  </div>
+
+  <div class="chart-box">
+    <h2>Sicherheiten-Zuordnung: Immobilie → Bank</h2>
+    <div style="font-size:0.78rem;color:#718096;margin-bottom:8px;">zeigt, welche Immobilie mit welchem Betrag als Sicherheit für welche Bank eingetragen ist (Flussbreite = Grundschuldbetrag)</div>
+    <canvas id="chartSankey" style="max-height:420px;"></canvas>
   </div>
 
   <div class="prop-add-row">
@@ -329,6 +336,60 @@ function renderCharts() {
     options: {
       responsive: true,
       plugins: { legend: { position: "bottom", labels: { boxWidth: 12, font: { size: 11 } } } },
+    },
+  });
+
+  renderSankey(activeGS);
+}
+
+// Sankey: Immobilie -> Bank, Flussbreite = Grundschuldbetrag
+let chartSankey = null;
+function renderSankey(activeGS) {
+  const canvas = document.getElementById("chartSankey");
+  const wrap = canvas.closest(".chart-box");
+  if (!activeGS.length) {
+    if (chartSankey) { chartSankey.destroy(); chartSankey = null; }
+    wrap.style.display = "none";
+    return;
+  }
+  wrap.style.display = "";
+
+  // aggregate by (Immobilie -> Bank)
+  const flowMap = new Map();
+  activeGS.forEach(g => {
+    const prop = data.properties.find(p => p.id === g.propertyId);
+    if (!prop) return;
+    const key = prop.name + "→" + g.glaeubiger;
+    flowMap.set(key, (flowMap.get(key) || 0) + (Number(g.betrag) || 0));
+  });
+  const flows = [...flowMap.entries()].map(([key, flow]) => {
+    const [from, to] = key.split("→");
+    return { from, to, flow };
+  });
+
+  if (chartSankey) chartSankey.destroy();
+  chartSankey = new Chart(canvas, {
+    type: "sankey",
+    data: {
+      datasets: [{
+        label: "Sicherheiten",
+        data: flows,
+        colorFrom: c => "#a0aec0",
+        colorTo: c => colorForCreditor(c.dataset.data[c.dataIndex].to),
+        colorMode: "gradient",
+        labels: Object.fromEntries(data.properties.map(p => [p.name, "🏠 " + p.name])),
+        priority: Object.fromEntries(data.properties.map((p, i) => [p.name, i])),
+      }],
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        tooltip: {
+          callbacks: {
+            label: ctx => `${ctx.raw.from} → ${ctx.raw.to}: ${fmt(ctx.raw.flow)}`,
+          },
+        },
+      },
     },
   });
 }
