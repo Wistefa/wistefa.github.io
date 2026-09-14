@@ -203,6 +203,22 @@
       <input type="number" id="g-restschuld" placeholder="zum Abgleich mit Grundschuldbetrag" min="0" step="0.01">
     </div>
     <div class="field">
+      <label style="display:flex;align-items:center;gap:7px;font-weight:600;cursor:pointer;">
+        <input type="checkbox" id="g-abgetreten-toggle" style="width:auto;" onchange="document.getElementById('g-abtretung-fields').style.display=this.checked?'block':'none'">
+        Wurde abgetreten
+      </label>
+    </div>
+    <div id="g-abtretung-fields" style="display:none;">
+      <div class="field">
+        <label>Ursprünglicher Gläubiger</label>
+        <input type="text" id="g-abgetreten-von" placeholder="Bank, von der abgetreten wurde">
+      </div>
+      <div class="field">
+        <label>Abtretungsdatum</label>
+        <input type="date" id="g-abtretungsdatum">
+      </div>
+    </div>
+    <div class="field">
       <label>Bemerkung</label>
       <textarea id="g-bemerkung" rows="3" maxlength="500" placeholder="z. B. Grundbuchblatt, Zinssatz, Zweck …"></textarea>
     </div>
@@ -272,9 +288,10 @@ function render() {
       const rows = items.length ? items.map(g => {
         const others = gsProperties(g).filter(id => id !== prop.id).map(id => data.properties.find(p => p.id === id)?.name).filter(Boolean);
         const gesamtNote = others.length ? `<div style="font-size:0.72rem;color:#c8952a;font-weight:600;margin-top:2px;">🔗 Gesamtgrundschuld – auch: ${esc(others.join(", "))}</div>` : "";
+        const abtretungNote = g.abgetretenVon ? `<div style="font-size:0.72rem;color:#718096;margin-top:2px;">↪ abgetreten von ${esc(g.abgetretenVon)}${g.abtretungsdatum ? " am " + fmtDate(g.abtretungsdatum) : ""}</div>` : "";
         return `
         <tr class="${g.status === 'geloescht' ? 'status-geloescht' : ''}">
-          <td>${esc(g.glaeubiger)}${gesamtNote}</td>
+          <td>${esc(g.glaeubiger)}${gesamtNote}${abtretungNote}</td>
           <td class="betrag-cell">${fmt(g.betrag)}</td>
           <td>${esc(g.rang || "–")}</td>
           <td>${fmtDate(g.datum)}</td>
@@ -479,6 +496,10 @@ function openGSModal(propertyId, gsId = null) {
     document.getElementById("g-status").value = g.status || "aktiv";
     document.getElementById("g-restschuld").value = g.restschuld ?? "";
     document.getElementById("g-bemerkung").value = g.bemerkung || "";
+    document.getElementById("g-abgetreten-toggle").checked = !!g.abgetretenVon;
+    document.getElementById("g-abtretung-fields").style.display = g.abgetretenVon ? "block" : "none";
+    document.getElementById("g-abgetreten-von").value = g.abgetretenVon || "";
+    document.getElementById("g-abtretungsdatum").value = g.abtretungsdatum || "";
   } else {
     document.getElementById("g-glaeubiger").value = "";
     document.getElementById("g-betrag").value = "";
@@ -487,6 +508,10 @@ function openGSModal(propertyId, gsId = null) {
     document.getElementById("g-status").value = "aktiv";
     document.getElementById("g-restschuld").value = "";
     document.getElementById("g-bemerkung").value = "";
+    document.getElementById("g-abgetreten-toggle").checked = false;
+    document.getElementById("g-abtretung-fields").style.display = "none";
+    document.getElementById("g-abgetreten-von").value = "";
+    document.getElementById("g-abtretungsdatum").value = "";
   }
   document.getElementById("overlay-gs").classList.add("open");
   setTimeout(() => document.getElementById("g-glaeubiger").focus(), 80);
@@ -502,10 +527,15 @@ function saveGS() {
   const restschuldRaw = document.getElementById("g-restschuld").value;
   const restschuld = restschuldRaw === "" ? undefined : parseFloat(restschuldRaw);
   const bemerkung = document.getElementById("g-bemerkung").value.trim();
+  const abgetretenVon = document.getElementById("g-abgetreten-toggle").checked ? document.getElementById("g-abgetreten-von").value.trim() : "";
+  const abtretungsdatum = document.getElementById("g-abgetreten-toggle").checked ? document.getElementById("g-abtretungsdatum").value : "";
   if (!propertyIds.length) { alert("Bitte mindestens eine Immobilie auswählen."); return; }
   if (!glaeubiger) { document.getElementById("g-glaeubiger").focus(); return; }
   if (isNaN(betrag) || betrag < 0) { document.getElementById("g-betrag").focus(); return; }
-  const entry = { propertyIds, glaeubiger, betrag, rang, datum, status, bemerkung, ...(restschuld !== undefined && !isNaN(restschuld) ? { restschuld } : {}) };
+  const entry = { propertyIds, glaeubiger, betrag, rang, datum, status, bemerkung,
+    ...(restschuld !== undefined && !isNaN(restschuld) ? { restschuld } : {}),
+    ...(abgetretenVon ? { abgetretenVon } : {}),
+    ...(abtretungsdatum ? { abtretungsdatum } : {}) };
   if (editGSId !== null) {
     const idx = data.grundschulden.findIndex(g => g.id === editGSId);
     data.grundschulden[idx] = { ...entry, id: editGSId };
