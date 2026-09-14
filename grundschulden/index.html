@@ -73,6 +73,8 @@
   .field input, .field select, .field textarea { width: 100%; padding: 9px 11px; border: 1.5px solid #e2e8f0; border-radius: 8px; font-size: 0.9rem; outline: none; font-family: inherit; box-sizing: border-box; }
   .field input:focus, .field select:focus, .field textarea:focus { border-color: #1e3a5f; }
   .field textarea { resize: vertical; }
+  .prop-check-row { display: flex; align-items: center; gap: 8px; padding: 5px 2px; font-size: 0.88rem; }
+  .prop-check-row input { width: auto; }
   .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; }
   .btn-cancel { background: none; border: none; color: #718096; font-size: 0.88rem; font-weight: 600; cursor: pointer; padding: 9px 12px; }
   .btn-save { background: #1e3a5f; color: white; border: none; border-radius: 8px; padding: 9px 18px; font-size: 0.88rem; font-weight: 600; cursor: pointer; }
@@ -170,8 +172,8 @@
   <div class="modal">
     <h3 id="gs-modal-title">Grundschuld hinzufügen</h3>
     <div class="field">
-      <label>Immobilie</label>
-      <select id="g-property"></select>
+      <label>Immobilie(n) <span style="font-weight:400;color:#a0aec0;">– mehrere auswählen bei Gesamtgrundschuld</span></label>
+      <div id="g-property-list" style="border:1.5px solid #e2e8f0;border-radius:8px;padding:8px 10px;max-height:150px;overflow-y:auto;"></div>
     </div>
     <div class="field">
       <label>Gläubiger / Bank</label>
@@ -241,8 +243,17 @@ function colorForCreditor(name) {
 }
 
 // ── Rendering ──────────────────────────────────────────
+// gibt propertyIds als Array zurück, auch für Alt-Daten mit einzelnem propertyId
+function gsProperties(g) {
+  if (Array.isArray(g.propertyIds)) return g.propertyIds;
+  if (g.propertyId != null) return [g.propertyId];
+  return [];
+}
+
 function render() {
   const activeGS = data.grundschulden.filter(g => g.status !== "geloescht");
+  // Dedupe: jede Grundschuld (auch Gesamtgrundschuld über mehrere Immobilien) zählt in der
+  // Gesamtsumme nur einmal, nicht pro verknüpfter Immobilie.
   const total = activeGS.reduce((s, g) => s + (Number(g.betrag) || 0), 0);
   const restschuldTotal = activeGS.reduce((s, g) => s + (Number(g.restschuld) || 0), 0);
 
@@ -256,11 +267,14 @@ function render() {
     container.innerHTML = '<div class="empty">Noch keine Immobilie angelegt. Oben auf „+ Immobilie hinzufügen" klicken.</div>';
   } else {
     container.innerHTML = data.properties.map(prop => {
-      const items = data.grundschulden.filter(g => g.propertyId === prop.id);
+      const items = data.grundschulden.filter(g => gsProperties(g).includes(prop.id));
       const sumActive = items.filter(g => g.status !== "geloescht").reduce((s, g) => s + (Number(g.betrag) || 0), 0);
-      const rows = items.length ? items.map(g => `
+      const rows = items.length ? items.map(g => {
+        const others = gsProperties(g).filter(id => id !== prop.id).map(id => data.properties.find(p => p.id === id)?.name).filter(Boolean);
+        const gesamtNote = others.length ? `<div style="font-size:0.72rem;color:#c8952a;font-weight:600;margin-top:2px;">🔗 Gesamtgrundschuld – auch: ${esc(others.join(", "))}</div>` : "";
+        return `
         <tr class="${g.status === 'geloescht' ? 'status-geloescht' : ''}">
-          <td>${esc(g.glaeubiger)}</td>
+          <td>${esc(g.glaeubiger)}${gesamtNote}</td>
           <td class="betrag-cell">${fmt(g.betrag)}</td>
           <td>${esc(g.rang || "–")}</td>
           <td>${fmtDate(g.datum)}</td>
@@ -268,7 +282,8 @@ function render() {
           <td class="restschuld-cell">${g.restschuld ? fmt(g.restschuld) : "–"}</td>
           <td class="bemerkung-cell">${esc(g.bemerkung || "")}</td>
           <td style="white-space:nowrap;"><button class="icon-btn" onclick="openGSModal(${prop.id}, ${g.id})">✏️</button></td>
-        </tr>`).join("") : `<tr><td colspan="8" style="color:#a0aec0;padding:14px 8px;">Keine Grundschulden erfasst</td></tr>`;
+        </tr>`;
+      }).join("") : `<tr><td colspan="8" style="color:#a0aec0;padding:14px 8px;">Keine Grundschulden erfasst</td></tr>`;
       return `<div class="property">
         <div class="property-head">
           <div>
@@ -286,7 +301,7 @@ function render() {
         </table>
         </div>
         <div class="property-foot">
-          <div class="property-sum">Summe aktiv: <b>${fmt(sumActive)}</b></div>
+          <div class="property-sum">Summe aktiv (auf diese Immobilie eingetragen): <b>${fmt(sumActive)}</b></div>
           <button class="btn-add-gs" onclick="openGSModal(${prop.id})">+ Grundschuld hinzufügen</button>
         </div>
       </div>`;
@@ -307,7 +322,7 @@ function renderCharts() {
   const datasets = creditors.map(cred => ({
     label: cred,
     data: data.properties.map(p => activeGS
-      .filter(g => g.propertyId === p.id && g.glaeubiger === cred)
+      .filter(g => gsProperties(g).includes(p.id) && g.glaeubiger === cred)
       .reduce((s, g) => s + (Number(g.betrag) || 0), 0)),
     backgroundColor: colorForCreditor(cred),
   }));
@@ -354,13 +369,15 @@ function renderSankey(activeGS) {
   }
   wrap.style.display = "";
 
-  // aggregate by (Immobilie -> Bank)
+  // aggregate by (Immobilie -> Bank); Gesamtgrundschulden erzeugen einen Fluss je verknüpfter Immobilie
   const flowMap = new Map();
   activeGS.forEach(g => {
-    const prop = data.properties.find(p => p.id === g.propertyId);
-    if (!prop) return;
-    const key = prop.name + "→" + g.glaeubiger;
-    flowMap.set(key, (flowMap.get(key) || 0) + (Number(g.betrag) || 0));
+    gsProperties(g).forEach(propId => {
+      const prop = data.properties.find(p => p.id === propId);
+      if (!prop) return;
+      const key = prop.name + "→" + g.glaeubiger;
+      flowMap.set(key, (flowMap.get(key) || 0) + (Number(g.betrag) || 0));
+    });
   });
   const flows = [...flowMap.entries()].map(([key, flow]) => {
     const [from, to] = key.split("→");
@@ -426,10 +443,17 @@ function saveProperty() {
 }
 function deleteProperty() {
   if (editPropertyId === null) return;
-  const hasGS = data.grundschulden.some(g => g.propertyId === editPropertyId);
-  if (hasGS && !confirm("Diese Immobilie hat noch Grundschulden erfasst. Immobilie und alle zugehörigen Grundschulden wirklich löschen?")) return;
+  const affected = data.grundschulden.filter(g => gsProperties(g).includes(editPropertyId));
+  const soleOwner = affected.filter(g => gsProperties(g).length <= 1);
+  const shared = affected.filter(g => gsProperties(g).length > 1);
+  let msg = "";
+  if (soleOwner.length) msg += `${soleOwner.length} Grundschuld(en) sind nur dieser Immobilie zugeordnet und werden mitgelöscht. `;
+  if (shared.length) msg += `${shared.length} Gesamtgrundschuld(en) bleiben erhalten (bei den übrigen verknüpften Immobilien).`;
+  if (affected.length && !confirm(`Immobilie löschen? ${msg}`)) return;
   data.properties = data.properties.filter(p => p.id !== editPropertyId);
-  data.grundschulden = data.grundschulden.filter(g => g.propertyId !== editPropertyId);
+  data.grundschulden = data.grundschulden
+    .filter(g => !soleOwner.includes(g))
+    .map(g => shared.includes(g) ? { ...g, propertyIds: gsProperties(g).filter(id => id !== editPropertyId) } : g);
   persist(); render(); closePropertyModal();
 }
 
@@ -439,12 +463,15 @@ function openGSModal(propertyId, gsId = null) {
   const isEdit = gsId !== null;
   document.getElementById("gs-modal-title").textContent = isEdit ? "Grundschuld bearbeiten" : "Grundschuld hinzufügen";
   document.getElementById("g-delete-btn").style.display = isEdit ? "" : "none";
-  const sel = document.getElementById("g-property");
-  sel.innerHTML = data.properties.map(p => `<option value="${p.id}">${esc(p.name)}</option>`).join("");
-  sel.value = propertyId;
+  const checkedIds = isEdit ? gsProperties(data.grundschulden.find(g => g.id === gsId)) : [propertyId];
+  const list = document.getElementById("g-property-list");
+  list.innerHTML = data.properties.map(p => `
+    <label class="prop-check-row">
+      <input type="checkbox" class="g-prop-check" value="${p.id}" ${checkedIds.includes(p.id) ? "checked" : ""}>
+      ${esc(p.name)}
+    </label>`).join("") || '<div style="color:#a0aec0;font-size:0.85rem;">Erst eine Immobilie anlegen.</div>';
   if (isEdit) {
     const g = data.grundschulden.find(g => g.id === gsId);
-    sel.value = g.propertyId;
     document.getElementById("g-glaeubiger").value = g.glaeubiger || "";
     document.getElementById("g-betrag").value = g.betrag ?? "";
     document.getElementById("g-rang").value = g.rang || "";
@@ -466,7 +493,7 @@ function openGSModal(propertyId, gsId = null) {
 }
 function closeGSModal() { document.getElementById("overlay-gs").classList.remove("open"); }
 function saveGS() {
-  const propertyId = Number(document.getElementById("g-property").value);
+  const propertyIds = [...document.querySelectorAll(".g-prop-check:checked")].map(cb => Number(cb.value));
   const glaeubiger = document.getElementById("g-glaeubiger").value.trim();
   const betrag = parseFloat(document.getElementById("g-betrag").value);
   const rang = document.getElementById("g-rang").value.trim();
@@ -475,9 +502,10 @@ function saveGS() {
   const restschuldRaw = document.getElementById("g-restschuld").value;
   const restschuld = restschuldRaw === "" ? undefined : parseFloat(restschuldRaw);
   const bemerkung = document.getElementById("g-bemerkung").value.trim();
+  if (!propertyIds.length) { alert("Bitte mindestens eine Immobilie auswählen."); return; }
   if (!glaeubiger) { document.getElementById("g-glaeubiger").focus(); return; }
   if (isNaN(betrag) || betrag < 0) { document.getElementById("g-betrag").focus(); return; }
-  const entry = { propertyId, glaeubiger, betrag, rang, datum, status, bemerkung, ...(restschuld !== undefined && !isNaN(restschuld) ? { restschuld } : {}) };
+  const entry = { propertyIds, glaeubiger, betrag, rang, datum, status, bemerkung, ...(restschuld !== undefined && !isNaN(restschuld) ? { restschuld } : {}) };
   if (editGSId !== null) {
     const idx = data.grundschulden.findIndex(g => g.id === editGSId);
     data.grundschulden[idx] = { ...entry, id: editGSId };
