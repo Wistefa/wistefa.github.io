@@ -337,6 +337,10 @@
       <label>Person</label>
       <select id="m-person"></select>
     </div>
+    <div class="field">
+      <label>Bemerkung</label>
+      <textarea id="m-bemerkung" rows="3" maxlength="500" placeholder="z. B. Kontonummer, Notizen, Zweck …" style="width:100%;padding:10px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:0.95rem;outline:none;font-family:inherit;resize:vertical;box-sizing:border-box;"></textarea>
+    </div>
     <div class="modal-actions">
       <button class="btn-cancel" onclick="closeModal()">Abbrechen</button>
       <button class="btn-save" onclick="saveItem()">Speichern</button>
@@ -654,6 +658,7 @@ function render() {
         <div class="item-info">
           <div class="item-name">${esc(item.name)}${item.person ? `<span class="person-badge">${esc(item.person)}</span>` : ""}</div>
           <div class="item-cat">${esc(item.cat)}${fremdwInfo}${item.date ? " · " + new Date(item.date).toLocaleDateString("de-DE") : ""}${item.laufzeit ? " · bis " + new Date(item.laufzeit).toLocaleDateString("de-DE") : ""}</div>
+          ${item.bemerkung ? `<div class="item-bemerkung" style="font-size:0.82rem;color:#8a94a3;margin-top:2px;white-space:pre-wrap;">${esc(item.bemerkung)}</div>` : ""}
         </div>
         <div class="item-value ${type==='aktiva'?'pos':'neg'}">${fmt(item.value)}</div>
         <button class="btn-del" style="color:#a0aec0; font-size:0.95rem;" onclick="openModal('${type}',${i})">✏️</button>
@@ -854,6 +859,7 @@ function openModal(type, idx = -1) {
     document.getElementById("m-value").value = item.value;
     document.getElementById("m-date").value = item.date || new Date().toISOString().slice(0, 10);
     document.getElementById("m-laufzeit").value = item.laufzeit || "";
+    document.getElementById("m-bemerkung").value = item.bemerkung || "";
     sel.value = item.cat;
     pSel.value = item.person || data.persons[0] || "";
     if (item.fremdw) {
@@ -868,6 +874,7 @@ function openModal(type, idx = -1) {
     document.getElementById("m-value").value = "";
     document.getElementById("m-date").value = new Date().toISOString().slice(0, 10);
     document.getElementById("m-laufzeit").value = "";
+    document.getElementById("m-bemerkung").value = "";
     pSel.value = filterPerson !== "alle" ? filterPerson : (data.persons[0] || "");
   }
   toggleLaufzeit(type, sel.value);
@@ -918,13 +925,14 @@ async function saveItem() {
   const date = document.getElementById("m-date").value;
   const person = document.getElementById("m-person").value;
   const laufzeit = document.getElementById("m-laufzeit").value;
+  const bemerkung = document.getElementById("m-bemerkung").value.trim();
   if (!name) { document.getElementById("m-name").focus(); return; }
   if (isNaN(value) || value < 0) { document.getElementById("m-value").focus(); return; }
   const fwAmount = parseFloat(document.getElementById("m-fw-amount").value) || 0;
   const fremdw = (cat === "Fremdwährungskonto" && window._fwRate && fwAmount > 0)
     ? { ...window._fwRate, amount: fwAmount }
     : undefined;
-  const entry = { name, cat, value, date, person, ...(laufzeit ? { laufzeit } : {}), ...(fremdw ? { fremdw } : {}) };
+  const entry = { name, cat, value, date, person, ...(laufzeit ? { laufzeit } : {}), ...(bemerkung ? { bemerkung } : {}), ...(fremdw ? { fremdw } : {}) };
   if (editIndex >= 0) {
     data[currentType][editIndex] = entry;
   } else {
@@ -980,6 +988,7 @@ function loadFromiCloud(event) {
         date:  String(it.date || '').slice(0, 10),
         person: String(it.person || '').slice(0, 100),
         laufzeit: String(it.laufzeit || '').slice(0, 10),
+        bemerkung: String(it.bemerkung || '').slice(0, 500),
         ...(it.fremdw && typeof it.fremdw === 'object' ? { fremdw: {
           currency: String(it.fremdw.currency || '').slice(0, 10),
           amount:   num(it.fremdw.amount),
@@ -1006,9 +1015,9 @@ function loadFromiCloud(event) {
 }
 
 function exportCSV() {
-  const rows = [["Typ","Kategorie","Bezeichnung","Wert (EUR)"]];
-  data.aktiva.forEach(i => rows.push(["Aktiva", i.cat, i.name, i.value.toFixed(2)]));
-  data.passiva.forEach(i => rows.push(["Passiva", i.cat, i.name, i.value.toFixed(2)]));
+  const rows = [["Typ","Kategorie","Bezeichnung","Wert (EUR)","Bemerkung"]];
+  data.aktiva.forEach(i => rows.push(["Aktiva", i.cat, i.name, i.value.toFixed(2), i.bemerkung || ""]));
+  data.passiva.forEach(i => rows.push(["Passiva", i.cat, i.name, i.value.toFixed(2), i.bemerkung || ""]));
   const a = sum(data.aktiva), p = sum(data.passiva);
   rows.push([]);
   rows.push(["","","Aktiva gesamt", a.toFixed(2)]);
@@ -1446,6 +1455,7 @@ function fabImport(input){
         date:   String(it.date||'').slice(0,10),
         person: String(it.person||'').slice(0,100),
         laufzeit:String(it.laufzeit||'').slice(0,10),
+        bemerkung:String(it.bemerkung||'').slice(0,500),
         fremdw: it.fremdw&&typeof it.fremdw==='object'?{
           currency:String(it.fremdw.currency||'').slice(0,10),
           amount:  num(it.fremdw.amount),
