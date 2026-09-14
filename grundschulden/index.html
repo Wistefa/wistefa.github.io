@@ -90,9 +90,10 @@
 <header>
   <div>
     <h1>🏠 Grundschulden-Übersicht</h1>
-    <div class="sub">eingetragene Grundschulden je Immobilie</div>
+    <div class="sub">eingetragene Grundschulden je Immobilie &nbsp;·&nbsp; <span id="dp-status" style="opacity:.9;">○ nicht verbunden</span></div>
   </div>
   <div class="actions">
+    <button id="dp-btn" onclick="dpConnect()">☁️ Mit Datenpool verbinden</button>
     <button onclick="document.getElementById('gs-import').click()">📂 Laden</button>
     <button onclick="exportJSON()">💾 Sichern</button>
     <input type="file" id="gs-import" accept=".json,application/json,text/plain" onchange="importJSON(event)">
@@ -581,7 +582,20 @@ function deleteGS() {
 }
 
 // ── Export / Import ────────────────────────────────────
-function exportJSON() {
+async function exportJSON() {
+  // Wenn mit WS Datenpool verbunden: dorthin sichern, kein Download-Dialog nötig.
+  if (_dpHandle) {
+    try {
+      const perm = await _dpHandle.queryPermission({ mode: "readwrite" });
+      if (perm === "granted") {
+        const fh = await _dpHandle.getFileHandle(_DP_FILE, { create: true });
+        const wr = await fh.createWritable();
+        await wr.write(JSON.stringify({ version: "1.0", app: DP_APP, savedAt: new Date().toISOString(), data }, null, 2));
+        await wr.close();
+        return;
+      }
+    } catch (e) { console.warn("[Datenpool] export:", e); }
+  }
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -613,7 +627,91 @@ document.querySelectorAll(".overlay").forEach(ov => {
   ov.addEventListener("click", e => { if (e.target === ov) ov.classList.remove("open"); });
 });
 
+// ── WS Datenpool ─────────────────────────────────────────────────────
+const DP_APP  = "Grundschulden";
+const _DP_FILE = "daten.json";
+const _DP_IDB  = "ws_datenpool";
+let   _dpHandle = null;
+
+async function _dpOpenDB() {
+  return new Promise((res, rej) => {
+    const req = indexedDB.open(_DP_IDB, 1);
+    req.onupgradeneeded = e => { if (!e.target.result.objectStoreNames.contains("h")) e.target.result.createObjectStore("h", { keyPath: "k" }); };
+    req.onsuccess = e => res(e.target.result);
+    req.onerror = rej;
+  });
+}
+async function _dpStoreHandle(h) {
+  const db = await _dpOpenDB();
+  return new Promise((res, rej) => {
+    const tx = db.transaction("h", "readwrite");
+    tx.objectStore("h").put({ k: "dp_" + DP_APP, h });
+    tx.oncomplete = res; tx.onerror = rej;
+  });
+}
+async function _dpGetHandle() {
+  const db = await _dpOpenDB();
+  return new Promise((res, rej) => {
+    const tx = db.transaction("h", "readonly");
+    const req = tx.objectStore("h").get("dp_" + DP_APP);
+    req.onsuccess = e => res(e.target.result?.h ?? null);
+    req.onerror = rej;
+  });
+}
+async function dpConnect() {
+  if (!("showDirectoryPicker" in window)) { dpUpdateUI("unsupported"); return; }
+  try {
+    const root = await window.showDirectoryPicker({ mode: "readwrite", startIn: "desktop" });
+    _dpHandle = await root.getDirectoryHandle(DP_APP, { create: true });
+    await _dpStoreHandle(_dpHandle);
+    await exportJSON();
+    dpUpdateUI(true);
+  } catch (e) {
+    if (e.name !== "AbortError") console.warn("[Datenpool] connect:", e);
+  }
+}
+async function dpLoad() {
+  try {
+    const handle = await _dpGetHandle();
+    if (!handle) return false;
+    const perm = await handle.queryPermission({ mode: "readwrite" });
+    if (perm !== "granted") { _dpHandle = handle; return false; }
+    _dpHandle = handle;
+    const fh = await handle.getFileHandle(_DP_FILE);
+    const file = await fh.getFile();
+    const obj = JSON.parse(await file.text());
+    if (obj?.data && Array.isArray(obj.data.properties) && Array.isArray(obj.data.grundschulden)) {
+      data = obj.data;
+      persist();
+      return true;
+    }
+    return false;
+  } catch (e) {
+    if (e.name !== "NotFoundError") console.warn("[Datenpool] load:", e);
+    return false;
+  }
+}
+function dpUpdateUI(state) {
+  const s = document.getElementById("dp-status");
+  const b = document.getElementById("dp-btn");
+  if (!s) return;
+  if (state === true)               { s.textContent = "● verbunden";               s.style.color = "#8fd19e"; if (b) b.style.display = "none"; }
+  else if (state === "prompt")      { s.textContent = "⚠ Berechtigung abgelaufen"; s.style.color = "#f6ad55"; if (b) { b.textContent = "☁️ Neu verbinden"; b.style.display = ""; } }
+  else if (state === "unsupported") { s.textContent = "— nur Chrome/Edge";          s.style.color = "#cbd5e0"; if (b) b.style.display = "none"; }
+  else                               { s.textContent = "○ nicht verbunden";         s.style.color = "#cbd5e0"; if (b) { b.textContent = "☁️ Mit Datenpool verbinden"; b.style.display = ""; } }
+}
+async function dpInit() {
+  if (!("showDirectoryPicker" in window)) { dpUpdateUI("unsupported"); return; }
+  const loaded = await dpLoad();
+  const handle = await _dpGetHandle();
+  if (!handle)      dpUpdateUI(false);
+  else if (!loaded) dpUpdateUI("prompt");
+  else              { dpUpdateUI(true); render(); }
+}
+// ─────────────────────────────────────────────────────────────────────
+
 render();
+dpInit();
 </script>
 </body>
 </html>
