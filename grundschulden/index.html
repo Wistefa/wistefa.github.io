@@ -172,8 +172,12 @@
   <div class="modal">
     <h3 id="gs-modal-title">Grundschuld hinzufügen</h3>
     <div class="field">
-      <label>Immobilie(n) <span style="font-weight:400;color:#a0aec0;">– mehrere auswählen bei Gesamtgrundschuld</span></label>
+      <label>Immobilie(n) <span style="font-weight:400;color:#a0aec0;">– worauf im Grundbuch eingetragen; mehrere bei Gesamtgrundschuld</span></label>
       <div id="g-property-list" style="border:1.5px solid #e2e8f0;border-radius:8px;padding:8px 10px;max-height:150px;overflow-y:auto;"></div>
+    </div>
+    <div class="field">
+      <label>Verwendungszweck <span style="font-weight:400;color:#a0aec0;">– wofür als Sicherheit genutzt, falls abweichend</span></label>
+      <input type="text" id="g-zweck" placeholder="z. B. Finanzierung Waiblingen (falls nicht die o. g. Immobilie selbst)">
     </div>
     <div class="field">
       <label>Gläubiger / Bank</label>
@@ -289,9 +293,10 @@ function render() {
         const others = gsProperties(g).filter(id => id !== prop.id).map(id => data.properties.find(p => p.id === id)?.name).filter(Boolean);
         const gesamtNote = others.length ? `<div style="font-size:0.72rem;color:#c8952a;font-weight:600;margin-top:2px;">🔗 Gesamtgrundschuld – auch: ${esc(others.join(", "))}</div>` : "";
         const abtretungNote = g.abgetretenVon ? `<div style="font-size:0.72rem;color:#718096;margin-top:2px;">↪ abgetreten von ${esc(g.abgetretenVon)}${g.abtretungsdatum ? " am " + fmtDate(g.abtretungsdatum) : ""}</div>` : "";
+        const zweckNote = g.zweck ? `<div style="font-size:0.72rem;color:#2b6cb0;margin-top:2px;">🎯 Sicherheit für: ${esc(g.zweck)}</div>` : "";
         return `
         <tr class="${g.status === 'geloescht' ? 'status-geloescht' : ''}">
-          <td>${esc(g.glaeubiger)}${gesamtNote}${abtretungNote}</td>
+          <td>${esc(g.glaeubiger)}${gesamtNote}${abtretungNote}${zweckNote}</td>
           <td class="betrag-cell">${fmt(g.betrag)}</td>
           <td>${esc(g.rang || "–")}</td>
           <td>${fmtDate(g.datum)}</td>
@@ -489,6 +494,7 @@ function openGSModal(propertyId, gsId = null) {
     </label>`).join("") || '<div style="color:#a0aec0;font-size:0.85rem;">Erst eine Immobilie anlegen.</div>';
   if (isEdit) {
     const g = data.grundschulden.find(g => g.id === gsId);
+    document.getElementById("g-zweck").value = g.zweck || "";
     document.getElementById("g-glaeubiger").value = g.glaeubiger || "";
     document.getElementById("g-betrag").value = g.betrag ?? "";
     document.getElementById("g-rang").value = g.rang || "";
@@ -501,6 +507,7 @@ function openGSModal(propertyId, gsId = null) {
     document.getElementById("g-abgetreten-von").value = g.abgetretenVon || "";
     document.getElementById("g-abtretungsdatum").value = g.abtretungsdatum || "";
   } else {
+    document.getElementById("g-zweck").value = "";
     document.getElementById("g-glaeubiger").value = "";
     document.getElementById("g-betrag").value = "";
     document.getElementById("g-rang").value = "";
@@ -519,6 +526,7 @@ function openGSModal(propertyId, gsId = null) {
 function closeGSModal() { document.getElementById("overlay-gs").classList.remove("open"); }
 function saveGS() {
   const propertyIds = [...document.querySelectorAll(".g-prop-check:checked")].map(cb => Number(cb.value));
+  const zweck = document.getElementById("g-zweck").value.trim();
   const glaeubiger = document.getElementById("g-glaeubiger").value.trim();
   const betrag = parseFloat(document.getElementById("g-betrag").value);
   const rang = document.getElementById("g-rang").value.trim();
@@ -533,6 +541,7 @@ function saveGS() {
   if (!glaeubiger) { document.getElementById("g-glaeubiger").focus(); return; }
   if (isNaN(betrag) || betrag < 0) { document.getElementById("g-betrag").focus(); return; }
   const entry = { propertyIds, glaeubiger, betrag, rang, datum, status, bemerkung,
+    ...(zweck ? { zweck } : {}),
     ...(restschuld !== undefined && !isNaN(restschuld) ? { restschuld } : {}),
     ...(abgetretenVon ? { abgetretenVon } : {}),
     ...(abtretungsdatum ? { abtretungsdatum } : {}) };
