@@ -83,6 +83,19 @@
   .btn-delete-inline { background: none; border: none; color: #e53e3e; font-size: 0.82rem; font-weight: 600; cursor: pointer; margin-right: auto; padding: 9px 4px; }
 
   input[type="file"] { display: none; }
+
+  @media print {
+    @page { size: A4; margin: 14mm; }
+    body { background: white; }
+    header .actions { display: none; }
+    .prop-add-row, .btn-add-gs, .property-head-actions, table.gs-table .icon-btn, .icon-btn { display: none; }
+    .cards { grid-template-columns: repeat(4, 1fr); }
+    .card, .chart-box, .property { box-shadow: none; border: 1px solid #dde3ea; break-inside: avoid; }
+    .property { break-inside: avoid; }
+    .charts-row { grid-template-columns: 1fr 1fr; }
+    header { background: white !important; color: #1a202c; -webkit-print-color-adjust: exact; }
+    header .sub, header .sub span { color: #4a5568 !important; }
+  }
 </style>
 </head>
 <body>
@@ -96,6 +109,7 @@
     <button id="dp-btn" onclick="dpConnect()">☁️ Mit Datenpool verbinden</button>
     <button onclick="document.getElementById('gs-import').click()">📂 Laden</button>
     <button onclick="exportJSON()">💾 Sichern</button>
+    <button id="print-btn" onclick="window.print()">🖨️ Drucken</button>
     <input type="file" id="gs-import" accept=".json,application/json,text/plain" onchange="importJSON(event)">
   </div>
 </header>
