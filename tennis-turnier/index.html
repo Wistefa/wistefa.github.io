@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Auslosung">
+<meta name="theme-color" content="#2f6b4f">
+<meta name="robots" content="noindex">
+<title>Tennis-Doppel Auslosung</title>
+<style>
+  :root{
+    --bg:#f4f1ea; --card:#ffffff; --ink:#1d2a22; --muted:#6b7a70;
+    --court:#2f6b4f; --court2:#b5542f; --line:#e2ddd2; --accent:#d8e84a;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--ink)}
+  header{background:var(--court);color:#fff;padding:14px 18px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+  header h1{margin:0;font-size:1.25rem;font-weight:700}
+  nav button{background:transparent;border:1px solid rgba(255,255,255,.5);color:#fff;padding:7px 12px;border-radius:8px;font-size:.9rem;cursor:pointer;margin-left:6px}
+  nav button.active{background:#fff;color:var(--court)}
+  main{max-width:1200px;margin:0 auto;padding:18px}
+  .layout{display:grid;grid-template-columns:240px minmax(0,1fr);gap:16px;align-items:start}
+  .side{position:sticky;top:12px;margin-bottom:0}
+  .side h2{display:flex;justify-content:space-between;align-items:baseline}
+  .side h2 small{color:var(--muted);font-weight:600;font-size:.8rem}
+  .plist{list-style:none;margin:0;padding:0}
+  .plist li{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 4px;border-bottom:1px solid var(--line);font-size:.95rem}
+  .plist li:last-child{border-bottom:none}
+  .plist .pn{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .plist .cnt{color:var(--muted);font-size:.78rem;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .badge{display:inline-block;min-width:64px;text-align:center;border-radius:999px;padding:2px 9px;font-size:.78rem;font-weight:700;color:#fff;background:var(--court)}
+  .badge.c2{background:var(--court2)}
+  .badge.pause{background:#e9d98a;color:#5a4b00}
+  .badge.none{background:#eceae3;color:var(--muted)}
+  @media (max-width:760px){.layout{grid-template-columns:1fr}.side{position:static;order:2}}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:16px}
+  h2{margin:0 0 12px;font-size:1.1rem}
+  label{font-weight:600;font-size:.9rem;display:block;margin-bottom:6px}
+  textarea{width:100%;min-height:290px;font-size:1rem;padding:10px;border:1px solid var(--line);border-radius:10px;font-family:inherit;line-height:1.5}
+  input[type=number]{width:90px;font-size:1rem;padding:8px;border:1px solid var(--line);border-radius:8px}
+  .row{display:flex;gap:18px;flex-wrap:wrap;align-items:flex-end}
+  .btn{background:var(--court);color:#fff;border:none;border-radius:10px;padding:12px 18px;font-size:1rem;font-weight:600;cursor:pointer}
+  .btn.big{font-size:1.2rem;padding:16px 24px;width:100%}
+  .btn.ghost{background:transparent;color:var(--court);border:1.5px solid var(--court)}
+  .btn.warn{background:#a33}
+  .btn:disabled{opacity:.4;cursor:default}
+  .hint{color:var(--muted);font-size:.88rem;margin-top:8px}
+  .timer{font-variant-numeric:tabular-nums;font-size:4.2rem;font-weight:800;text-align:center;letter-spacing:2px;margin:4px 0}
+  .timer.done{color:#a33;animation:blink 1s infinite}
+  @keyframes blink{50%{opacity:.35}}
+  .timer-btns{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
+  .round-title{display:flex;justify-content:space-between;align-items:baseline}
+  .round-title h2{font-size:1.5rem;margin:0}
+  .courts{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;margin-top:14px}
+  .court{border-radius:14px;color:#fff;padding:16px;background:var(--court);position:relative;overflow:hidden}
+  .court.c2{background:var(--court2)}
+  .court::after{content:"";position:absolute;inset:10px;border:2px solid rgba(255,255,255,.25);border-radius:8px;pointer-events:none}
+  .court h3{margin:0 0 10px;font-size:1rem;text-transform:uppercase;letter-spacing:1px;opacity:.9}
+  .team{background:rgba(255,255,255,.14);border-radius:10px;padding:10px 12px;font-size:1.35rem;font-weight:700;line-height:1.35}
+  .vs{text-align:center;font-weight:800;margin:6px 0;color:var(--accent);letter-spacing:2px}
+  .bench{margin-top:14px;padding:12px 14px;background:#fff7d6;border:1px dashed #d9c76a;border-radius:12px}
+  .bench b{display:block;margin-bottom:4px}
+  .empty{text-align:center;color:var(--muted);padding:30px 10px}
+  table{width:100%;border-collapse:collapse;font-size:.95rem}
+  th,td{text-align:left;padding:7px 6px;border-bottom:1px solid var(--line)}
+  th{color:var(--muted);font-weight:600}
+  td.num,th.num{text-align:center}
+  .hist-round{border-top:1px solid var(--line);padding:10px 0}
+  .hist-round:first-child{border-top:none}
+  .hist-round small{color:var(--muted)}
+  .modal{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;align-items:center;justify-content:center;padding:20px}
+  .modal.show{display:flex}
+  .modal .card{max-width:380px;width:100%}
+  .hidden{display:none}
+  @media (max-width:520px){.timer{font-size:3.2rem}.team{font-size:1.15rem}}
+</style>
+</head>
+<body>
+<header>
+  <h1>🎾 Doppel-Auslosung</h1>
+  <nav>
+    <button data-view="spiel" class="active">Runde</button>
+    <button data-view="setup">Eingabe</button>
+    <button data-view="stats">Übersicht</button>
+  </nav>
+</header>
+
+<main>
+  <!-- RUNDE -->
+  <section id="view-spiel">
+   <div class="layout">
+    <aside class="card side">
+      <h2>Spieler <small id="playerCount"></small></h2>
+      <ul class="plist" id="playerList"></ul>
+      <p class="hint" style="margin-bottom:12px">Rechts neben dem Namen: gespielt · Pause</p>
+      <button class="btn warn" id="resetSide" style="width:100%">↺ Alles auf Null setzen</button>
+    </aside>
+    <div class="content">
+    <div class="card">
+      <div class="timer" id="timer">30:00</div>
+      <div class="timer-btns">
+        <button class="btn" id="tStart">▶︎ Start</button>
+        <button class="btn ghost" id="tReset">↺ Zurück auf Anfang</button>
+      </div>
+    </div>
+
+    <button class="btn big" id="drawBtn">🎲 Neue Runde auslosen</button>
+
+    <div class="card" style="margin-top:16px" id="roundCard">
+      <div class="empty" id="emptyMsg">Noch keine Runde ausgelost.<br>Spieler prüfen und auf „Neue Runde auslosen“ tippen.</div>
+      <div id="roundBox" class="hidden">
+        <div class="round-title"><h2 id="roundTitle">Runde 1</h2><small id="roundTime" class="hint"></small></div>
+        <div class="courts" id="courts"></div>
+        <div class="bench" id="bench"></div>
+      </div>
+    </div>
+    </div><!-- /content -->
+   </div><!-- /layout -->
+  </section>
+
+  <!-- SETUP -->
+  <section id="view-setup" class="hidden">
+    <div class="card">
+      <h2>Eingabe</h2>
+      <div class="row">
+        <div><label for="minutes">Spielzeit (Minuten)</label><input type="number" id="minutes" min="1" max="120" value="30"></div>
+        <div><label for="playersN">Anzahl Spieler</label><input type="number" id="playersN" min="4" max="60" value="12"></div>
+        <div><label for="courtsN">Anzahl Plätze</label><input type="number" id="courtsN" min="1" max="6" value="2"></div>
+      </div>
+      <label for="names" style="margin-top:16px">Namen (ein Name pro Zeile, wird bei „Anzahl Spieler“ automatisch angepasst)</label>
+      <textarea id="names"></textarea>
+      <div class="row" style="margin-top:14px">
+        <button class="btn" id="saveSetup">Übernehmen</button>
+      </div>
+      <p class="hint" id="setupInfo"></p>
+    </div>
+    <div class="card">
+      <h2>Alles zurücksetzen</h2>
+      <p class="hint" style="margin-top:0">Löscht alle bisherigen Runden und die Statistik und setzt die Namen auf „Spieler 1–12“ zurück.</p>
+      <button class="btn warn" id="resetAll">Alles auf Null setzen</button>
+    </div>
+  </section>
+
+  <!-- STATS -->
+  <section id="view-stats" class="hidden">
+    <div class="card">
+      <h2>Spiele &amp; Pausen</h2>
+      <table id="statsTable"></table>
+    </div>
+    <div class="card">
+      <h2>Bisherige Runden</h2>
+      <div id="history"></div>
+    </div>
+  </section>
+</main>
+
+<div class="modal" id="modal">
+  <div class="card">
+    <h2 id="mTitle">Sicher?</h2>
+    <p id="mText" class="hint"></p>
+    <div class="row" style="justify-content:flex-end">
+      <button class="btn ghost" id="mNo">Abbrechen</button>
+      <button class="btn warn" id="mYes">Ja</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const KEY = "tennis-doppel-v1";
+  const defaultNames = Array.from({length:12},(_,i)=>"Spieler "+(i+1));
+  let state = { names: defaultNames, courts: 2, minutes: 30, rounds: [] };
+
+  // ---------- Speicher ----------
+  function load(){ try{ const s=localStorage.getItem(KEY); if(s){ state=Object.assign(state, JSON.parse(s)); } }catch(e){} }
+  function save(){ try{ localStorage.setItem(KEY, JSON.stringify(state)); }catch(e){} }
+
+  // ---------- Zufall ----------
+  function rnd(n){
+    if (window.crypto && crypto.getRandomValues){ const a=new Uint32Array(1); crypto.getRandomValues(a); return a[0]%n; }
+    return Math.floor(Math.random()*n);
+  }
+  function shuffle(arr){ const a=arr.slice(); for(let i=a.length-1;i>0;i--){ const j=rnd(i+1); [a[i],a[j]]=[a[j],a[i]]; } return a; }
+  const key2 = (a,b)=> a<b ? a+"|"+b : b+"|"+a;
+
+  // ---------- Statistik aus Historie ----------
+  function stats(){
+    const s = {}; state.names.forEach(n=> s[n]={played:0,sat:0,lastSat:false});
+    const partners = {}, opponents = {};
+    state.rounds.forEach((r,idx)=>{
+      const last = idx===state.rounds.length-1;
+      r.bench.forEach(n=>{ if(s[n]){ s[n].sat++; if(last) s[n].lastSat=true; } });
+      r.matches.forEach(m=>{
+        [...m.a,...m.b].forEach(n=>{ if(s[n]) s[n].played++; });
+        partners[key2(m.a[0],m.a[1])]=(partners[key2(m.a[0],m.a[1])]||0)+1;
+        partners[key2(m.b[0],m.b[1])]=(partners[key2(m.b[0],m.b[1])]||0)+1;
+        m.a.forEach(x=>m.b.forEach(y=>{ opponents[key2(x,y)]=(opponents[key2(x,y)]||0)+1; }));
+      });
+    });
+    return {s,partners,opponents};
+  }
+
+  // ---------- Auslosung ----------
+  function draw(){
+    const names = state.names;
+    const perRound = Math.min(state.courts*4, Math.floor(names.length/4)*4);
+    if (perRound < 4) return null;
+    const {s,partners,opponents} = stats();
+    const benchCount = names.length - perRound;
+
+    // Wer pausiert: wer bisher am wenigsten pausiert hat; wer gerade pausiert hat, möglichst nicht nochmal; Rest Zufall
+    const order = shuffle(names).map(n=>({n, p: s[n].sat*10 + (s[n].lastSat?5:0) + Math.random()}));
+    order.sort((x,y)=>x.p-y.p);
+    const bench = order.slice(0,benchCount).map(o=>o.n);
+    const playing = order.slice(benchCount).map(o=>o.n);
+
+    // Paarungen: viele Zufallsmischungen testen, die mit den wenigsten Wiederholungen nehmen
+    let best=null, bestScore=Infinity;
+    for(let t=0;t<4000;t++){
+      const p = shuffle(playing); let sc=0;
+      for(let c=0;c<p.length;c+=4){
+        const a=[p[c],p[c+1]], b=[p[c+2],p[c+3]];
+        sc += 100*((partners[key2(a[0],a[1])]||0)+(partners[key2(b[0],b[1])]||0));
+        a.forEach(x=>b.forEach(y=>{ sc += 3*(opponents[key2(x,y)]||0); }));
+      }
+      if(sc<bestScore){ bestScore=sc; best=p; if(sc===0) break; }
+    }
+    const matches=[];
+    for(let c=0;c<best.length;c+=4) matches.push({court:c/4+1, a:[best[c],best[c+1]], b:[best[c+2],best[c+3]]});
+    return {matches, bench, time:new Date().toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"})};
+  }
+
+  // ---------- Anzeige ----------
+  const $ = id=>document.getElementById(id);
+  const esc = t=>String(t).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+  function renderRound(){
+    const r = state.rounds[state.rounds.length-1];
+    renderPlayers();
+    if(!r){ $("emptyMsg").classList.remove("hidden"); $("roundBox").classList.add("hidden"); return; }
+    $("emptyMsg").classList.add("hidden"); $("roundBox").classList.remove("hidden");
+    $("roundTitle").textContent = "Runde "+state.rounds.length;
+    $("roundTime").textContent = "ausgelost um "+r.time+" Uhr";
+    $("courts").innerHTML = r.matches.map((m,i)=>`
+      <div class="court ${i%2?'c2':''}">
+        <h3>Platz ${m.court}</h3>
+        <div class="team">${esc(m.a[0])}<br>${esc(m.a[1])}</div>
+        <div class="vs">GEGEN</div>
+        <div class="team">${esc(m.b[0])}<br>${esc(m.b[1])}</div>
+      </div>`).join("");
+    $("bench").innerHTML = r.bench.length ? `<b>☕ Pause diese Runde</b>${r.bench.map(esc).join(" · ")}` : "<b>Alle spielen</b>";
+  }
+
+  function renderPlayers(){
+    const {s} = stats();
+    const r = state.rounds[state.rounds.length-1];
+    const where = {};
+    if(r){
+      r.matches.forEach((m,i)=>[...m.a,...m.b].forEach(n=>{ where[n]={court:m.court,alt:i%2}; }));
+      r.bench.forEach(n=>{ where[n]={pause:true}; });
+    }
+    $("playerCount").textContent = state.names.length+" Teilnehmer";
+    $("playerList").innerHTML = state.names.map(n=>{
+      const w = where[n];
+      const b = !r ? '<span class="badge none">–</span>'
+        : !w ? '<span class="badge none">–</span>'
+        : w.pause ? '<span class="badge pause">☕ Pause</span>'
+        : `<span class="badge ${w.alt?'c2':''}">Platz ${w.court}</span>`;
+      return `<li><span class="pn">${esc(n)}</span><span>${b} <span class="cnt">${s[n].played} · ${s[n].sat}</span></span></li>`;
+    }).join("");
+  }
+
+  function renderStats(){
+    const {s} = stats();
+    const rows = state.names.slice().sort((a,b)=>a.localeCompare(b,"de"));
+    $("statsTable").innerHTML = `<tr><th>Name</th><th class="num">Gespielt</th><th class="num">Pause</th></tr>` +
+      rows.map(n=>`<tr><td>${esc(n)}</td><td class="num">${s[n].played}</td><td class="num">${s[n].sat}</td></tr>`).join("");
+    $("history").innerHTML = state.rounds.length ? state.rounds.map((r,i)=>`
+      <div class="hist-round"><b>Runde ${i+1}</b> <small>${r.time} Uhr</small><br>
+      ${r.matches.map(m=>`Platz ${m.court}: ${esc(m.a.join(" & "))} – ${esc(m.b.join(" & "))}`).join("<br>")}
+      ${r.bench.length?`<br><small>Pause: ${r.bench.map(esc).join(", ")}</small>`:""}</div>`).reverse().join("")
+      : '<p class="hint">Noch keine Runden.</p>';
+  }
+
+  function renderSetup(){
+    renderPlayers();
+    $("names").value = state.names.join("\n"); $("playersN").value = state.names.length;
+    $("courtsN").value = state.courts; $("minutes").value = state.minutes;
+    const per = Math.min(state.courts*4, Math.floor(state.names.length/4)*4);
+    $("setupInfo").textContent = `${state.names.length} Teilnehmer · ${per} spielen pro Runde · ${state.names.length-per} pausieren`;
+  }
+
+  // ---------- Timer ----------
+  let remaining = state.minutes*60, running=false, tick=null, audio=null, endAt=0;
+  function fmt(sec){ const m=Math.floor(sec/60), s=sec%60; return String(m).padStart(2,"0")+":"+String(s).padStart(2,"0"); }
+  function showTimer(){ $("timer").textContent = fmt(Math.max(0,remaining)); $("timer").classList.toggle("done", remaining<=0); }
+  function beep(){
+    if(!audio) return;
+    try{
+      [0,0.5,1.0,1.5,2.0].forEach(off=>{
+        const o=audio.createOscillator(), g=audio.createGain();
+        o.frequency.value=880; o.connect(g); g.connect(audio.destination);
+        g.gain.setValueAtTime(0.0001,audio.currentTime+off);
+        g.gain.exponentialRampToValueAtTime(0.5,audio.currentTime+off+0.02);
+        g.gain.exponentialRampToValueAtTime(0.0001,audio.currentTime+off+0.35);
+        o.start(audio.currentTime+off); o.stop(audio.currentTime+off+0.4);
+      });
+    }catch(e){}
+  }
+  function startTimer(){
+    try{ if(!audio) audio = new (window.AudioContext||window.webkitAudioContext)(); audio.resume(); }catch(e){}
+    if(remaining<=0) remaining = state.minutes*60;
+    endAt = Date.now()+remaining*1000; running=true; $("tStart").textContent="⏸ Pause";
+    clearInterval(tick);
+    tick = setInterval(()=>{
+      remaining = Math.round((endAt-Date.now())/1000);
+      if(remaining<=0){ remaining=0; clearInterval(tick); running=false; $("tStart").textContent="▶︎ Start"; beep(); }
+      showTimer();
+    },250);
+  }
+  function pauseTimer(){ clearInterval(tick); running=false; $("tStart").textContent="▶︎ Weiter"; }
+  function resetTimer(){ clearInterval(tick); running=false; remaining=state.minutes*60; $("tStart").textContent="▶︎ Start"; showTimer(); }
+
+  // ---------- Dialog ----------
+  function ask(title,text,onYes){
+    $("mTitle").textContent=title; $("mText").textContent=text; $("modal").classList.add("show");
+    $("mYes").onclick=()=>{ $("modal").classList.remove("show"); onYes(); };
+    $("mNo").onclick=()=>$("modal").classList.remove("show");
+  }
+
+  // ---------- Events ----------
+  document.querySelectorAll("nav button").forEach(b=>b.addEventListener("click",()=>{
+    document.querySelectorAll("nav button").forEach(x=>x.classList.toggle("active",x===b));
+    ["spiel","setup","stats"].forEach(v=>$("view-"+v).classList.toggle("hidden", v!==b.dataset.view));
+    if(b.dataset.view==="stats") renderStats();
+    if(b.dataset.view==="setup") renderSetup();
+  }));
+
+  $("drawBtn").addEventListener("click",()=>{
+    const r = draw();
+    if(!r){ ask("Zu wenige Spieler","Für ein Doppel werden mindestens 4 Namen benötigt.",()=>{}); return; }
+    state.rounds.push(r); save(); renderRound(); resetTimer(); startTimer();
+  });
+  $("tStart").addEventListener("click",()=> running ? pauseTimer() : startTimer());
+  $("tReset").addEventListener("click",resetTimer);
+
+  // Anzahl Spieler <-> Namensliste
+  function lines(){ return $("names").value.split("\n").map(x=>x.trim()).filter(Boolean); }
+  $("playersN").addEventListener("input",()=>{
+    const n = Math.max(0,Math.min(60,parseInt($("playersN").value)||0)); if(!n) return;
+    let l = lines();
+    if(l.length>n) l = l.slice(0,n);
+    let k = 1; while(l.length<n){ const nm="Spieler "+k++; if(!l.includes(nm)) l.push(nm); }
+    $("names").value = l.join("\n");
+  });
+  $("names").addEventListener("input",()=>{ $("playersN").value = lines().length; });
+
+  $("saveSetup").addEventListener("click",()=>{
+    const list = $("names").value.split("\n").map(x=>x.trim()).filter(Boolean);
+    const uniq = [...new Set(list)];
+    if(uniq.length<4){ ask("Zu wenige Spieler","Für ein Doppel werden mindestens 4 Spieler benötigt.",()=>{}); return; }
+    if(uniq.length!==list.length){ ask("Doppelte Namen","Bitte jeden Namen nur einmal eintragen (z. B. „Peter M.“ und „Peter S.“).",()=>{}); return; }
+    const apply = ()=>{
+      state.names = uniq;
+      state.courts = Math.max(1,Math.min(6,parseInt($("courtsN").value)||2));
+      state.minutes = Math.max(1,Math.min(120,parseInt($("minutes").value)||30));
+      save(); renderSetup(); if(!running) resetTimer();
+      $("setupInfo").textContent += " ✓ gespeichert";
+    };
+    const changed = JSON.stringify(uniq)!==JSON.stringify(state.names);
+    if(changed && state.rounds.length) ask("Namen ändern?","Es gibt schon ausgeloste Runden. Geänderte Namen zählen in der Statistik neu.",apply);
+    else apply();
+  });
+  function resetEverything(){
+    ask("Alles auf Null setzen?","Alle Runden, die Statistik (Gespielt/Pause), der Timer und die Namen (zurück auf „Spieler 1“ bis „Spieler 12“) werden zurückgesetzt. Plätze und Minuten bleiben.",()=>{
+      state.rounds=[]; state.names=defaultNames.slice(); save(); renderRound(); renderSetup(); resetTimer();
+    });
+  }
+  $("resetAll").addEventListener("click",resetEverything);
+  $("resetSide").addEventListener("click",resetEverything);
+
+  load(); remaining = state.minutes*60; showTimer(); renderRound(); renderSetup();
+})();
+</script>
+</body>
+</html>
